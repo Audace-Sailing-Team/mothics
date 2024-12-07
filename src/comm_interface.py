@@ -7,6 +7,7 @@ import time
 import serial
 from datetime import datetime
 import paho.mqtt.client as mqtt
+from paho.mqtt import MQTTException
 
 from .helpers import setup_logger, tipify
 
@@ -61,7 +62,7 @@ class SerialInterface(BaseInterface):
             self.serial_conn = serial.Serial(self.port, self.baudrate, timeout=1)
             self.logger.info(f"connected to {self.port} at {self.baudrate} baud.")
         except serial.SerialException as e:
-            self.logger.error(f"failed to connect to {self.port}: {e}")
+            self.logger.critical(f"failed to connect to {self.port}: {e}")
             raise RuntimeError(f"failed to connect to {self.port}: {e}")
         
         # Start loop (non-blocking)
@@ -102,7 +103,7 @@ class SerialInterface(BaseInterface):
                     value = list(message.values())[0]
                     self.on_message_callback(topic, value)
             except Exception as e:
-                self.logger.error(f"error processing incoming data: {e}")
+                self.logger.critical(f"error processing incoming data: {e}")
 
     def on_message_callback(self, topic, data):
         """Aggregate raw data from messages into dict"""
@@ -125,7 +126,7 @@ class SerialInterface(BaseInterface):
     def publish(self, topic: str, payload):
         """Send data over serial."""
         if not self.serial_conn or not self.serial_conn.is_open:
-            self.logger.error("attempted to publish without an open connection.")
+            self.logger.critical("attempted to publish without an open connection.")
             raise RuntimeError("serial connection is not open.")
 
         message = json.dumps({"topic": topic, "payload": payload})
@@ -210,8 +211,8 @@ class MQTTInterface(BaseInterface):
         try:
             self.client.connect(self.hostname, self.port, keepalive=self.keep_alive)
             self.logger.info(f"connected to {self.hostname} at port {self.port}.")
-        except self.client.MQTTException as e:
-            self.logger.error(f"failed to connect to {self.hostname} at port {self.port}: {e}")
+        except (MQTTException, OSError) as e:
+            self.logger.critical(f"failed to connect to {self.hostname} at port {self.port}: {e}")
             raise RuntimeError(f"failed to connect to {self.hostname} at port {self.port}: {e}")
 
         # Start loop (non-blocking)
@@ -247,9 +248,267 @@ class MQTTInterface(BaseInterface):
         self.logger.info(f"published to {topic}: {message}")
 
 
+# Communicator
+
 class Communicator:
-    pass
+    """Class to manage multiple communication interfaces and merge their data."""
     
+    def __init__(self, interfaces=None):
+        """
+        Initialize communicator with optional interfaces.
+        
+        Args:
+            interfaces (dict): Dictionary mapping interface classes to their kwargs
+                             Format: {InterfaceClass: {'arg1': val1, ...}}
+        """
+        self.interfaces = {}
+        """Initialized interfaces"""
+        
+        # Setup logger
+        self.logger = logging.getLogger("Communicator")
+        self.logger.info("-------------Communicator-------------")
+        
+        # Initialize interfaces if provided
+        if interfaces:
+            self.add_interfaces(interfaces)
+            
+    def add_interfaces(self, interfaces):
+        """
+        Add new interfaces to the communicator.
+        
+        Args:
+            interfaces (dict or class): Single interface class or dict of 
+                                      {InterfaceClass: {'arg1': val1, ...}}
+        """
+        # Handle single interface class case
+        if isinstance(interfaces, type):
+            interfaces = {interfaces: {}}
+        # Handle dict with single interface
+        elif not isinstance(interfaces, dict):
+            raise ValueError("interfaces must be a class or dict of {class: kwargs}")
+            
+        # Initialize each interface            
+        for interface_class, kwargs in interfaces.items():
+            class_name = interface_class.__name__
+            if class_name in self.interfaces:
+                self.logger.warning(f"interface {class_name} already exists, skipping")
+                continue
+                
+            try:
+                self.interfaces[class_name] = interface_class(**kwargs)
+                self.logger.info(f"initialized {class_name} with kwargs: {kwargs}")
+            except Exception as e:
+                self.logger.critical(f"failed to initialize {class_name}: {e}")
+                raise RuntimeError(f"failed to initialize {class_name}: {e}")
+    
+    def remove_interface(self, interface_class):
+        """
+        Remove an interface from the communicator.
+        
+        Args:
+            interface_class: The class of the interface to remove
+        """
+        class_name = interface_class.__name__
+        if class_name in self.interfaces:
+            try:
+                # Ensure interface is disconnected
+                if hasattr(self.interfaces[class_name], 'disconnect'):
+                    self.interfaces[class_name].disconnect()
+                del self.interfaces[class_name]
+                self.logger.info(f"removed interface {class_name}")
+            except Exception as e:
+                self.logger.critical(f"error removing interface {class_name}: {e}")
+                raise RuntimeError(f"error removing interface {class_name}: {e}")
+        else:
+            self.logger.warning(f"interface {class_name} not found")
+    
+    def connect(self):
+        """Start all communication interfaces."""
+        failed_interfaces = []
+        
+        for name, interface in self.interfaces.items():
+            try:
+                interface.connect()
+                self.logger.info(f"started {name}")
+            except Exception as e:
+                self.logger.warning(f"failed to start {name}: {e}")
+                failed_interfaces.append(name)
+
+        if failed_interfaces == list(self.interfaces.keys()):
+            self.logger.critical('failed to start all interfaces')
+            raise RuntimeError('failed to start all interfaces')
+
+        if failed_interfaces:
+            error_msg = f"Failed to start interfaces: {', '.join(failed_interfaces)}"
+            self.logger.warning(error_msg)
+    
+    def disconnect(self):
+        """Stop all communication interfaces."""
+        for name, interface in self.interfaces.items():
+            try:
+                interface.disconnect()
+                self.logger.info(f"stopped {name}")
+            except Exception as e:
+                self.logger.critical(f"error stopping {name}: {e}")
+                raise RuntimeError(f"failed to stop {name}: {e}")
+    
+    @property
+    def raw_data(self):
+        """
+        Merge and return raw data from all interfaces.
+        
+        Returns:
+            dict: Merged dictionary of all raw data from all interfaces
+        """
+        merged_data = {}
+        
+        # Merge data from all interfaces
+        for interface in self.interfaces.values():
+            for topic, data_list in interface.raw_data.items():
+                if topic not in merged_data:
+                    merged_data[topic] = []
+                merged_data[topic].extend(data_list)
+        
+        # Sort data by timestamp for each topic
+        for topic in merged_data:
+            merged_data[topic].sort(key=lambda x: list(x.keys())[0])
+            
+        return merged_data
+    
+    def publish(self, topic, payload, interfaces=None):
+        """
+        Publish message to specified interfaces.
+        
+        Args:
+            topic (str): Topic to publish to
+            payload: Message payload
+            interfaces (list, optional): List of interface names to publish to.
+                                      If None, publish to all interfaces.
+        """
+        if interfaces is None:
+            interfaces = self.interfaces.keys()
+        
+        for interface_name in interfaces:
+            if interface_name not in self.interfaces:
+                self.logger.warning(f"interface {interface_name} not found")
+                continue
+                
+            try:
+                self.interfaces[interface_name].publish(topic, payload)
+            except Exception as e:
+                self.logger.warning(f"failed to publish to {interface_name}: {e}")
+
+# class Communicator:
+#     """Class to manage multiple communication interfaces and merge their data."""
+    
+#     def __init__(self, interface_classes=None, **interface_kwargs):
+#         """
+#         Initialize communicator with multiple interface classes.
+        
+#         Args:
+#             interface_classes (list): List of interface classes (not instances)
+#             **interface_kwargs: Dictionary of kwargs for each interface class
+#                               Format: {'interface_class_name': {'arg1': val1, ...}}
+#         """
+#         self.interfaces = {}
+#         """Initialized interfaces"""
+        
+#         # Setup logger
+#         self.logger = logging.getLogger("Communicator")
+#         self.logger.info("-------------Communicator-------------")
+        
+#         # Handle single interface
+#         if not isinstance(interface_classes, list):
+#             interface_classes = [interface_classes]
+
+#         # Handle no interfaces
+#         if interface_classes is None:
+#             interface_classes = [SerialInterface, MQTTInterface]
+            
+#         # Initialize each interface            
+#         for interface_class in interface_classes:
+#             # TODO: use coslo function for name getter, it's more robust
+#             class_name = interface_class.__name__
+#             kwargs = interface_kwargs.get(class_name, {})
+#             try:
+#                 self.interfaces[class_name] = interface_class(**kwargs)
+#                 self.logger.info(f"initialized {class_name} with kwargs: {kwargs}")
+#             except Exception as e:
+#                 self.logger.critical(f"failed to initialize {class_name}: {e}")
+#                 raise RuntimeError(f"failed to initialize {class_name}: {e}")
+    
+#     def connect(self):
+#         """Start all communication interfaces."""
+#         for name, interface in self.interfaces.items():
+#             try:
+#                 interface.connect()
+#                 self.logger.info(f"started {name}")
+#             except Exception as e:
+#                 self.logger.error(f"failed to start {name}: {e}")
+#                 # NOTE: if an interface didn't start, it's a serious
+#                 # issue but I wouldn't stop the whole process. Keep
+#                 # the running interfaces runnings and offer a `restart`
+#                 # and `add` capability
+#                 self.stop()  # Stop any started interfaces
+#                 raise RuntimeError(f"failed to start {name}: {e}")
+    
+#     def disconnect(self):
+#         """Stop all communication interfaces."""
+#         for name, interface in self.interfaces.items():
+#             try:
+#                 interface.disconnect()
+#                 self.logger.info(f"stopped {name}")
+#             except Exception as e:
+#                 self.logger.critical(f"error stopping {name}: {e}")
+#                 # NOTE: here, a forced stop makes sense
+#                 raise RuntimeError(f"failed to stop {name}: {e}")
+    
+#     @property
+#     def raw_data(self):
+#         """
+#         Merge and return raw data from all interfaces.
+        
+#         Returns:
+#             dict: Merged dictionary of all raw data from all interfaces
+#         """
+#         merged_data = {}
+        
+#         # Merge data from all interfaces
+#         for interface in self.interfaces.values():
+#             for topic, data_list in interface.raw_data.items():
+#                 if topic not in merged_data:
+#                     merged_data[topic] = []
+#                 merged_data[topic].extend(data_list)
+        
+#         # Sort data by timestamp for each topic
+#         for topic in merged_data:
+#             merged_data[topic].sort(key=lambda x: list(x.keys())[0])
+            
+#         return merged_data
+    
+#     def publish(self, topic, payload, interfaces=None):
+#         """
+#         Publish message to specified interfaces.
+        
+#         Args:
+#             topic (str): Topic to publish to
+#             payload: Message payload
+#             interfaces (list, optional): List of interface names to publish to.
+#                                       If None, publish to all interfaces.
+#         """
+#         if interfaces is None:
+#             interfaces = self.interfaces.keys()
+        
+#         for interface_name in interfaces:
+#             if interface_name not in self.interfaces:
+#                 self.logger.warning(f"interface {interface_name} not found")
+#                 continue
+                
+#             try:
+#                 self.interfaces[interface_name].publish(topic, payload)
+#             except Exception as e:
+#                 self.logger.error(f"failed to publish to {interface_name}: {e}")
+
 
 if __name__ == "__main__":
     pass
