@@ -1,9 +1,10 @@
+import threading
 import random
 import json
 import os
 import logging
 import time
-# import serial
+import serial
 from datetime import datetime
 import paho.mqtt.client as mqtt
 
@@ -28,58 +29,111 @@ class BaseInterface:
         pass
 
 
-# class SerialInterface:
-#     # TO TEST
-#     """Interface class for communication via USB Serial."""
+class SerialInterface(BaseInterface):
+    """Interface class for communication via USB Serial."""
     
-#     def __init__(self, port: str, baudrate: int=9600):
-#         self.port = port
-#         self.baudrate = baudrate
-#         self.serial_conn = None
-#         """Serial connection object."""
+    def __init__(self, port, baudrate=9600, topics=None):
+        self.port = port
+        self.baudrate = baudrate
+        self.serial_conn = None
+        """Serial connection object."""
+        self.running = False
 
-#     def connect(self):
-#         """Establish a serial connection."""
-#         try:
-#             self.serial_conn = serial.Serial(self.port, self.baudrate, timeout=1)
-#             self.logger.info(f"Connected to {self.port} at {self.baudrate} baud.")
-#         except serial.SerialException as e:
-#             self.logger.error(f"Failed to connect to {self.port}: {e}")
-#             raise
+        if topics is None:
+            # NOTE: `<topic>_sudo` should only be used to push
+            #       commands to the remote unit (rm)
+            # NOTE: topic syntax is <module>/<sensor>/<quantity>
+            topics = ['rm1/gps/lat', 'rm1/gps/long']
+        elif isinstance(topics, str):
+            topics = [topics]
+        self.topics = topics
+        """Client topics to subscribe to"""
+        self.raw_data = {k: [] for k in self.topics}
+        """Dictionary of all raw data fetched from available topics. Topics are keys, list of {timestamp: quantity} as values"""
 
-#     def disconnect(self):
-#         """Close the serial connection."""
-#         if self.serial_conn and self.serial_conn.is_open:
-#             self.serial_conn.close()
-#             self.logger.info("Serial connection closed.")
+        # Setup logger
+        self.logger = logging.getLogger("Serial-Interface")
+        self.logger.info("-------------Serial Interface-------------")
+        
+    def connect(self):
+        """Connect to the serial port and start the loop."""
+        try:
+            self.serial_conn = serial.Serial(self.port, self.baudrate, timeout=1)
+            self.logger.info(f"connected to {self.port} at {self.baudrate} baud.")
+        except serial.SerialException as e:
+            self.logger.error(f"failed to connect to {self.port}: {e}")
+            raise RuntimeError(f"failed to connect to {self.port}: {e}")
+        
+        # Start loop (non-blocking)
+        self._loop_start()
+    
+    def _loop_start(self):
+        """Start a non-blocking loop"""
+        if not self.running:
+            self.running = True
+            self.thread = threading.Thread(target=self._run_loop, daemon=True)
+            self.thread.start()
+            self.logger.info("started non-blocking loop.")
 
-#     def publish(self, topic: str, payload: Any):
-#         """Send data over serial."""
-#         if not self.serial_conn or not self.serial_conn.is_open:
-#             self.logger.error("Attempted to publish without an open connection.")
-#             raise RuntimeError("Serial connection is not open.")
+    def _loop_stop(self):
+        """Stop non-blocking loop"""
+        self.running = False
+        if self.thread and self.thread.is_alive():
+            self.thread.join()
+            self.logger.info("stopped loop.")
+            
+    def _run_loop(self):
+        """Blocking listening loop"""
+        # Sanity check - connection
+        if not self.serial_conn or not self.serial_conn.is_open:
+            raise RuntimeError("Serial connection is not open.")
 
-#         message = json.dumps({"topic": topic, "payload": payload})
-#         self.serial_conn.write(message.encode('utf-8'))
-#         self.logger.info(f"Published to serial: {message}")
+        # Loop
+        while self.running:
+            try:
+                line = self.serial_conn.readline().decode('utf-8').strip()
+                if line:
+                    self.logger.info(f"received: {line}")
+                    message = json.loads(line)
+                    # Suboptimal way to get topic and value, given a
+                    # single topic-value pair is passed at each serial
+                    # entry
+                    topic = list(message.keys())[0]
+                    value = list(message.values())[0]
+                    self.on_message_callback(topic, value)
+            except Exception as e:
+                self.logger.error(f"error processing incoming data: {e}")
 
-#     def listen(self):
-#         """Listen for incoming data."""
-#         if not self.serial_conn or not self.serial_conn.is_open:
-#             raise RuntimeError("Serial connection is not open.")
+    def on_message_callback(self, topic, data):
+        """Aggregate raw data from messages into dict"""
+        if topic not in self.topics:
+            self.raw_data[topic] = []
+        timestamp = datetime.now()
+        self.raw_data[topic].append({timestamp: data})
+                
+    def disconnect(self):
+        """Close the serial connection."""
+        # Stop loop
+        if self.running:
+            self._loop_stop()
+            
+        # Close connection
+        if self.serial_conn and self.serial_conn.is_open:
+            self.serial_conn.close()
+            self.logger.info("serial connection closed.")
 
-#         while True:
-#             try:
-#                 line = self.serial_conn.readline().decode('utf-8').strip()
-#                 if line:
-#                     self.logger.info(f"Received: {line}")
-#                     message = json.loads(line)
-#                     self.on_message_callback(message["topic"], message["payload"])
-#             except Exception as e:
-#                 self.logger.error(f"Error processing incoming data: {e}")
+    def publish(self, topic: str, payload):
+        """Send data over serial."""
+        if not self.serial_conn or not self.serial_conn.is_open:
+            self.logger.error("attempted to publish without an open connection.")
+            raise RuntimeError("serial connection is not open.")
+
+        message = json.dumps({"topic": topic, "payload": payload})
+        self.serial_conn.write(message.encode('utf-8'))
+        self.logger.info(f"published to serial: {message}")
 
 
-class MQTTInterface:
+class MQTTInterface(BaseInterface):
     """Interface class for remote communications via MQTT protocol"""
 
     def __init__(self, hostname, topics=None, port=1883, keep_alive=120):
@@ -147,18 +201,27 @@ class MQTTInterface:
             # Pass topic and data to the external handler
             self.on_message_callback(msg.topic, data)
         except ValueError:
-            self.logger.critical("Failed to tipify MQTT message.")
+            self.logger.critical("failed to tipify MQTT message.")
         except:
-            self.logger.critical("Failed to store MQTT message.")
+            self.logger.critical("failed to store MQTT message.")
 
     def connect(self):
         """Connect to the MQTT broker and start the loop."""
-        self.client.connect(self.hostname, self.port, keepalive=self.keep_alive)
+        try:
+            self.client.connect(self.hostname, self.port, keepalive=self.keep_alive)
+            self.logger.info(f"connected to {self.hostname} at port {self.port}.")
+        except self.client.MQTTException as e:
+            self.logger.error(f"failed to connect to {self.hostname} at port {self.port}: {e}")
+            raise RuntimeError(f"failed to connect to {self.hostname} at port {self.port}: {e}")
+
+        # Start loop (non-blocking)
         self.client.loop_start()
 
     def disconnect(self):
         """Disconnect from the MQTT broker and stop the loop."""
+        # Stop loop
         self.client.loop_stop()
+        # Close connection
         self.client.disconnect()
         
     def on_message_callback(self, topic, data):
@@ -183,7 +246,11 @@ class MQTTInterface:
             raise RuntimeError(f'{topic} is not in topics list: {self.topics}')
         self.logger.info(f"published to {topic}: {message}")
 
+
+class Communicator:
+    pass
     
+
 if __name__ == "__main__":
     pass
 #    # Test code
