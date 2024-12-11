@@ -12,7 +12,7 @@ from .helpers import tipify
 
 
 class Aggregator:
-    def __init__(self, raw_data, interval=5, database=None):
+    def __init__(self, raw_data=None, raw_data_getter=None, interval=5, database=None):
         """
         Asynchronous Aggregator class that periodically fetches raw sensor
         data and stores it in a Database.
@@ -21,11 +21,21 @@ class Aggregator:
         - raw_data: unprocessed data from the Communication Interface. 
                     Data structure is
                     `{topic1: [{timestamp: value1}, ...]}`
+        - raw_data_getter: getter function for raw data from comms
         - interval: Time interval (seconds) between data aggregation cycles.
         - database: Input database object; if None is provided, one is created
         """
         self.raw_data = raw_data
+        self.get_raw_data = raw_data_getter
+
+        if self.raw_data is None and self.get_raw_data is None:
+            self.logger.critical(f'no raw data nor getter available, got {raw_data=}, {raw_data_getter=}')
+            raise RuntimeError(f'no raw data nor getter available, got {raw_data=}, {raw_data_getter=}')
+        
         self.interval = interval
+        """Sampling interval of the input data"""
+
+        self.database = database
         if database is None:
             self.database = Database()
         self.running = False
@@ -47,6 +57,14 @@ class Aggregator:
         """Fetches raw data and stores it as a DataPoint in the Database."""
         try:
             timestamp = datetime.now()
+            
+            # Get data with thread lock to ensure no reading operation
+            # is tampered with by outside processes
+            self._lock = threading.Lock()
+
+            if self.get_raw_data is not None:
+                with self._lock:
+                    self.raw_data = self.get_raw_data()
 
             # Flatten sensor data
             flat_data = {}
@@ -63,12 +81,6 @@ class Aggregator:
             
         except Exception as e:
             self.logger.critical(f"error during aggregation: {e}")
-
-    # def start_blocking(self):
-    #     """Start the loop in blocking mode."""
-    #     self.running = True
-    #     self.logger.info("starting blocking loop...")
-    #     self._run_loop()
             
     def start(self):
         """Start the loop in non-blocking mode."""
