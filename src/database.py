@@ -27,6 +27,14 @@ class DataPoint:
             k = f'{topic_component[1]}_{topic_component[2]}'
             setattr(self, k, v)
 
+    def to_dict(self):
+        """
+        Export the data point as a dictionary including the timestamp and input data.
+        Returns:
+            A dictionary with 'timestamp' and 'data'.
+        """
+        return {"timestamp": self.timestamp.isoformat()} | self.input_data
+
 
 @dataclass
 class Database:
@@ -74,3 +82,15 @@ class Database:
         rows = [[dp.timestamp.isoformat()] + [dp.input_data.get(field, "") for field in self.field_names] for dp in self.data_points]
 
         return tabulate(rows, headers=headers, tablefmt="github")
+
+    def get_latest_data(self) -> List[DataPoint]:
+        """Returns the latest data point for each unique entry."""
+        if not self.data_points:
+            return []
+
+        latest_data = {}
+        for dp in self.data_points:
+            for field, value in dp.data.items():
+                latest_data[field] = dp  # Overwrite to get the most recent
+
+        return list(latest_data.values())
