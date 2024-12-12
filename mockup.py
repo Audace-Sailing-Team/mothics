@@ -8,7 +8,7 @@ from pprint import pprint
 
 from src.aggregator import Aggregator
 from src.comm_interface import MQTTInterface, SerialInterface, Communicator
-
+from src.webapp import WebApp
 
 # Tests
 
@@ -52,19 +52,29 @@ def mock_publisher(topics, messages, broker_host="test.mosquitto.org", broker_po
 
     
 if __name__ == '__main__':
-
+    # Start logger
     logging.basicConfig(level=logging.INFO)
-    
+
+    # Start communicator and initialize interfaces
     serial_kwargs = {'port': "/dev/ttyACM0", 'baudrate': 9600, 'topics': 'rm/wind/speed'}
     mqtt_kwargs = {'hostname': "test.mosquitto.org", 'topics': ['rm/gps/lat', 'rm/gps/long']}
     comms = Communicator(interfaces={SerialInterface: serial_kwargs, MQTTInterface: mqtt_kwargs})
     comms.connect()
 
+    # Getters
     def raw_data_getter():
         return comms.raw_data
-    
+
+    def db_getter():
+        return aggregator.database
+
+    # Start aggregator
     aggregator = Aggregator(raw_data_getter=raw_data_getter, interval=1, database=None)
     aggregator.start()
+
+    # Start webapp in background
+    web_app = WebApp(database_getter=db_getter)
+    web_app.start_in_background()
     
     # Simulate posting messages on topics at different intervals
     topics = ['rm/gps/lat', 'rm/gps/lat', 'rm/gps/long', 'rm/gps/long']
@@ -73,11 +83,13 @@ if __name__ == '__main__':
     
     # Publish
     mock_publisher(topics, messages, waits=sleeps)
-    # time.sleep(12)
-    
+    time.sleep(120)
+
+    # Disconnect all
     comms.disconnect()
     aggregator.stop()
 
+    # Compare dictionary with database
     print("Script completed and all services stopped.")
     print('from interface', comms.raw_data)
     print('from aggregator\n', aggregator.database)
