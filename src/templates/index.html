@@ -12,6 +12,11 @@
 <body>
 <div class="container mt-4">
     <h1 class="mb-4">Database Dashboard</h1>
+
+    <h2>Remote Unit status</h2>
+    <div id="status-container" class="status-container">
+        <!-- Status will be updated here -->
+    </div>
     
     <h2>Latest Data</h2>
     <div class="table-responsive" id="table-container">
@@ -20,7 +25,7 @@
     
     <h2>Time Evolution</h2>
     <div class="plot-container my-4" id="plot-container">
-      {{ script|safe }}
+      {{ script | safe }}
       {{ div | safe }}
     </div>
 </div>
@@ -34,6 +39,11 @@ async function updateDashboard() {
         const tableResponse = await fetch('/get_table');
         const tableHtml = await tableResponse.text();
         document.getElementById('table-container').innerHTML = tableHtml;
+	
+	const statusResponse = await fetch('/get_status');
+	const statusHtml = await statusResponse.text();
+	document.getElementById('status-container').innerHTML = statusHtml;
+	
     } catch (error) {
         console.error("Error updating dashboard:", error);
     }
@@ -42,8 +52,44 @@ async function updateDashboard() {
 setInterval(updateDashboard, auto_refresh);
 updateDashboard();
 </script>
-  
+
 <style>
+/* Styling for the status section */
+.status-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+.status-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+.interface-name {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+.status-dot {
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background-color: gray; /* Default color */
+}
+.status-dot.online {
+    background-color: green;
+}
+.status-dot.noncomm {
+    background-color: yellow;
+}
+.status-dot.offline {
+    background-color: red;
+}
+
+
+/* Styling for the plot container */
 .plot-container > div {
     display: flex;
     flex-direction: column;

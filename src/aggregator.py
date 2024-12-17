@@ -43,15 +43,6 @@ class Aggregator:
         # Setup logger
         self.logger = logging.getLogger("Aggregator")
         self.logger.info("-------------Aggregator-------------")
-
-    def _format_topic(self, topic):
-        """
-        Split MQTT topic in its components.  
-        MQTT topics are composed by <module>/<sensor>/<quantity>/
-        """
-        topic_split = topic.split("/")
-        assert len(topic_split) == 3, "topic is malformed, got {topic_split}"
-        return topic_split
             
     def aggregate(self):
         """Fetches raw data and stores it as a DataPoint in the Database."""

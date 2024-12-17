@@ -5,8 +5,9 @@ from .bokeh_plots import create_bokeh_plots
 
 
 class WebApp:
-    def __init__(self, database_getter=None, auto_refresh_table=2):
+    def __init__(self, database_getter=None, status_getter=None, auto_refresh_table=2):
         self.get_database = database_getter
+        self.get_status = status_getter
         self.app = Flask(__name__, template_folder="templates")
         self.auto_refresh_table = auto_refresh_table*1000
         self.setup_routes()
@@ -24,11 +25,16 @@ class WebApp:
             latest_data = [self.database.data_points[-1].to_dict()] if self.database.data_points else []
             return render_template("table.html", table_data=latest_data)
 
-        @self.app.route("/get_plots")
-        def get_plots():
-            self.database = self.get_database()
-            plot_script, plot_div = create_bokeh_plots(self.database)
-            return render_template("plots.html", plot_script=plot_script, plot_div=plot_div)
+        @self.app.route("/get_status")
+        def get_status():
+            self.status = self.get_status()
+            return render_template("status.html", status_data=self.status)
+
+        # @self.app.route("/get_plots")
+        # def get_plots():
+        #     self.database = self.get_database()
+        #     plot_script, plot_div = create_bokeh_plots(self.database)
+        #     return render_template("plots.html", plot_script=plot_script, plot_div=plot_div)
         
     def run(self, host="0.0.0.0", port=5000, debug=False):
         self.app.run(host=host, port=port, debug=debug)

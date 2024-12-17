@@ -5,7 +5,7 @@ import os
 import logging
 import time
 import serial
-from datetime import datetime
+from datetime import datetime, timedelta
 import paho.mqtt.client as mqtt
 from paho.mqtt import MQTTException
 
@@ -253,7 +253,7 @@ class MQTTInterface(BaseInterface):
 class Communicator:
     """Class to manage multiple communication interfaces and merge their data."""
     
-    def __init__(self, interfaces=None):
+    def __init__(self, interfaces=None, status_noncomm=30, status_offline=60, thesaurus=None):
         """
         Initialize communicator with optional interfaces.
         
@@ -263,6 +263,12 @@ class Communicator:
         """
         self.interfaces = {}
         """Initialized interfaces"""
+        self.status_noncomm = status_noncomm
+        """Time in seconds for an interface to be declared non-communicative"""
+        self.status_offline = status_offline
+        """Time in seconds for an interface to be declared offline"""
+        self.thesaurus = thesaurus
+        """Thesaurus of remote unit names"""
         
         # Setup logger
         self.logger = logging.getLogger("Communicator")
@@ -351,7 +357,94 @@ class Communicator:
             except Exception as e:
                 self.logger.critical(f"error stopping {name}: {e}")
                 raise RuntimeError(f"failed to stop {name}: {e}")
-    
+
+    def _format_topic(self, topic):
+        """
+        Split MQTT topic in its components.  
+        MQTT topics are composed by <module>/<sensor>/<quantity>
+        """
+        topic_split = topic.split("/")
+        assert len(topic_split) == 3, "topic is malformed, got {topic_split}"
+        return topic_split
+
+    @property
+    def interface_status(self):
+        """
+        Set status of all interfaces.
+        """
+        # Get current time
+        now = datetime.now()
+
+        # Initialize statuses
+        topics = {}
+        status = {name: 'online' for name in self.interfaces.keys()}
+        
+        # Get available topics from each interface
+        for name, interface in self.interfaces.items():
+            for topic in interface.topics:
+                # Avoid central unit to remote unit communication topics
+                if self._format_topic(topic)[1] == 'sudo':
+                    continue
+                # Get timestamp from last point
+                try:
+                    last_point_timestamp = list(interface.raw_data[topic][-1].keys())[0]
+                except IndexError:
+                    status[name] = 'offline'
+                    continue
+                # Set non-communicative
+                if (now - timedelta(seconds=self.status_noncomm)) > last_point_timestamp:
+                    status[name] = 'noncomm'
+                # Set offline
+                if (now - timedelta(seconds=self.status_offline)) > last_point_timestamp:
+                    status[name] = 'offline'
+        return status
+
+    @property
+    def status(self):
+        """
+        Set status of all remote units.
+        """
+        # Get current time
+        now = datetime.now()
+
+        # Get all topics
+        topics = []
+        for interface in self.interfaces.values():
+            topics.extend(interface.topics)
+        topics = [t for t in topics if not t.endswith('sudo')]
+
+        # Get all available remote units
+        remotes = list(set([self._format_topic(t)[0] for t in topics]))
+        
+        # Initialize statuses
+        status = {name: 'online' for name in remotes}
+        
+        # Get available topics from each interface
+        for interface in self.interfaces.values():
+            for topic in interface.topics:
+                # Get remote name
+                remote_name = self._format_topic(topic)[0]
+                # Avoid central unit to remote unit communication topics
+                if self._format_topic(topic)[1] == 'sudo':
+                    continue
+                # Get timestamp from last point
+                try:
+                    last_point_timestamp = list(interface.raw_data[topic][-1].keys())[0]
+                except IndexError:
+                    status[remote_name] = 'offline'
+                    continue
+                # Set non-communicative
+                if (now - timedelta(seconds=self.status_noncomm)) > last_point_timestamp:
+                    status[remote_name] = 'noncomm'
+                # Set offline
+                if (now - timedelta(seconds=self.status_offline)) > last_point_timestamp:
+                    status[remote_name] = 'offline'
+        # Cleanup names
+        if self.thesaurus:
+            return {self.thesaurus[k]: v for k, v in status.items()}
+        else:
+            return status
+
     @property
     def raw_data(self):
         """
@@ -397,117 +490,6 @@ class Communicator:
                 self.interfaces[interface_name].publish(topic, payload)
             except Exception as e:
                 self.logger.warning(f"failed to publish to {interface_name}: {e}")
-
-# class Communicator:
-#     """Class to manage multiple communication interfaces and merge their data."""
-    
-#     def __init__(self, interface_classes=None, **interface_kwargs):
-#         """
-#         Initialize communicator with multiple interface classes.
-        
-#         Args:
-#             interface_classes (list): List of interface classes (not instances)
-#             **interface_kwargs: Dictionary of kwargs for each interface class
-#                               Format: {'interface_class_name': {'arg1': val1, ...}}
-#         """
-#         self.interfaces = {}
-#         """Initialized interfaces"""
-        
-#         # Setup logger
-#         self.logger = logging.getLogger("Communicator")
-#         self.logger.info("-------------Communicator-------------")
-        
-#         # Handle single interface
-#         if not isinstance(interface_classes, list):
-#             interface_classes = [interface_classes]
-
-#         # Handle no interfaces
-#         if interface_classes is None:
-#             interface_classes = [SerialInterface, MQTTInterface]
-            
-#         # Initialize each interface            
-#         for interface_class in interface_classes:
-#             # TODO: use coslo function for name getter, it's more robust
-#             class_name = interface_class.__name__
-#             kwargs = interface_kwargs.get(class_name, {})
-#             try:
-#                 self.interfaces[class_name] = interface_class(**kwargs)
-#                 self.logger.info(f"initialized {class_name} with kwargs: {kwargs}")
-#             except Exception as e:
-#                 self.logger.critical(f"failed to initialize {class_name}: {e}")
-#                 raise RuntimeError(f"failed to initialize {class_name}: {e}")
-    
-#     def connect(self):
-#         """Start all communication interfaces."""
-#         for name, interface in self.interfaces.items():
-#             try:
-#                 interface.connect()
-#                 self.logger.info(f"started {name}")
-#             except Exception as e:
-#                 self.logger.error(f"failed to start {name}: {e}")
-#                 # NOTE: if an interface didn't start, it's a serious
-#                 # issue but I wouldn't stop the whole process. Keep
-#                 # the running interfaces runnings and offer a `restart`
-#                 # and `add` capability
-#                 self.stop()  # Stop any started interfaces
-#                 raise RuntimeError(f"failed to start {name}: {e}")
-    
-#     def disconnect(self):
-#         """Stop all communication interfaces."""
-#         for name, interface in self.interfaces.items():
-#             try:
-#                 interface.disconnect()
-#                 self.logger.info(f"stopped {name}")
-#             except Exception as e:
-#                 self.logger.critical(f"error stopping {name}: {e}")
-#                 # NOTE: here, a forced stop makes sense
-#                 raise RuntimeError(f"failed to stop {name}: {e}")
-    
-#     @property
-#     def raw_data(self):
-#         """
-#         Merge and return raw data from all interfaces.
-        
-#         Returns:
-#             dict: Merged dictionary of all raw data from all interfaces
-#         """
-#         merged_data = {}
-        
-#         # Merge data from all interfaces
-#         for interface in self.interfaces.values():
-#             for topic, data_list in interface.raw_data.items():
-#                 if topic not in merged_data:
-#                     merged_data[topic] = []
-#                 merged_data[topic].extend(data_list)
-        
-#         # Sort data by timestamp for each topic
-#         for topic in merged_data:
-#             merged_data[topic].sort(key=lambda x: list(x.keys())[0])
-            
-#         return merged_data
-    
-#     def publish(self, topic, payload, interfaces=None):
-#         """
-#         Publish message to specified interfaces.
-        
-#         Args:
-#             topic (str): Topic to publish to
-#             payload: Message payload
-#             interfaces (list, optional): List of interface names to publish to.
-#                                       If None, publish to all interfaces.
-#         """
-#         if interfaces is None:
-#             interfaces = self.interfaces.keys()
-        
-#         for interface_name in interfaces:
-#             if interface_name not in self.interfaces:
-#                 self.logger.warning(f"interface {interface_name} not found")
-#                 continue
-                
-#             try:
-#                 self.interfaces[interface_name].publish(topic, payload)
-#             except Exception as e:
-#                 self.logger.error(f"failed to publish to {interface_name}: {e}")
 
 
 if __name__ == "__main__":
