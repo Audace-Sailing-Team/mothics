@@ -1,3 +1,77 @@
+<!-- <!DOCTYPE html> -->
+<!-- <html lang="en"> -->
+<!-- <head> -->
+<!--     <meta charset="UTF-8"> -->
+<!--     <meta name="viewport" content="width=device-width, initial-scale=1.0"> -->
+<!--     <title>Database Dashboard</title> -->
+
+<!--     <\!-- Bootstrap CSS -\-> -->
+<!--     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"> -->
+<!--     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">  -->
+
+<!--     <\!-- Bokeh Scripts -\-> -->
+<!--     <script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.js"></script> -->
+<!--     <script src="https://cdn.bokeh.org/bokeh/release/bokeh-widgets-3.6.2.min.js"></script> -->
+<!--     <script src="https://cdn.bokeh.org/bokeh/release/bokeh-tables-3.6.2.min.js"></script> -->
+
+<!--     <\!-- Custom CSS -\-> -->
+<!--     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"> -->
+<!-- </head> -->
+
+<!-- <body> -->
+<!--   <div class="container mt-4"> -->
+<!--         <h1 class="mb-4">Database Dashboard</h1> -->
+
+<!--         <\!-- Remote Unit Status -\-> -->
+<!--         <h2>Remote Unit Status</h2> -->
+<!--         <div id="status-container" class="status-container"> -->
+<!--             <\!-- Status will be updated here -\-> -->
+<!--         </div> -->
+        
+<!--         <\!-- Latest Data -\-> -->
+<!--         <h2>Latest Data</h2> -->
+<!--         <div class="table-responsive" id="table-container"> -->
+<!--             <\!-- Table will be updated here -\-> -->
+<!--         </div> -->
+        
+<!--         <\!-- Time Evolution -\-> -->
+<!--         <h2>Time Evolution</h2> -->
+<!--         <div class="plot-container my-4" id="plot-container"> -->
+<!--             {{ script | safe }} -->
+<!--             {{ div | safe }} -->
+<!--         </div> -->
+	
+<!--     </div> -->
+
+<!--     <\!-- JavaScript -\-> -->
+<!--     <script> -->
+<!--         const auto_refresh = {{ auto_refresh }}; -->
+
+<!--         // Function to update the dashboard dynamically -->
+<!--         async function updateDashboard() { -->
+<!--             try { -->
+<!--                 // Fetch and update the latest data table -->
+<!--                 const tableResponse = await fetch('/get_table'); -->
+<!--                 const tableHtml = await tableResponse.text(); -->
+<!--                 document.getElementById('table-container').innerHTML = tableHtml; -->
+
+<!--                 // Fetch and update the remote unit status -->
+<!--                 const statusResponse = await fetch('/get_status'); -->
+<!--                 const statusHtml = await statusResponse.text(); -->
+<!--                 document.getElementById('status-container').innerHTML = statusHtml; -->
+
+<!--             } catch (error) { -->
+<!--                 console.error("Error updating dashboard:", error); -->
+<!--             } -->
+<!--         } -->
+
+<!--         // Automatically refresh the dashboard at the specified interval -->
+<!--         setInterval(updateDashboard, auto_refresh); -->
+<!--         updateDashboard(); -->
+<!--     </script> -->
+<!-- </body> -->
+<!-- </html> -->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,6 +81,7 @@
 
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
     <!-- Bokeh Scripts -->
@@ -14,58 +89,82 @@
     <script src="https://cdn.bokeh.org/bokeh/release/bokeh-widgets-3.6.2.min.js"></script>
     <script src="https://cdn.bokeh.org/bokeh/release/bokeh-tables-3.6.2.min.js"></script>
 
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container mt-4">
-        <h1 class="mb-4">Database Dashboard</h1>
+  <!-- Header and Navigation -->
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/">Dashboard</a>
 
-        <!-- Remote Unit Status -->
-        <h2>Remote Unit Status</h2>
-        <div id="status-container" class="status-container">
-            <!-- Status will be updated here -->
-        </div>
-        
-        <!-- Latest Data -->
-        <h2>Latest Data</h2>
-        <div class="table-responsive" id="table-container">
-            <!-- Table will be updated here -->
-        </div>
-        
-        <!-- Time Evolution -->
-        <h2>Time Evolution</h2>
-        <div class="plot-container my-4" id="plot-container">
-            {{ script | safe }}
-            {{ div | safe }}
-        </div>
+    <!-- Toggler Button for Small Screens -->
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <!-- Navbar Links -->
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link active" aria-current="page" href="/">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/logs">Logs</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/settings">Settings</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <!-- Main Content Block -->
+    <div class="container mt-4">
+    <h1 class="mb-4">Database Dashboard</h1>
+
+    <!-- Remote Unit Status -->
+    <h2>Remote Unit Status</h2>
+    <div id="status-container" class="status-container">
+        <!-- Status will be updated here -->
     </div>
 
-    <!-- JavaScript -->
+    <!-- Latest Data -->
+    <h2>Latest Data</h2>
+    <div class="table-responsive" id="table-container">
+        <!-- Table will be updated here -->
+    </div>
+
+    <!-- Time Evolution -->
+    <h2>Time Evolution</h2>
+    <div class="plot-container my-4" id="plot-container">
+        {{ script | safe }}
+        {{ div | safe }}
+    </div>
+    </div>
     <script>
-        const auto_refresh = {{ auto_refresh }};
+    const auto_refresh = {{ auto_refresh }};
 
-        // Function to update the dashboard dynamically
-        async function updateDashboard() {
-            try {
-                // Fetch and update the latest data table
-                const tableResponse = await fetch('/get_table');
-                const tableHtml = await tableResponse.text();
-                document.getElementById('table-container').innerHTML = tableHtml;
+    // Function to update the dashboard dynamically
+    async function updateDashboard() {
+        try {
+            // Fetch and update the latest data table
+            const tableResponse = await fetch('/get_table');
+            const tableHtml = await tableResponse.text();
+            document.getElementById('table-container').innerHTML = tableHtml;
 
-                // Fetch and update the remote unit status
-                const statusResponse = await fetch('/get_status');
-                const statusHtml = await statusResponse.text();
-                document.getElementById('status-container').innerHTML = statusHtml;
+            // Fetch and update the remote unit status
+            const statusResponse = await fetch('/get_status');
+            const statusHtml = await statusResponse.text();
+            document.getElementById('status-container').innerHTML = statusHtml;
 
-            } catch (error) {
-                console.error("Error updating dashboard:", error);
-            }
+        } catch (error) {
+            console.error("Error updating dashboard:", error);
         }
+    }
 
-        // Automatically refresh the dashboard at the specified interval
-        setInterval(updateDashboard, auto_refresh);
-        updateDashboard();
+    // Automatically refresh the dashboard at the specified interval
+    setInterval(updateDashboard, auto_refresh);
+    updateDashboard();
     </script>
 </body>
 </html>

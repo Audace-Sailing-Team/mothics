@@ -1,8 +1,7 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 from threading import Thread
 from .database import Database
 from .bokeh_plots import create_bokeh_plots
-
 
 class WebApp:
     def __init__(self, database_getter=None, status_getter=None, auto_refresh_table=2):
@@ -29,7 +28,23 @@ class WebApp:
         def get_status():
             self.status = self.get_status()
             return render_template("status.html", status_data=self.status)
-        
+
+        @self.app.route('/logs')
+        def logs():
+            # For now, let's simulate logs being read from a file or database
+            log_data = ["Log entry 1", "Log entry 2", "Log entry 3"]
+            return render_template('logs.html', log_data=log_data)
+
+        @self.app.route('/settings', methods=['GET', 'POST'])
+        def settings():
+            # Process settings here with form submission or any other logic
+            if request.method == 'POST':
+                # Process form data and apply settings
+                new_setting = request.form['setting']
+                # Update settings
+                return render_template('settings.html', success=True)
+            return render_template('settings.html', success=False)
+
     def run(self, host="0.0.0.0", port=5000, debug=False):
         self.app.run(host=host, port=port, debug=debug)
 
