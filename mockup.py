@@ -56,14 +56,20 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
     # Start communicator and initialize interfaces
-    serial_kwargs = {'port': "/dev/ttyACM0", 'baudrate': 9600, 'topics': 'rm/wind/speed'}
-    mqtt_kwargs = {'hostname': "test.mosquitto.org", 'topics': ['rm/gps/lat', 'rm/gps/long']}
-    comms = Communicator(interfaces={SerialInterface: serial_kwargs, MQTTInterface: mqtt_kwargs})
+    serial_kwargs = {'port': "/dev/ttyACM0", 'baudrate': 9600, 'topics': 'rm2/wind/speed'}
+    mqtt_kwargs = {'hostname': "test.mosquitto.org", 'topics': ['rm1/gps/lat', 'rm1/gps/long']}
+
+    units_thesaurus = {'rm1': 'GPS+IMU', 'rm2': 'Anemometer'}
+
+    comms = Communicator(interfaces={SerialInterface: serial_kwargs, MQTTInterface: mqtt_kwargs}, thesaurus=units_thesaurus)
     comms.connect()
 
     # Getters
     def raw_data_getter():
         return comms.raw_data
+
+    def status_getter():
+        return comms.status
 
     def db_getter():
         return aggregator.database
@@ -72,12 +78,12 @@ if __name__ == '__main__':
     aggregator = Aggregator(raw_data_getter=raw_data_getter, interval=1, database=None)
     aggregator.start()
 
-    # Start webapp in background
-    web_app = WebApp(database_getter=db_getter)
+    # # Start webapp in background
+    web_app = WebApp(database_getter=db_getter, status_getter=status_getter)
     web_app.start_in_background()
     
     # Simulate posting messages on topics at different intervals
-    topics = ['rm/gps/lat', 'rm/gps/lat', 'rm/gps/long', 'rm/gps/long']
+    topics = ['rm1/gps/lat', 'rm1/gps/lat', 'rm1/gps/long', 'rm1/gps/long']
     messages = ['12', '13', '14.5', '15.5']
     sleeps = [1, 2, 1, 3]
     
@@ -93,7 +99,6 @@ if __name__ == '__main__':
     print("Script completed and all services stopped.")
     print('from interface', comms.raw_data)
     print('from aggregator\n', aggregator.database)
-
     
     # # Initialize MQTT interface
     # topics = ['rm/gps/lat', 'rm/gps/long', 'rm/gps/sudo']
