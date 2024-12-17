@@ -1,0 +1,85 @@
+/* General Styling */
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Center horizontally */
+    justify-content: center; /* Center vertically */
+    min-height: 100vh; /* Ensure full height of the viewport */
+    margin: 0;
+    padding: 0;
+}
+
+/* Styling for the status section */
+.status-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    justify-content: center; /* Center-align status items */
+    margin-bottom: 2rem;
+}
+
+.status-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.interface-name {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.status-dot {
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background-color: gray; /* Default color */
+}
+
+.status-dot.online {
+    background-color: green;
+}
+
+.status-dot.noncomm {
+    background-color: yellow;
+}
+
+.status-dot.offline {
+    background-color: red;
+}
+
+/* Styling for the plot container */
+.plot-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Center-align plot container */
+    gap: 20px;
+}
+
+.card-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.card {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 1rem;
+    width: 300px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    padding: 0.5rem;
+    border-bottom: 1px solid #ddd;
+}
+
+.card-body {
+    padding: 0.5rem;
+}

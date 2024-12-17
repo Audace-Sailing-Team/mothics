@@ -14,7 +14,8 @@
     <tbody>
         {% for row in table_data %}
         <tr>
-            <td>{{ row["timestamp"] }}</td>
+	    <td>{{ row["timestamp"] | replace("T", " ") | truncate(22) }}</td>
+            <!-- <td>{{ row["timestamp"] }}</td> -->
             {% for field, value in row.items() if field != "timestamp" %}
             <td>{{ value }}</td>
             {% endfor %}
@@ -22,3 +23,18 @@
         {% endfor %}
     </tbody>
 </table>
+
+<!-- <div class="card-container"> -->
+<!--     {% for row in table_data %} -->
+<!--     <div class="card"> -->
+<!--         <div class="card-header"> -->
+<!--             <h5>Timestamp: {{ row["timestamp"] }}</h5> -->
+<!--         </div> -->
+<!--         <div class="card-body"> -->
+<!--             {% for field, value in row.items() if field != "timestamp" %} -->
+<!--             <p><strong>{{ field }}:</strong> {{ value }}</p> -->
+<!--             {% endfor %} -->
+<!--         </div> -->
+<!--     </div> -->
+<!--     {% endfor %} -->
+<!-- </div> -->
