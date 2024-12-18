@@ -1,50 +1,93 @@
-from flask import Flask, render_template, jsonify, request
+import math
+import time
+import logging
+from flask import Flask, render_template, jsonify, request, Response
 from threading import Thread
 from .database import Database
 from .bokeh_plots import create_bokeh_plots
+from .helpers import tipify
+
 
 class WebApp:
-    def __init__(self, database_getter=None, status_getter=None, auto_refresh_table=2):
-        self.get_database = database_getter
-        self.get_status = status_getter
+    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None):
+        self.getters = getters
+        self.setters = setters
+        self.logger_fname = logger_fname
         self.app = Flask(__name__, template_folder="templates", static_folder='static')
         self.auto_refresh_table = auto_refresh_table*1000
         self.setup_routes()
         
+        # Setup logger
+        self.logger = logging.getLogger("WebApp")
+        # Ignore less than ERROR level logs from werkzeug
+        logging.getLogger("werkzeug").setLevel(logging.ERROR)
+        
     def setup_routes(self):
         @self.app.route("/")
         def index():
-            database = self.get_database()
+            database = self.getters['database']()
+            # database = self.get_database()
             script, div = create_bokeh_plots(database)
             return render_template("index.html", script=script, div=div, auto_refresh=self.auto_refresh_table)
             
         @self.app.route("/get_table")
         def get_table():
-            self.database = self.get_database()
-            latest_data = [self.database.data_points[-1].to_dict()] if self.database.data_points else []
+            database = self.getters['database']()
+            # self.database = self.get_database()
+            latest_data = [database.data_points[-1].to_dict()] if database.data_points else []
             return render_template("table.html", table_data=latest_data)
         
         @self.app.route("/get_status")
         def get_status():
-            self.status = self.get_status()
-            return render_template("status.html", status_data=self.status)
+            status = self.getters['status']()
+            # self.status = self.get_status()
+            return render_template("status.html", status_data=status)
 
         @self.app.route('/logs')
         def logs():
-            # For now, let's simulate logs being read from a file or database
-            log_data = ["Log entry 1", "Log entry 2", "Log entry 3"]
-            return render_template('logs.html', log_data=log_data)
+            # # Mockup
+            # log_data = ["Log entry 1", "Log entry 2", "Log entry 3"]
+            return render_template('logs.html') #, log_data=log_data)
+        
+        @self.app.route('/stream_logs')
+        def stream_logs():
+            def generate():
+                with open(self.logger_fname, 'r') as f:
+                    while True:
+                        line = f.readline()
+                        if line:
+                            yield f"data: {line}\n\n"
+            return Response(generate(), content_type='text/event-stream')
 
+        @self.app.route('/empty_log_file', methods=['POST'])
+        def empty_log_file():
+            try:
+                open(self.logger_fname, 'w').close()
+                return jsonify({'status': 'success', 'message': 'Log file emptied successfully.'}), 200
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
         @self.app.route('/settings', methods=['GET', 'POST'])
         def settings():
             # Process settings here with form submission or any other logic
             if request.method == 'POST':
-                # Process form data and apply settings
-                new_setting = request.form['setting']
+                # Update table refresh rate
+                if request.form['auto_refresh_table']:
+                    self.auto_refresh_table = tipify(request.form['auto_refresh_table'])*1000
+                    self.logger.info(f'set auto refresh rate for table at {self.auto_refresh_table/1000} s')
+                # Update Aggregator refresh rate
+                if request.form['aggregator_interval']:
+                    aggregator_refresh_rate = tipify(request.form['aggregator_interval'])
+                    try:
+                        self.setter['aggregator_refresh_rate'](aggregator_refresh_rate)
+                        self.logger.info(f'set Aggregator refresh rate at {aggregator_refresh_rate} s')
+                    except:
+                        self.logger.warning(f'could not set Aggregator refresh rate')
+                # ADD OTHER TOGGLES HERE
                 # Update settings
                 return render_template('settings.html', success=True)
             return render_template('settings.html', success=False)
-
+        
     def run(self, host="0.0.0.0", port=5000, debug=False):
         self.app.run(host=host, port=port, debug=debug)
 

@@ -44,7 +44,7 @@ def setup_logger(name, level=logging.INFO, fname=None, silent=False):
     if fname is None:
         ch = logging.StreamHandler(sys.stdout)
     else:
-        ch = logging.FileHandler(fname)
+        ch = logging.FileHandler(fname, mode='w')
     if silent:
         ch = logging.NullHandler()
         

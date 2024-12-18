@@ -436,9 +436,11 @@ class Communicator:
                 # Set non-communicative
                 if (now - timedelta(seconds=self.status_noncomm)) > last_point_timestamp:
                     status[remote_name] = 'noncomm'
+                    self.logger.info(f'{remote_name} is non-communicative')
                 # Set offline
                 if (now - timedelta(seconds=self.status_offline)) > last_point_timestamp:
                     status[remote_name] = 'offline'
+                    self.logger.info(f'{remote_name} is offline')
         # Cleanup names
         if self.thesaurus:
             return {self.thesaurus[k]: v for k, v in status.items()}
