@@ -1,10 +1,57 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h2>Logs</h2>
-<ul>
-    {% for log in log_data %}
-        <li>{{ log }}</li>
-    {% endfor %}
-</ul>
+<h2>Real-Time Logs</h2>
+<div class="mb-2">
+    <button id="clear-log-btn" class="btn btn-secondary">Clear On-Screen Logs</button>
+    <button id="empty-logfile-btn" class="btn btn-danger">Empty Log File</button>
+</div>
+
+<div id="log-container" style="background-color: #333; color: #fff; font-family: monospace; padding: 10px; height: 400px; overflow-y: auto;">
+    <!-- Log entries will appear here dynamically -->
+</div>
+
+<script>
+    const logContainer = document.getElementById('log-container');
+
+    // Establish a connection to the log stream
+    const eventSource = new EventSource('/stream_logs');
+
+    eventSource.onmessage = function(event) {
+        const logLine = document.createElement('div');
+        logLine.textContent = event.data;
+        logContainer.appendChild(logLine);
+
+        // Auto-scroll to the bottom
+        logContainer.scrollTop = logContainer.scrollHeight;
+    };
+
+    eventSource.onerror = function() {
+        const errorLine = document.createElement('div');
+        errorLine.textContent = "[ERROR] Connection lost to the log stream.";
+        errorLine.style.color = 'red';
+        logContainer.appendChild(errorLine);
+    };
+
+    // Clear on-screen logs
+    document.getElementById('clear-log-btn').addEventListener('click', () => {
+        logContainer.innerHTML = '';
+    });
+
+    // Empty log file
+    document.getElementById('empty-logfile-btn').addEventListener('click', async () => {
+        try {
+            const response = await fetch('/empty_log_file', { method: 'POST' });
+            if (response.ok) {
+                logContainer.innerHTML = '';
+                alert('Log file emptied successfully.');
+            } else {
+                alert('Failed to empty the log file.');
+            }
+        } catch (error) {
+            console.error('Error emptying log file:', error);
+            alert('An error occurred while emptying the log file.');
+        }
+    });
+</script>
 {% endblock %}

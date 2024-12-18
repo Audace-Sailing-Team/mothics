@@ -9,6 +9,7 @@ from pprint import pprint
 from src.aggregator import Aggregator
 from src.comm_interface import MQTTInterface, SerialInterface, Communicator
 from src.webapp import WebApp
+from src.helpers import setup_logger
 
 # Tests
 
@@ -53,7 +54,9 @@ def mock_publisher(topics, messages, broker_host="test.mosquitto.org", broker_po
     
 if __name__ == '__main__':
     # Start logger
-    logging.basicConfig(level=logging.INFO)
+    logger_fname = os.path.join(os.getcwd(), 'mockup.log')
+    setup_logger('logger', fname=logger_fname, silent=False)
+    # logging.basicConfig(level=logging.INFO)
 
     # Start communicator and initialize interfaces
     serial_kwargs = {'port': "/dev/ttyACM0", 'baudrate': 9600, 'topics': 'rm2/wind/speed'}
@@ -63,8 +66,11 @@ if __name__ == '__main__':
 
     comms = Communicator(interfaces={SerialInterface: serial_kwargs, MQTTInterface: mqtt_kwargs}, thesaurus=units_thesaurus)
     comms.connect()
-
+    
     # Getters
+    # NOTE: these can be streamlined by writing a simple function
+    # which takes the returned attribute as an argument
+
     def raw_data_getter():
         return comms.raw_data
 
@@ -74,12 +80,19 @@ if __name__ == '__main__':
     def db_getter():
         return aggregator.database
 
+    # Setters
+    def refresh_interval_setter(interval):
+        aggregator.interval = interval
+        
+    getters_website = {'database': db_getter, 'status': status_getter}
+    setters_website = {'aggregator_refresh_rate': refresh_interval_setter}
+    
     # Start aggregator
     aggregator = Aggregator(raw_data_getter=raw_data_getter, interval=1, database=None)
     aggregator.start()
 
     # # Start webapp in background
-    web_app = WebApp(database_getter=db_getter, status_getter=status_getter)
+    web_app = WebApp(getters=getters_website, setters=setters_website, logger_fname=logger_fname)
     web_app.start_in_background()
     
     # Simulate posting messages on topics at different intervals
@@ -97,8 +110,8 @@ if __name__ == '__main__':
 
     # Compare dictionary with database
     print("Script completed and all services stopped.")
-    print('from interface', comms.raw_data)
-    print('from aggregator\n', aggregator.database)
+    # print('from interface', comms.raw_data)
+    # print('from aggregator\n', aggregator.database)
     
     # # Initialize MQTT interface
     # topics = ['rm/gps/lat', 'rm/gps/long', 'rm/gps/sudo']
