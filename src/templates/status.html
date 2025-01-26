@@ -1,8 +1,8 @@
 <div class="status-container">
     {% if status_data %}
-        {% for interface_name, status in status_data.items() %}
+        {% for status_key, status in status_data.items() %}
         <div class="status-item">
-            <div class="interface-name">{{ interface_name }}</div>
+            <div class="interface-name">{{ status_key.split('/')[0] }}</div>
             <div class="status-dot {{ status|lower }}"></div>
         </div>
         {% endfor %}
@@ -10,4 +10,3 @@
     <p>No data available.</p>
     {% endif %}
 </div>
-

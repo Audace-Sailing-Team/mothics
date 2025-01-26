@@ -9,13 +9,14 @@ from .helpers import tipify
 
 
 class WebApp:
-    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None):
+    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None):
         self.getters = getters
         self.setters = setters
         self.logger_fname = logger_fname
         self.app = Flask(__name__, template_folder="templates", static_folder='static')
         self.auto_refresh_table = auto_refresh_table*1000
         self.setup_routes()
+        self.rm_thesaurus = rm_thesaurus
         
         # Setup logger
         self.logger = logging.getLogger("WebApp")
@@ -33,20 +34,25 @@ class WebApp:
         @self.app.route("/get_table")
         def get_table():
             database = self.getters['database']()
-            # self.database = self.get_database()
-            latest_data = [database.data_points[-1].to_dict()] if database.data_points else []
+            latest_data = [{key: value for key, value in database.data_points[-1].to_dict().items() if '/status' not in key}] if database.data_points else []
+            
             return render_template("table.html", table_data=latest_data)
         
         @self.app.route("/get_status")
         def get_status():
-            status = self.getters['status']()
-            # self.status = self.get_status()
-            return render_template("status.html", status_data=status)
+            # Fetch the latest aggregated data point from the database
+            database = self.getters['database']()
+            latest_data = database.data_points[-1].to_dict() if database.data_points else {}
+    
+            # Extract status data from the latest aggregated data
+            status_data = {key: value for key, value in latest_data.items() if key.endswith('/status')}
+            if self.rm_thesaurus:
+                status_data = {self.rm_thesaurus[k.split('/')[0]]: v for k, v in status_data.items()}
+            
+            return render_template("status.html", status_data=status_data)
 
         @self.app.route('/logs')
         def logs():
-            # # Mockup
-            # log_data = ["Log entry 1", "Log entry 2", "Log entry 3"]
             return render_template('logs.html') #, log_data=log_data)
         
         @self.app.route('/stream_logs')

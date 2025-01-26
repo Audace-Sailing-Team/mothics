@@ -38,7 +38,7 @@ def mock_publisher(topics, messages, broker_host="test.mosquitto.org", broker_po
 
     for topic, message, wait in zip(topics, messages, waits):
         # Publish the message to the topic
-        result = client.publish(topic, message)
+        result = client.publish(topic, message, qos=2)
     
         # Check for publishing success
         if result.rc == mqtt.MQTT_ERR_SUCCESS:
@@ -62,9 +62,7 @@ if __name__ == '__main__':
     serial_kwargs = {'port': "/dev/ttyACM0", 'baudrate': 9600, 'topics': 'rm2/wind/speed'}
     mqtt_kwargs = {'hostname': "test.mosquitto.org", 'topics': ['rm1/gps/lat', 'rm1/gps/long']}
 
-    units_thesaurus = {'rm1': 'GPS+IMU', 'rm2': 'Anemometer'}
-
-    comms = Communicator(interfaces={SerialInterface: serial_kwargs, MQTTInterface: mqtt_kwargs}, thesaurus=units_thesaurus)
+    comms = Communicator(interfaces={SerialInterface: serial_kwargs, MQTTInterface: mqtt_kwargs})
     comms.connect()
     
     # Getters
@@ -74,9 +72,6 @@ if __name__ == '__main__':
     def raw_data_getter():
         return comms.raw_data
 
-    def status_getter():
-        return comms.status
-
     def db_getter():
         return aggregator.database
 
@@ -84,15 +79,18 @@ if __name__ == '__main__':
     def refresh_interval_setter(interval):
         aggregator.interval = interval
         
-    getters_website = {'database': db_getter, 'status': status_getter}
+    getters_website = {'database': db_getter}
     setters_website = {'aggregator_refresh_rate': refresh_interval_setter}
+
+    # Thesaurus for remote units names
+    units_thesaurus = {'rm1': 'GPS+IMU', 'rm2': 'Anemometer'}
     
     # Start aggregator
     aggregator = Aggregator(raw_data_getter=raw_data_getter, interval=1, database=None)
     aggregator.start()
 
     # # Start webapp in background
-    web_app = WebApp(getters=getters_website, setters=setters_website, logger_fname=logger_fname)
+    web_app = WebApp(getters=getters_website, setters=setters_website, logger_fname=logger_fname, rm_thesaurus=units_thesaurus)
     web_app.start_in_background()
     
     # Simulate posting messages on topics at different intervals
@@ -102,7 +100,7 @@ if __name__ == '__main__':
     
     # Publish
     mock_publisher(topics, messages, waits=sleeps)
-    time.sleep(120)
+    time.sleep(25)
 
     # Disconnect all
     comms.disconnect()
@@ -110,8 +108,8 @@ if __name__ == '__main__':
 
     # Compare dictionary with database
     print("Script completed and all services stopped.")
-    # print('from interface', comms.raw_data)
-    # print('from aggregator\n', aggregator.database)
+    print('from interface', comms.raw_data)
+    print('from aggregator\n', aggregator.database)
     
     # # Initialize MQTT interface
     # topics = ['rm/gps/lat', 'rm/gps/long', 'rm/gps/sudo']

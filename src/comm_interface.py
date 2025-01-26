@@ -253,7 +253,7 @@ class MQTTInterface(BaseInterface):
 class Communicator:
     """Class to manage multiple communication interfaces and merge their data."""
     
-    def __init__(self, interfaces=None, status_noncomm=30, status_offline=60, thesaurus=None):
+    def __init__(self, interfaces=None):
         """
         Initialize communicator with optional interfaces.
         
@@ -263,13 +263,7 @@ class Communicator:
         """
         self.interfaces = {}
         """Initialized interfaces"""
-        self.status_noncomm = status_noncomm
-        """Time in seconds for an interface to be declared non-communicative"""
-        self.status_offline = status_offline
-        """Time in seconds for an interface to be declared offline"""
-        self.thesaurus = thesaurus
-        """Thesaurus of remote unit names"""
-        
+                
         # Setup logger
         self.logger = logging.getLogger("Communicator")
         self.logger.info("-------------Communicator-------------")
@@ -368,86 +362,6 @@ class Communicator:
         return topic_split
 
     @property
-    def interface_status(self):
-        """
-        Set status of all interfaces.
-        """
-        # Get current time
-        now = datetime.now()
-
-        # Initialize statuses
-        topics = {}
-        status = {name: 'online' for name in self.interfaces.keys()}
-        
-        # Get available topics from each interface
-        for name, interface in self.interfaces.items():
-            for topic in interface.topics:
-                # Avoid central unit to remote unit communication topics
-                if self._format_topic(topic)[1] == 'sudo':
-                    continue
-                # Get timestamp from last point
-                try:
-                    last_point_timestamp = list(interface.raw_data[topic][-1].keys())[0]
-                except IndexError:
-                    status[name] = 'offline'
-                    continue
-                # Set non-communicative
-                if (now - timedelta(seconds=self.status_noncomm)) > last_point_timestamp:
-                    status[name] = 'noncomm'
-                # Set offline
-                if (now - timedelta(seconds=self.status_offline)) > last_point_timestamp:
-                    status[name] = 'offline'
-        return status
-
-    @property
-    def status(self):
-        """
-        Set status of all remote units.
-        """
-        # Get current time
-        now = datetime.now()
-
-        # Get all topics
-        topics = []
-        for interface in self.interfaces.values():
-            topics.extend(interface.topics)
-        topics = [t for t in topics if not t.endswith('sudo')]
-
-        # Get all available remote units
-        remotes = list(set([self._format_topic(t)[0] for t in topics]))
-        
-        # Initialize statuses
-        status = {name: 'online' for name in remotes}
-        
-        # Get available topics from each interface
-        for interface in self.interfaces.values():
-            for topic in interface.topics:
-                # Get remote name
-                remote_name = self._format_topic(topic)[0]
-                # Avoid central unit to remote unit communication topics
-                if self._format_topic(topic)[1] == 'sudo':
-                    continue
-                # Get timestamp from last point
-                try:
-                    last_point_timestamp = list(interface.raw_data[topic][-1].keys())[0]
-                except IndexError:
-                    status[remote_name] = 'offline'
-                    continue
-                # Set non-communicative
-                if (now - timedelta(seconds=self.status_noncomm)) > last_point_timestamp:
-                    status[remote_name] = 'noncomm'
-                    self.logger.info(f'{remote_name} is non-communicative')
-                # Set offline
-                if (now - timedelta(seconds=self.status_offline)) > last_point_timestamp:
-                    status[remote_name] = 'offline'
-                    self.logger.info(f'{remote_name} is offline')
-        # Cleanup names
-        if self.thesaurus:
-            return {self.thesaurus[k]: v for k, v in status.items()}
-        else:
-            return status
-
-    @property
     def raw_data(self):
         """
         Merge and return raw data from all interfaces.
@@ -467,7 +381,7 @@ class Communicator:
         # Sort data by timestamp for each topic
         for topic in merged_data:
             merged_data[topic].sort(key=lambda x: list(x.keys())[0])
-            
+
         return merged_data
     
     def publish(self, topic, payload, interfaces=None):
