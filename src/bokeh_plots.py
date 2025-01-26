@@ -21,7 +21,7 @@ def create_bokeh_plots(database):
 
     plots = []
     for key, data in time_series.items():
-        if len(data["timestamp"]) == 0 or len(data["value"]) == 0:
+        if len(data["timestamp"]) == 0 or len(data["value"]) == 0 or key.split('/')[1] == 'status':
             continue
         
         source = ColumnDataSource(data={
@@ -50,6 +50,8 @@ def create_bokeh_plots(database):
         
         min_x, max_x = min(data["timestamp"]), max(data["timestamp"])
         min_y, max_y = min(data["value"]), max(data["value"])
+
+        print(min_y, max_y)
         
         y_padding = (max_y - min_y) * 0.05 if max_y != min_y else max_y * 0.05
         
