@@ -20,13 +20,6 @@ class DataPoint:
         if not isinstance(self.input_data, dict):
             raise ValueError("data must be a dictionary")
         
-        # Set attributes from input_data dictionary
-        for k, v in self.input_data.items():
-            # Refactor attribute name to `<sensor>_<quantity>`
-            topic_component = k.split('/')
-            k = f'{topic_component[1]}_{topic_component[2]}'
-            setattr(self, k, v)
-
     def to_dict(self):
         """
         Export the data point as a dictionary including the timestamp and input data.
