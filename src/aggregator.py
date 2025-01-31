@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Dict
 import random
 
-from .database import DataPoint, Database
+from .database import DataPoint, Track
 from .helpers import tipify
 
 
@@ -30,7 +30,7 @@ class Aggregator:
         # Database
         self.database = database
         if database is None:
-            self.database = Database()
+            self.database = Track()
         self.running = False
 
         # Directories

@@ -10,6 +10,7 @@ from src.aggregator import Aggregator
 from src.comm_interface import MQTTInterface, SerialInterface, Communicator
 from src.webapp import WebApp
 from src.helpers import setup_logger
+from src.database import Track
 
 # Tests
 
@@ -56,7 +57,7 @@ if __name__ == '__main__':
     # Start logger
     logger_fname = os.path.join(os.getcwd(), 'mockup.log')
     setup_logger('logger', fname=logger_fname, silent=False)
-    # logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO)
     
     # Start communicator and initialize interfaces
     serial_kwargs = {'port': "/dev/ttyACM0", 'baudrate': 9600, 'topics': 'rm2/wind/speed'}
@@ -73,7 +74,7 @@ if __name__ == '__main__':
         return comms.raw_data
 
     def db_getter():
-        return aggregator.database
+        return aggregator.database.get_current()
 
     # Setters
     def refresh_interval_setter(interval):
@@ -92,7 +93,16 @@ if __name__ == '__main__':
     aggregator = Aggregator(raw_data_getter=raw_data_getter, interval=1, database=None, output_dir='data')
     aggregator.start()
 
-    # # Start webapp in background
+    # # Load JSON file
+    # track = Track()
+    # track.load('data/chk/20250131-172606.json.chk')
+
+    # def json_data_getter():
+    #     return track.get_current()
+
+    # getters_website = {'database': json_data_getter}
+    
+    # Start webapp in background
     web_app = WebApp(getters=getters_website, setters=setters_website, logger_fname=logger_fname, rm_thesaurus=units_thesaurus)
     web_app.start_in_background()
     
@@ -111,7 +121,7 @@ if __name__ == '__main__':
 
     # Compare dictionary with database
     print("Script completed and all services stopped.")
-    print('from interface', comms.raw_data)
+    # print('from interface', comms.raw_data)
     print('from aggregator\n', aggregator.database)
     
     # # Initialize MQTT interface

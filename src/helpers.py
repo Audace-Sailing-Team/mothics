@@ -1,7 +1,7 @@
 import sys
 import logging
 from datetime import datetime, timedelta
-
+import dateutil.parser as parser 
 
 def tipify(s):
     """
@@ -60,13 +60,20 @@ def setup_logger(name, level=logging.INFO, fname=None, silent=False):
     logger.addHandler(ch)
 
 
-def compute_status(timestamp, timeout_offline=60, timeout_noncomm=30):
+def compute_status(timestamp, now=None, timeout_offline=60, timeout_noncomm=30):
     """
     Compute status of a remote unit by checking timestamp against current time.
     """
-
+    
     # Get current time
-    now = datetime.now()
+    if now is None:
+        now = datetime.now()
+    
+    # Convert timestamp to datetime object
+    if isinstance(timestamp, str):
+        timestamp = parser.parse(timestamp)
+    if isinstance(now, str):
+        now = parser.parse(now)
     
     # Compare timestamps
     if timestamp is None or now - timedelta(seconds=timeout_offline) > timestamp:

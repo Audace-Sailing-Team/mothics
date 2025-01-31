@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 import csv
 import json
-
+import logging
 
 @dataclass
 class DataPoint:
@@ -30,11 +30,25 @@ class DataPoint:
 
 
 @dataclass
-class Database:
+class Track:
     data_points: List[DataPoint] = field(default_factory=list)
     field_names: Optional[List[str]] = None
-    file_name: Optional[str] = None
+    mode: Optional[str] = 'live'
+    logger: logging.Logger = field(default_factory=lambda: logging.getLogger("Track"))
+    _replay_index: int = 0  # Internal index for replay mode
     
+    def load(self, filename: str):
+        """Loads a Track object from a JSON file."""
+        with open(filename, 'r') as f:
+            try:
+                data = json.load(f)
+            except:
+                self.logger.critical(f'could not load {filename} into a Track')
+                raise RuntimeError(f'could not load {filename} into a Track')
+
+        self.data_points = [DataPoint(datetime.fromisoformat(dp["timestamp"]), dp["input_data"]) for dp in data]
+        self.mode = 'replay'
+
     def add_point(self, timestamp: datetime, data: Dict[str, Any]):
         """Add a data point ensuring field consistency."""
         # Validate or establish field consistency
@@ -87,3 +101,28 @@ class Database:
                 latest_data[field] = dp  # Overwrite to get the most recent
 
         return list(latest_data.values())
+
+    def get_current(self):
+        """Returns the current Track instance."""
+        if self.mode == "live":
+            return self  # In live mode, return the latest track
+        elif self.mode == "replay":
+            return self._get_replay_track()
+
+    def _get_replay_track(self):
+        """Returns a progressively growing Track instance in replay mode."""
+        if not self.data_points:
+            raise ValueError("No data available for replay")
+
+        # Limit replay index
+        self._replay_index = min(self._replay_index + 1, len(self.data_points))
+
+        # Create a new track with data up to the current replay index
+        mock_track = Track()
+        mock_track.field_names = self.field_names
+        mock_track.data_points = self.data_points[:self._replay_index]
+
+        return mock_track
+
+
+            

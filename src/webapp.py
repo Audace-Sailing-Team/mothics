@@ -3,7 +3,7 @@ import time
 import logging
 from flask import Flask, render_template, jsonify, request, Response
 from threading import Thread
-from .database import Database
+from .database import Track
 from .bokeh_plots import create_bokeh_plots
 from .helpers import tipify, compute_status
 
@@ -45,9 +45,9 @@ class WebApp:
             # Fetch the latest aggregated data point from the database
             database = self.getters['database']()
             latest_data = database.data_points[-1].to_dict() if database.data_points else {}    
-
+            now = latest_data['timestamp']
             # Compute status for each remote unit
-            status_data = {rm.split('/')[0]: compute_status(ts, timeout_noncomm=self.timeout_noncomm, timeout_offline=self.timeout_offline) for rm, ts in latest_data.items() if 'last_timestamp' in rm}
+            status_data = {rm.split('/')[0]: compute_status(ts, now=now, timeout_noncomm=self.timeout_noncomm, timeout_offline=self.timeout_offline) for rm, ts in latest_data.items() if 'last_timestamp' in rm}
 
             # Apply rm_thesaurus mapping if available
             if self.rm_thesaurus:
