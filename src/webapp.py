@@ -5,11 +5,11 @@ from flask import Flask, render_template, jsonify, request, Response
 from threading import Thread
 from .database import Database
 from .bokeh_plots import create_bokeh_plots
-from .helpers import tipify
+from .helpers import tipify, compute_status
 
 
 class WebApp:
-    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None):
+    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, timeout_offline=60, timeout_noncomm=30):
         self.getters = getters
         self.setters = setters
         self.logger_fname = logger_fname
@@ -17,6 +17,8 @@ class WebApp:
         self.auto_refresh_table = auto_refresh_table*1000
         self.setup_routes()
         self.rm_thesaurus = rm_thesaurus
+        self.timeout_offline = timeout_offline
+        self.timeout_noncomm = timeout_noncomm
         
         # Setup logger
         self.logger = logging.getLogger("WebApp")
@@ -34,7 +36,7 @@ class WebApp:
         @self.app.route("/get_table")
         def get_table():
             database = self.getters['database']()
-            latest_data = [{key: value for key, value in database.data_points[-1].to_dict().items() if '/status' not in key}] if database.data_points else []
+            latest_data = [{key: value for key, value in database.data_points[-1].to_dict().items() if '/last_timestamp' not in key}] if database.data_points else []
             
             return render_template("table.html", table_data=latest_data)
         
@@ -42,13 +44,15 @@ class WebApp:
         def get_status():
             # Fetch the latest aggregated data point from the database
             database = self.getters['database']()
-            latest_data = database.data_points[-1].to_dict() if database.data_points else {}
-    
-            # Extract status data from the latest aggregated data
-            status_data = {key: value for key, value in latest_data.items() if key.endswith('/status')}
+            latest_data = database.data_points[-1].to_dict() if database.data_points else {}    
+
+            # Compute status for each remote unit
+            status_data = {rm.split('/')[0]: compute_status(ts, timeout_noncomm=self.timeout_noncomm, timeout_offline=self.timeout_offline) for rm, ts in latest_data.items() if 'last_timestamp' in rm}
+
+            # Apply rm_thesaurus mapping if available
             if self.rm_thesaurus:
-                status_data = {self.rm_thesaurus[k.split('/')[0]]: v for k, v in status_data.items()}
-            
+                status_data = {self.rm_thesaurus[rm]: status for rm, status in status_data.items()}
+        
             return render_template("status.html", status_data=status_data)
 
         @self.app.route('/logs')

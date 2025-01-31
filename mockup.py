@@ -57,7 +57,7 @@ if __name__ == '__main__':
     logger_fname = os.path.join(os.getcwd(), 'mockup.log')
     setup_logger('logger', fname=logger_fname, silent=False)
     # logging.basicConfig(level=logging.INFO)
-
+    
     # Start communicator and initialize interfaces
     serial_kwargs = {'port': "/dev/ttyACM0", 'baudrate': 9600, 'topics': 'rm2/wind/speed'}
     mqtt_kwargs = {'hostname': "test.mosquitto.org", 'topics': ['rm1/gps/lat', 'rm1/gps/long']}
@@ -78,6 +78,9 @@ if __name__ == '__main__':
     # Setters
     def refresh_interval_setter(interval):
         aggregator.interval = interval
+
+    def save_database_json(filename):
+        aggregator.database.export_to_json(filename)
         
     getters_website = {'database': db_getter}
     setters_website = {'aggregator_refresh_rate': refresh_interval_setter}
@@ -86,7 +89,7 @@ if __name__ == '__main__':
     units_thesaurus = {'rm1': 'GPS+IMU', 'rm2': 'Anemometer'}
     
     # Start aggregator
-    aggregator = Aggregator(raw_data_getter=raw_data_getter, interval=1, database=None)
+    aggregator = Aggregator(raw_data_getter=raw_data_getter, interval=1, database=None, output_dir='data')
     aggregator.start()
 
     # # Start webapp in background
@@ -100,7 +103,7 @@ if __name__ == '__main__':
     
     # Publish
     mock_publisher(topics, messages, waits=sleeps)
-    time.sleep(25)
+    time.sleep(60)
 
     # Disconnect all
     comms.disconnect()
