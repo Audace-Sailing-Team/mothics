@@ -1,6 +1,6 @@
 import sys
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def tipify(s):
@@ -58,3 +58,20 @@ def setup_logger(name, level=logging.INFO, fname=None, silent=False):
 
     # Add console handler to logger
     logger.addHandler(ch)
+
+
+def compute_status(timestamp, timeout_offline=60, timeout_noncomm=30):
+    """
+    Compute status of a remote unit by checking timestamp against current time.
+    """
+
+    # Get current time
+    now = datetime.now()
+    
+    # Compare timestamps
+    if timestamp is None or now - timedelta(seconds=timeout_offline) > timestamp:
+        return "offline"
+    elif now - timedelta(seconds=timeout_noncomm) > timestamp:
+        return "noncomm"
+    else:
+        return "online"

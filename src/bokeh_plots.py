@@ -21,7 +21,7 @@ def create_bokeh_plots(database):
 
     plots = []
     for key, data in time_series.items():
-        if len(data["timestamp"]) == 0 or len(data["value"]) == 0 or key.split('/')[1] == 'status':
+        if len(data["timestamp"]) == 0 or len(data["value"]) == 0 or key.split('/')[1] == 'last_timestamp':
             continue
         
         source = ColumnDataSource(data={

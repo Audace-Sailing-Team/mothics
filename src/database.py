@@ -1,6 +1,6 @@
 from tabulate import tabulate
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 import csv
 import json
@@ -32,16 +32,16 @@ class DataPoint:
 @dataclass
 class Database:
     data_points: List[DataPoint] = field(default_factory=list)
-    field_names: Optional[List[str]] = None  # Stores the set of consistent fields dynamically
-
+    field_names: Optional[List[str]] = None
+    file_name: Optional[str] = None
+    
     def add_point(self, timestamp: datetime, data: Dict[str, Any]):
-        """Adds a data point and ensures field consistency."""
+        """Add a data point ensuring field consistency."""
         # Validate or establish field consistency
-        if self.field_names is None:
-            self.field_names = list(data.keys())
-        elif set(self.field_names) != set(data.keys()):
+        # NOTE: if no field names are passed, no checks are performed
+        if self.field_names is not None and set(self.field_names) != set(data.keys()):
             raise ValueError(f"Inconsistent fields. Expected {self.field_names}, got {list(data.keys())}")
-
+            
         self.data_points.append(DataPoint(timestamp, data))
 
     def export_to_csv(self, filename: str):
@@ -61,15 +61,15 @@ class Database:
         with open(filename, mode='w') as jsonfile:
             json.dump([asdict(dp) for dp in self.data_points], jsonfile, default=str, indent=4)
 
-    def filter_by_time_range(self, start_time: datetime, end_time: datetime) -> List[DataPoint]:
-        """Returns data points within a specific time range."""
-        return [dp for dp in self.data_points if start_time <= dp.timestamp <= end_time]
-
     def __str__(self):
         """Returns a tabular view of all data points."""
         if not self.data_points:
             return "No data points available."
-
+        
+        # Set available field names if None are provided 
+        if self.field_names is None:
+            self.field_names = list(self.data_points[-1].to_dict().keys())
+        
         # Prepare headers and rows for the table
         headers = ["Timestamp"] + self.field_names
         rows = [[dp.timestamp.isoformat()] + [dp.input_data.get(field, "") for field in self.field_names] for dp in self.data_points]
