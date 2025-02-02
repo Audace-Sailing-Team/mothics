@@ -6,7 +6,7 @@ import threading
 from datetime import datetime, timedelta
 from traceback import format_exc
 
-from .database import DataPoint, Track
+from .track import DataPoint, Track
 from .helpers import tipify
 
 
