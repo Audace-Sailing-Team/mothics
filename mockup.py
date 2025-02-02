@@ -10,7 +10,7 @@ from src.aggregator import Aggregator
 from src.comm_interface import MQTTInterface, SerialInterface, Communicator
 from src.webapp import WebApp
 from src.helpers import setup_logger
-from src.database import Track
+from src.track import Track
 
 # Tests
 
@@ -54,6 +54,19 @@ def mock_publisher(topics, messages, broker_host="test.mosquitto.org", broker_po
 
     
 if __name__ == '__main__':
+    # # Test database
+    # from src.database import Database
+    # units_thesaurus = {'rm1': 'GPS+IMU', 'rm2': 'Anemometer'}
+    # manager = Database("data/", rm_thesaurus=units_thesaurus)
+    
+    # # List all tracks and print their metadata.
+    # manager.list_tracks()
+
+    # # Example: Select the first track.
+    # selected_track = manager.select_track(0)
+    # if selected_track:
+    #     print(f"\nSelected Track Metadata:\n{selected_track}")
+
     # Start logger
     logger_fname = os.path.join(os.getcwd(), 'mockup.log')
     setup_logger('logger', fname=logger_fname, silent=False)
@@ -102,14 +115,14 @@ if __name__ == '__main__':
     aggregator = Aggregator(raw_data_getter=raw_data_getter, interval=1, database=None, output_dir='data')
     aggregator.start()
 
-    # # Load JSON file - without Aggregator
-    # track = Track()
-    # track.load('data/chk/20250131-172606.json.chk')
+    # # # Load JSON file - without Aggregator
+    # # track = Track()
+    # # track.load('data/chk/20250131-172606.json.chk')
 
-    # def json_data_getter():
-    #     return track.get_current()
+    # # def json_data_getter():
+    # #     return track.get_current()
 
-    # getters_website = {'database': json_data_getter}
+    # # getters_website = {'database': json_data_getter}
     
     # Start webapp in background
     web_app = WebApp(getters=getters_website, setters=setters_website, logger_fname=logger_fname, rm_thesaurus=units_thesaurus)
@@ -128,7 +141,7 @@ if __name__ == '__main__':
     comms.disconnect()
     aggregator.stop()
 
-    # Compare dictionary with database
+    # # Compare dictionary with database
     print("Script completed and all services stopped.")
     # print('from interface', comms.raw_data)
     print('from aggregator\n', aggregator.database)

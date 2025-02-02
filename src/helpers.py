@@ -82,3 +82,14 @@ def compute_status(timestamp, now=None, timeout_offline=60, timeout_noncomm=30):
         return "noncomm"
     else:
         return "online"
+
+def format_duration(seconds):
+    """
+    Convert seconds into a string in the format "Hh Mm Ss".
+    """
+    if seconds is None:
+        return "N/A"
+    seconds = int(seconds)
+    hours, remainder = divmod(seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return f"{hours}h:{minutes}m:{secs}s"
