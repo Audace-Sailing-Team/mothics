@@ -122,6 +122,17 @@
     <div class="container mt-4">
     <h1 class="mb-4">Database Dashboard</h1>
 
+    <!-- Sampling Control Buttons and Indicator -->
+    <div class="row mb-3 align-items-center">
+      <div class="col-auto">
+        <button id="startSamplingBtn" class="btn btn-success">Start Sampling</button>
+        <button id="stopSamplingBtn" class="btn btn-danger">Stop Sampling</button>
+      </div>
+      <div class="col-auto">
+        <span id="samplingStatusIndicator" class="badge bg-secondary">Not Sampling</span>
+      </div>
+    </div>
+    
     <!-- Remote Unit Status -->
     <h2>Remote Unit Status</h2>
     <div id="status-container" class="status-container">
@@ -143,7 +154,7 @@
     </div>
     <script>
     const auto_refresh = {{ auto_refresh }};
-
+      
     // Function to update the dashboard dynamically
     async function updateDashboard() {
         try {
@@ -157,11 +168,46 @@
             const statusHtml = await statusResponse.text();
             document.getElementById('status-container').innerHTML = statusHtml;
 
+            // Update the sampling status indicator
+            const samplingResponse = await fetch('/sampling_status');
+            const samplingData = await samplingResponse.json();
+            const indicator = document.getElementById('samplingStatusIndicator');
+            if (samplingData.save_mode === 'continuous') {
+		indicator.textContent = 'Continuous Sampling Active';
+		indicator.className = 'badge bg-success';
+            } else {
+		indicator.textContent = 'Not Sampling';
+		indicator.className = 'badge bg-secondary';
+            }
+	    
         } catch (error) {
             console.error("Error updating dashboard:", error);
         }
     }
 
+    // Button handlers for starting and stopping sampling
+    document.getElementById('startSamplingBtn').addEventListener('click', async () => {
+      try {
+        const response = await fetch('/start_save', { method: 'POST' });
+        const result = await response.json();
+        console.log(result.message);
+        updateDashboard();  // refresh all after starting sampling
+      } catch (error) {
+        console.error("Error starting sampling:", error);
+      }
+    });
+
+    document.getElementById('stopSamplingBtn').addEventListener('click', async () => {
+      try {
+        const response = await fetch('/end_save', { method: 'POST' });
+        const result = await response.json();
+        console.log(result.message);
+        updateDashboard();  // refresh all after stopping sampling
+      } catch (error) {
+        console.error("Error stopping sampling:", error);
+      }
+    });
+      
     // Automatically refresh the dashboard at the specified interval
     setInterval(updateDashboard, auto_refresh);
     updateDashboard();

@@ -55,6 +55,33 @@ class WebApp:
         
             return render_template("status.html", status_data=status_data)
 
+        @self.app.route('/start_save', methods=['POST'])
+        def start_save():
+            try:
+                # Call the aggregator method via the setter/getter dictionary.
+                # For example, assume the aggregator instance is passed via getters:
+                self.setters['start_save']()
+                return jsonify({'status': 'success', 'message': 'Continuous sampling started.'})
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+
+        @self.app.route('/end_save', methods=['POST'])
+        def end_save():
+            try:
+                self.setters['end_save']()
+                return jsonify({'status': 'success', 'message': 'Continuous sampling ended.'})
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+
+        @self.app.route('/sampling_status')
+        def sampling_status():
+            try:
+                save_status = self.getters['save_status']()
+                # Return the current sampling mode
+                return jsonify({'save_mode': save_status})
+            except Exception as e:
+                return jsonify({'save_mode': 'unknown', 'error': str(e)}), 500
+
         @self.app.route('/logs')
         def logs():
             return render_template('logs.html') #, log_data=log_data)
