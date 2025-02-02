@@ -1,19 +1,19 @@
+import glob
 import os
-import numpy as np
 import time
 import logging
 import threading
-import asyncio
 from datetime import datetime, timedelta
-from typing import Dict
-import random
+from traceback import format_exc
 
 from .database import DataPoint, Track
 from .helpers import tipify
 
 
 class Aggregator:
-    def __init__(self, raw_data=None, raw_data_getter=None, interval=5, database=None, checkpoint=30, output_dir=None):
+    def __init__(self, raw_data=None, raw_data_getter=None, interval=5, database=None, output_dir=None):
+        self.running = False
+        """Aggregator loop status"""
         # Raw data
         self.raw_data = raw_data
         self.get_raw_data = raw_data_getter
@@ -23,33 +23,20 @@ class Aggregator:
             raise RuntimeError(f'no raw data nor getter available, got {raw_data=}, {raw_data_getter=}')
 
         # Thresholds (in seconds)
-        self.checkpoint = checkpoint
         self.interval = interval
         """Sampling interval of the input data"""
 
         # Database
         self.database = database
         if database is None:
-            self.database = Track()
-        self.running = False
-
-        # Directories
-        self.output_dir = output_dir
-        if self.output_dir is None:
-            self.output_dir = 'data'
+            self.database = Track(output_dir=output_dir)
             
-        os.makedirs(self.output_dir, exist_ok=True)
-        os.makedirs(os.path.join(self.output_dir, 'chk'), exist_ok=True)
-
-        # Timers
-        self.last_checkpoint = None
-        
         # Setup logger
         self.logger = logging.getLogger("Aggregator")
         self.logger.info("-------------Aggregator-------------")
-        
+                            
     def aggregate(self):
-        """Fetches raw data and stores it as a DataPoint in the Database."""
+        """Fetch raw data and store it as a DataPoint in a Track."""
         try:
             timestamp = datetime.now()
             
@@ -82,18 +69,9 @@ class Aggregator:
             # Add to database as a DataPoint
             assert self.database is not None, 'error initializing Database'
             self.database.add_point(timestamp, flat_data)
-
-            # Check if no new data has been gathered within the checkpoint threshold
-            if self.checkpoint is not None:
-                if self.last_checkpoint is None or (timestamp - self.last_checkpoint).total_seconds() > self.checkpoint:
-                    self.last_checkpoint = timestamp
-                    checkpoint_fname = os.path.join(self.output_dir, f'chk/{self.last_checkpoint.strftime("%Y%m%d-%H%M%S")}.json.chk')
-                    self.logger.info(f"saving checkpoint to JSON: {checkpoint_fname}")
-                    self.database.export_to_json(checkpoint_fname)
-
             
         except Exception as e:
-            self.logger.critical(f"error during aggregation: {e}")
+            self.logger.critical(f"error during aggregation: {e} \n {format_exc()}")
             
     def start(self):
         """Start the loop in non-blocking mode."""

@@ -76,15 +76,24 @@ if __name__ == '__main__':
     def db_getter():
         return aggregator.database.get_current()
 
+    def save_status_getter():
+        return aggregator.database.save_mode
+
     # Setters
     def refresh_interval_setter(interval):
         aggregator.interval = interval
 
     def save_database_json(filename):
         aggregator.database.export_to_json(filename)
+
+    def start_database_save():
+        aggregator.database.start_run()
+
+    def end_database_save():
+        aggregator.database.end_run()
         
-    getters_website = {'database': db_getter}
-    setters_website = {'aggregator_refresh_rate': refresh_interval_setter}
+    getters_website = {'database': db_getter, 'save_status': save_status_getter}
+    setters_website = {'aggregator_refresh_rate': refresh_interval_setter, 'start_save': start_database_save, 'end_save': end_database_save}
 
     # Thesaurus for remote units names
     units_thesaurus = {'rm1': 'GPS+IMU', 'rm2': 'Anemometer'}
@@ -93,7 +102,7 @@ if __name__ == '__main__':
     aggregator = Aggregator(raw_data_getter=raw_data_getter, interval=1, database=None, output_dir='data')
     aggregator.start()
 
-    # # Load JSON file
+    # # Load JSON file - without Aggregator
     # track = Track()
     # track.load('data/chk/20250131-172606.json.chk')
 
@@ -113,7 +122,7 @@ if __name__ == '__main__':
     
     # Publish
     mock_publisher(topics, messages, waits=sleeps)
-    time.sleep(60)
+    time.sleep(120)
 
     # Disconnect all
     comms.disconnect()
