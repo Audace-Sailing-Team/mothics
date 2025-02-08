@@ -22,6 +22,16 @@ def settings():
                 current_app.config['LOGGER'].info(f'set Aggregator refresh rate at {aggregator_refresh_rate} s')
             except:
                 current_app.config['LOGGER'].warning(f'could not set Aggregator refresh rate')
+
+        # Toggle between 'static' and 'real-time' plot modes
+        if request.form.get('plot_mode'):
+            plot_mode = request.form['plot_mode']
+            if plot_mode in ['static', 'real-time']:
+                current_app.config['PLOT_MODE'] = plot_mode
+                current_app.config['LOGGER'].info(f'set plot mode to {plot_mode}')
+            else:
+                current_app.config['LOGGER'].warning(f'invalid plot mode: {plot_mode}')
+
         # ADD OTHER TOGGLES HERE
 
         # Update settings
