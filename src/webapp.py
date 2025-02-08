@@ -15,7 +15,7 @@ from .blueprints.bp_database import database_bp
 
 
 class WebApp:
-    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None):
+    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None, plot_mode='static'):
         self.getters = getters or {}
         self.setters = setters or {}
         self.logger_fname = logger_fname
@@ -25,6 +25,8 @@ class WebApp:
         self.timeout_noncomm = timeout_noncomm
         self.track_manager_directory = track_manager_directory 
         self.track_manager = None
+        self.plot_mode = plot_mode
+        self.plot_realtime_url = "http://localhost:5006/bokeh_app"
         
         # Setup logger
         self.logger = logging.getLogger("WebApp")
@@ -44,7 +46,9 @@ class WebApp:
             'LOGGER_FNAME': self.logger_fname,
             'TRACK_MANAGER_DIRECTORY': self.track_manager_directory,
             'TRACK_MANAGER': self.track_manager,
-            'LOGGER': self.logger
+            'LOGGER': self.logger,
+            'PLOT_MODE': self.plot_mode,
+            'PLOT_REALTIME_URL': self.plot_realtime_url
         })
         
         self.setup_routes()
