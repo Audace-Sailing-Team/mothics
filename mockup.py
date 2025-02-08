@@ -123,9 +123,12 @@ if __name__ == '__main__':
     # #     return track.get_current()
 
     # # getters_website = {'database': json_data_getter}
+
+    # Setup database/track_manager
+    # tm_dir = os.path.join(os.getcwd, 'data')
     
     # Start webapp in background
-    web_app = WebApp(getters=getters_website, setters=setters_website, logger_fname=logger_fname, rm_thesaurus=units_thesaurus)
+    web_app = WebApp(getters=getters_website, setters=setters_website, logger_fname=logger_fname, rm_thesaurus=units_thesaurus, track_manager_directory='data/')
     web_app.start_in_background()
     
     # Simulate posting messages on topics at different intervals

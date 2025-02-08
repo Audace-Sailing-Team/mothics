@@ -11,11 +11,11 @@ from .blueprints.bp_monitoring import monitor_bp
 from .blueprints.bp_logging import log_bp
 from .blueprints.bp_saving import save_bp
 from .blueprints.bp_settings import settings_bp
+from .blueprints.bp_database import database_bp
 
 
 class WebApp:
-    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, 
-                 rm_thesaurus=None, timeout_offline=60, timeout_noncomm=30):
+    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None):
         self.getters = getters or {}
         self.setters = setters or {}
         self.logger_fname = logger_fname
@@ -23,6 +23,7 @@ class WebApp:
         self.rm_thesaurus = rm_thesaurus
         self.timeout_offline = timeout_offline
         self.timeout_noncomm = timeout_noncomm
+        self.track_manager_directory = track_manager_directory 
         self.track_manager = None
         
         # Setup logger
@@ -41,6 +42,8 @@ class WebApp:
             'TIMEOUT_OFFLINE': self.timeout_offline,
             'TIMEOUT_NONCOMM': self.timeout_noncomm,
             'LOGGER_FNAME': self.logger_fname,
+            'TRACK_MANAGER_DIRECTORY': self.track_manager_directory,
+            'TRACK_MANAGER': self.track_manager,
             'LOGGER': self.logger
         })
         
@@ -52,6 +55,7 @@ class WebApp:
         self.app.register_blueprint(settings_bp)
         self.app.register_blueprint(log_bp)
         self.app.register_blueprint(save_bp)
+        self.app.register_blueprint(database_bp)
         # self.app.register_blueprint(control_bp, url_prefix='/control')
         
     def run(self, host="0.0.0.0", port=5000, debug=False):
