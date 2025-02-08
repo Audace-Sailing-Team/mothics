@@ -1,0 +1,19 @@
+[serial]
+port = "/dev/ttyACM0"
+baudrate = 9600
+# Topics can be a single string or a comma‐separated list
+topics = "rm2/wind/speed"
+
+[mqtt]
+hostname = "test.mosquitto.org"
+topics = ["rm1/gps/lat", "rm1/gps/long"]
+
+[aggregator]
+interval = 1
+output_dir = "data"
+
+[webapp]
+logger_fname = "mockup.log"
+track_manager_directory = "data/"
+# Remote unit names mapping.
+rm_thesaurus = { rm1 = "GPS+IMU", rm2 = "Anemometer" }
