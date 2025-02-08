@@ -12,8 +12,28 @@ from typing import List, Dict, Any, Optional
 from tinydb import TinyDB, Query
 from tinydb.storages import JSONStorage
 from tinydb.middlewares import CachingMiddleware
+from jsonschema import validate, ValidationError
 
 from .helpers import format_duration
+
+# Validation schema
+TRACK_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "timestamp": {"type": "string"},
+            "input_data": {
+                "type": "object",
+                "patternProperties": {
+                    ".*": {"type": ["number", "string", "null"]}
+                },
+                "additionalProperties": False
+            }
+        },
+        "required": ["timestamp", "input_data"]
+    }
+}
 
 
 # Metadata extractors
@@ -183,34 +203,78 @@ class Database:
         self.load_tracks()
         self.rm_thesaurus = rm_thesaurus
 
+    def validate_json(self, filepath: Path):
+        """
+        Validate a JSON file against the schema.
+        Returns True if valid, False otherwise.
+        """
+        try:
+            with open(filepath, "r") as f:
+                data = json.load(f)
+            validate(instance=data, schema=TRACK_SCHEMA)
+            return True
+        except (json.JSONDecodeError, ValidationError) as e:
+            self.logger.warning(f"validation error in {filepath.name}: {e}")
+            return False
+
     def load_tracks(self):
         """
         Scan the directory for JSON files, including files in the 'chk' subdirectory.
-        Extract metadata from each file and store it in the TinyDB.
+        Validate each JSON file before extracting metadata and storing it in TinyDB.
         Files ending with '.chk.json' are flagged with a "Checkpoint" flag.
         """
-        # Clear the DB before re-loading.
         self.db.truncate()
-        self.tracks = []  # Reset our local track list
+        self.tracks = []
 
-        # Process JSON files in the main directory.
+        def process_file(file: Path, is_checkpoint: bool):
+            """Helper to validate and process a JSON file."""
+            if self.validate_json(file):
+                meta = extract_metadata_from_file(file)
+                meta["checkpoint"] = is_checkpoint
+                self.db.insert(meta)
+                self.tracks.append(meta)
+            else:
+                print(f"Skipping invalid file: {file.name}")
+
+        # Process main directory JSON files
         for file in self.directory.glob("*.json"):
-            meta = extract_metadata_from_file(file)
-            meta["checkpoint"] = False
-            # If the file name ends with ".chk.json", flag it as a checkpoint.
-            if file.name.endswith(".chk.json"):
-                meta["checkpoint"] = True
-            self.db.insert(meta)
-            self.tracks.append(meta)
+            is_checkpoint = file.name.endswith(".chk.json")
+            process_file(file, is_checkpoint)
 
-        # Process JSON files in the 'chk' subdirectory (if it exists).
+        # Process 'chk' subdirectory JSON files
         chk_dir = self.directory / "chk"
         if chk_dir.exists() and chk_dir.is_dir():
             for file in chk_dir.glob("*.chk.json"):
-                meta = extract_metadata_from_file(file)
-                meta["checkpoint"] = True
-                self.db.insert(meta)
-                self.tracks.append(meta)
+                process_file(file, is_checkpoint=True)
+        
+    # def load_tracks(self):
+    #     """
+    #     Scan the directory for JSON files, including files in the 'chk' subdirectory.
+    #     Extract metadata from each file and store it in the TinyDB.
+    #     Files ending with '.chk.json' are flagged with a "Checkpoint" flag.
+    #     """
+    #     # Clear the DB before re-loading.
+    #     self.db.truncate()
+    #     self.tracks = []  # Reset our local track list
+
+    #     # Process JSON files in the main directory.
+    #     for file in self.directory.glob("*.json"):
+    #         meta = extract_metadata_from_file(file)
+    #         meta["checkpoint"] = False
+    #         # If the file name ends with ".chk.json", flag it as a checkpoint.
+    #         if file.name.endswith(".chk.json"):
+    #             meta["checkpoint"] = True
+    #         self.db.insert(meta)
+    #         self.tracks.append(meta)
+
+    #     # Process JSON files in the 'chk' subdirectory (if it exists).
+    #     chk_dir = self.directory / "chk"
+    #     if chk_dir.exists() and chk_dir.is_dir():
+    #         for file in chk_dir.glob("*.chk.json"):
+    #             meta = extract_metadata_from_file(file)
+    #             meta["checkpoint"] = True
+    #             self.db.insert(meta)
+    #             self.tracks.append(meta)
             
     def list_tracks(self) -> List[Dict[str, Any]]:
         """

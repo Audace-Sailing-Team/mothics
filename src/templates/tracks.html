@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h1>Available Tracks</h1>
+
+  {% if tracks %}
+    <table class="table table-striped mt-4">
+      <thead>
+        <tr>
+          <th>Index</th>
+          <th>
+            <a href="{{ url_for('database.tracks_view', sort_by='filename', order='desc' if current_sort=='filename' and current_order=='asc' else 'asc') }}">
+              Filename
+              {% if current_sort == 'filename' %}
+                {% if current_order == 'asc' %}
+                  &#9650;
+                {% else %}
+                  &#9660;
+                {% endif %}
+              {% endif %}
+            </a>
+          </th>
+          <th>
+            <a href="{{ url_for('database.tracks_view', sort_by='track_datetime', order='desc' if current_sort=='track_datetime' and current_order=='asc' else 'asc') }}">
+              Date/Time
+              {% if current_sort == 'track_datetime' %}
+                {% if current_order == 'asc' %}
+                  &#9650;
+                {% else %}
+                  &#9660;
+                {% endif %}
+              {% endif %}
+            </a>
+          </th>
+          <th>
+            <a href="{{ url_for('database.tracks_view', sort_by='checkpoint', order='desc' if current_sort=='checkpoint' and current_order=='asc' else 'asc') }}">
+              Checkpoint
+              {% if current_sort == 'checkpoint' %}
+                {% if current_order == 'asc' %}
+                  &#9650;
+                {% else %}
+                  &#9660;
+                {% endif %}
+              {% endif %}
+            </a>
+          </th>
+          <th>
+            <a href="{{ url_for('database.tracks_view', sort_by='track_duration', order='desc' if current_sort=='track_duration' and current_order=='asc' else 'asc') }}">
+              Duration
+              {% if current_sort == 'track_duration' %}
+                {% if current_order == 'asc' %}
+                  &#9650;
+                {% else %}
+                  &#9660;
+                {% endif %}
+              {% endif %}
+            </a>
+          </th>
+          <th>
+            <a href="{{ url_for('database.tracks_view', sort_by='datapoint_count', order='desc' if current_sort=='datapoint_count' and current_order=='asc' else 'asc') }}">
+              Data Points
+              {% if current_sort == 'datapoint_count' %}
+                {% if current_order == 'asc' %}
+                  &#9650;
+                {% else %}
+                  &#9660;
+                {% endif %}
+              {% endif %}
+            </a>
+          </th>
+          <th>
+            <a href="{{ url_for('database.tracks_view', sort_by='remote_units', order='desc' if current_sort=='remote_units' and current_order=='asc' else 'asc') }}">
+              Remote Units
+              {% if current_sort == 'remote_units' %}
+                {% if current_order == 'asc' %}
+                  &#9650;
+                {% else %}
+                  &#9660;
+                {% endif %}
+              {% endif %}
+            </a>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for track in tracks %}
+          <tr>
+            <td>{{ loop.index0 }}</td>
+            <td>{{ track.filename }}</td>
+            <td>{{ track.track_datetime or "N/A" }}</td>
+            <td>{{ track.checkpoint }}</td>
+            <td>
+              {% if track.track_duration %}
+                {% set seconds = track.track_duration | int %}
+                {% set hours = seconds // 3600 %}
+                {% set remainder = seconds % 3600 %}
+                {% set minutes = remainder // 60 %}
+                {% set secs = remainder % 60 %}
+                {{ hours }}h {{ minutes }}m {{ secs }}s
+              {% else %}
+                N/A
+              {% endif %}
+            </td>
+            <td>{{ track.datapoint_count or "N/A" }}</td>
+            <td>
+              {% if track.remote_units %}
+                {% set thesaurized_units = [] %}
+                {% for rm in track.remote_units %}
+                  {% if rm_thesaurus and rm in rm_thesaurus %}
+                    {% set _ = thesaurized_units.append(rm_thesaurus[rm]) %}
+                  {% else %}
+                    {% set _ = thesaurized_units.append(rm) %}
+                  {% endif %}
+                {% endfor %}
+                {{ thesaurized_units | join(", ") }}
+              {% else %}
+                N/A
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No tracks available.</p>
+  {% endif %}
+{% endblock %}
