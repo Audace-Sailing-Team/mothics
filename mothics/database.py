@@ -8,7 +8,7 @@ from pathlib import Path
 from tabulate import tabulate
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from tinydb import TinyDB, Query
 from tinydb.storages import JSONStorage
 from tinydb.middlewares import CachingMiddleware
@@ -245,36 +245,7 @@ class Database:
         chk_dir = self.directory / "chk"
         if chk_dir.exists() and chk_dir.is_dir():
             for file in chk_dir.glob("*.chk.json"):
-                process_file(file, is_checkpoint=True)
-        
-    # def load_tracks(self):
-    #     """
-    #     Scan the directory for JSON files, including files in the 'chk' subdirectory.
-    #     Extract metadata from each file and store it in the TinyDB.
-    #     Files ending with '.chk.json' are flagged with a "Checkpoint" flag.
-    #     """
-    #     # Clear the DB before re-loading.
-    #     self.db.truncate()
-    #     self.tracks = []  # Reset our local track list
-
-    #     # Process JSON files in the main directory.
-    #     for file in self.directory.glob("*.json"):
-    #         meta = extract_metadata_from_file(file)
-    #         meta["checkpoint"] = False
-    #         # If the file name ends with ".chk.json", flag it as a checkpoint.
-    #         if file.name.endswith(".chk.json"):
-    #             meta["checkpoint"] = True
-    #         self.db.insert(meta)
-    #         self.tracks.append(meta)
-
-    #     # Process JSON files in the 'chk' subdirectory (if it exists).
-    #     chk_dir = self.directory / "chk"
-    #     if chk_dir.exists() and chk_dir.is_dir():
-    #         for file in chk_dir.glob("*.chk.json"):
-    #             meta = extract_metadata_from_file(file)
-    #             meta["checkpoint"] = True
-    #             self.db.insert(meta)
-    #             self.tracks.append(meta)
+                process_file(file, is_checkpoint=True)        
             
     def list_tracks(self) -> List[Dict[str, Any]]:
         """
@@ -321,6 +292,44 @@ class Database:
         print("Invalid track index")
         return {}
 
+    def get_track_path(self, identifier: Union[int, str]) -> Optional[Path]:
+        """
+        Return full path for the selected track, identified by index or filename.
+        If the track is a checkpoint, check both the main directory and 'chk' subdirectory.
+        """
+        self.tracks = self.db.all()
+
+        if isinstance(identifier, int):  # Lookup by index
+            if 0 <= identifier < len(self.tracks):
+                track = self.tracks[identifier]
+            else:
+                self.logger.warning("Invalid track index")
+                return None
+        elif isinstance(identifier, str):  # Lookup by filename
+            track = next((t for t in self.tracks if t["filename"] == identifier), None)
+            if not track:
+                self.logger.warning(f"Track with filename '{identifier}' not found in DB")
+                return None
+        else:
+            self.logger.warning("Invalid identifier type")
+            return None
+
+        filename = track["filename"]
+
+        # Check if it's a checkpoint track
+        if track.get("checkpoint", False):
+            chk_path = self.directory / "chk" / filename
+            if chk_path.exists():
+                return chk_path
+
+        # Default to searching in the main directory
+        file_path = self.directory / filename
+        if file_path.exists():
+            return file_path
+
+        self.logger.warning(f"File '{filename}' not found in expected directories.")
+        return None
+    
     def update_track_metadata(self, filename: str, new_metadata: Dict[str, Any]):
         """
         Update the metadata for a given track identified by filename.

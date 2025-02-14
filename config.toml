@@ -13,7 +13,7 @@ interval = 1
 output_dir = "data"
 
 [webapp]
-logger_fname = "mockup.log"
+logger_fname = "default.log"
 track_manager_directory = "data/"
 # Remote unit names mapping.
-rm_thesaurus = { rm1 = "GPS+IMU", rm2 = "Anemometer" }
+rm_thesaurus = {rm1 = "GPS+IMU", rm2 = "Anemometer"}
