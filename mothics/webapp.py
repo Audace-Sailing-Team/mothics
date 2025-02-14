@@ -1,8 +1,9 @@
-import math
+import requests
 import time
 import logging
 from flask import Flask, render_template, jsonify, request, Response
 from threading import Thread
+from multiprocessing import Process
 from .bokeh_plots import create_bokeh_plots
 from .helpers import tipify, compute_status
 from .database import Database
@@ -29,8 +30,8 @@ class WebApp:
         self.plot_realtime_url = "http://localhost:5006/bokeh_app"
         
         # Setup logger
-        self.logger = logging.getLogger("WebApp")
         logging.getLogger("werkzeug").setLevel(logging.ERROR)
+        self.logger = logging.getLogger("WebApp")
         
         # Create the Flask app
         self.app = Flask(__name__, template_folder="templates", static_folder='static')
@@ -61,11 +62,16 @@ class WebApp:
         self.app.register_blueprint(save_bp)
         self.app.register_blueprint(database_bp)
         # self.app.register_blueprint(control_bp, url_prefix='/control')
-        
-    def run(self, host="0.0.0.0", port=5000, debug=False):
-        self.app.run(host=host, port=port, debug=debug)
 
-    def start_in_background(self, host="0.0.0.0", port=5000, debug=False):
-        thread = Thread(target=self.run, kwargs={"host": host, "port": port, "debug": debug})
-        thread.daemon = True
-        thread.start()
+    def run(self, host="0.0.0.0", port=5000, debug=False):
+        # self.process = Process(target=self.app.run, kwargs={"host": host, "port": port, "debug": debug, "use_reloader": False})
+        self.process = Thread(target=self.app.run, kwargs={"host": host, "port": port, "debug": debug, "use_reloader": False})
+        self.process.daemon = True
+        self.process.start()
+
+    # def stop(self):
+    #     try:            
+    #         self.process.terminate()
+    #         self.logger.info("server shutdown successfully.")
+    #     except Exception as e:
+    #         self.logger.critical(f"error shutting down WebApp: {e}")
