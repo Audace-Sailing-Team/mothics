@@ -1,3 +1,5 @@
+import requests
+import os
 import sys
 import logging
 from datetime import datetime, timedelta
@@ -95,3 +97,54 @@ def format_duration(seconds):
     hours, remainder = divmod(seconds, 3600)
     minutes, secs = divmod(remainder, 60)
     return f"{hours}h:{minutes}m:{secs}s"
+
+
+def download_file(url, dest_path):
+    """Download a file from the URL if it doesn't already exist."""
+    if os.path.exists(dest_path):
+        return
+
+    response = requests.get(url)
+    response.raise_for_status()  # Raise an error for bad status codes
+
+    # Create the destination directory if it doesn't exist
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+
+    with open(dest_path, 'wb') as f:
+        f.write(response.content)
+
+    
+def download_cdn(urls=None, outdir='static'):
+    if urls is None:
+        urls = [
+            "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css",
+            "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"
+        ]
+    
+    for url in urls:
+        # Extract the filename from the URL
+        filename = os.path.basename(url)
+        # Generate the destination path
+        dest = os.path.join(outdir, filename)
+        download_file(url, dest)
+
+
+def check_cdn_availability(urls=None, outdir='static'):
+    """
+    Check whether the CDN files are available in the output directory.
+    Returns a list of missing files (empty if all are present).
+    """
+    missing_files = []
+    if urls is None:
+        urls = [
+            "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css",
+            "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"
+        ]
+    
+    for url in urls:
+        filename = os.path.basename(url)
+        dest = os.path.join(outdir, filename)
+        if not os.path.exists(dest):
+            missing_files.append(dest)
+    
+    return missing_files

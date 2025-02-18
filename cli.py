@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import requests
 import psutil
 import argh
 import toml
@@ -11,6 +12,7 @@ import csv
 import sys
 import shutil
 import threading
+import subprocess
 from tabulate import tabulate
 from cmd import Cmd
 from datetime import datetime
@@ -20,7 +22,7 @@ from typing import Optional, List, Dict, Any
 from mothics.aggregator import Aggregator
 from mothics.comm_interface import MQTTInterface, SerialInterface, Communicator
 from mothics.webapp import WebApp
-from mothics.helpers import setup_logger, tipify
+from mothics.helpers import setup_logger, tipify, check_cdn_availability, download_cdn
 from mothics.track import Track
 from mothics.database import Database
 
@@ -57,6 +59,36 @@ class SystemManager:
         else:
             self.logger.info(f"no configuration file '{config_file}' found. Using defaults.")
 
+    def initialize_cdns(self):
+        """ Initializes CDNs for webapp display """
+        # Get CDN URLs from configuration
+        cdn_urls = self.config.get("webapp", {}).get("cdns", [])
+        if not cdn_urls:
+            self.logger.warning("no CDN URLs specified in configuration. Skipping CDN initialization")
+            return
+
+        # Check if required CDN files are already cached locally
+        cdn_dir = os.path.join(os.getcwd(), self.config.get("webapp", {}).get("cdn_directory", []))
+        missing_files = check_cdn_availability(urls=cdn_urls, outdir=cdn_dir)
+        if not missing_files:
+            self.logger.info("all required CDN files are cached")
+            return
+
+        # Check internet connectivity before attempting to download missing files
+        try:
+            # Use a HEAD request to a well-known website to verify connectivity.
+            response = requests.head("https://www.google.com", timeout=5)
+            if response.status_code != 200:
+                raise Exception(f"connectivity check returned unexpected status code: {response.status_code}")
+        except Exception as e:
+            self.logger.warning(f"internet connectivity is not available. Cannot download missing CDNs, got: {e}")
+            self.logger.warning("proceeding without updated CDN files")
+            return
+
+        # Download missing CDN files using the existing download_cdn function
+        self.logger.info(f"internet available. Downloading missing CDN files to {cdn_dir}")
+        download_cdn(urls=cdn_urls, outdir=cdn_dir)
+    
     def initialize_database(self, aggregator_config=None, webapp_config=None):
         """ Initializes the database. """
         # Get configs
@@ -98,6 +130,9 @@ class SystemManager:
     def initialize_webapp(self, webapp_config, output_dir):
         """ Initializes the web application with necessary getters and setters. """
         if not self.webapp:
+            # Initialize CDNs
+            self.initialize_cdns()
+            # Initialize Webapp
             getters = {
                 'database': lambda: self.track.get_current(),
                 'save_status': lambda: self.track.save_mode
@@ -138,7 +173,8 @@ class SystemManager:
         # Set up web app
         self.initialize_webapp(webapp_config, output_dir)
 
-        self.logger.info("Live mode started")
+        self.mode = 'live'
+        self.logger.info("live mode started")
 
     def start_replay(self, track_file=None, aggregator_config=None, webapp_config=None):
         aggregator_config, webapp_config, output_dir = self.initialize_common_components("replay", track_file, aggregator_config, webapp_config)
@@ -150,7 +186,8 @@ class SystemManager:
         # Set up web app
         self.initialize_webapp(webapp_config, output_dir)
 
-        self.logger.info("Replay mode started")            
+        self.mode = 'replay'
+        self.logger.info("replay mode started")
 
     def stop(self):
         self.logger.info("stopping system")
@@ -171,7 +208,7 @@ class SystemManager:
     def restart(self, mode=None):
         self.logger.info("restarting system")
         if mode is None:
-            current_mode = self.mode
+            mode = self.mode
         self.stop()
         time.sleep(1)
         if mode == "live":
@@ -179,7 +216,7 @@ class SystemManager:
         elif mode == "replay":
             self.start_replay()
         else:
-            self.logger.error("no valid mode found for restart")
+            self.logger.error(f"no valid mode found for restart, got: {mode}")
 
     def get_status(self):
         return {
@@ -334,7 +371,34 @@ class MothicsCLI(Cmd):
 
         # Print as a table
         print(f'\n{tabulate(data, headers=["Resource", "Usage"], tablefmt="github")}')
-                
+
+    def do_shell(self, args):
+        """Execute shell commands without exiting the CLI.
+        
+        Usage:
+            shell <command>
+            !<command>  (shortcut)
+        """
+        if not args:
+            print("Please provide a shell command.")
+            return
+
+        try:
+            result = subprocess.run(args, shell=True, text=True, capture_output=True)
+            print(result.stdout)  # Print command output
+            if result.stderr:
+                print("Error:", result.stderr)
+        except Exception as e:
+            print(f"Error executing command: {e}")
+
+    def default(self, line):
+        """Allows using '!' as a shortcut to run shell commands."""
+        if line.startswith("!"):
+            self.do_shell(line[1:])
+        else:
+            print(f"Unknown command: {line}")
+
+        
     def do_exit(self, args):
         """Exit the CLI stopping processes."""
         print("Exiting CLI.")
@@ -348,7 +412,7 @@ class MothicsCLI(Cmd):
         """Exit the CLI abruptly."""
         print("Exiting CLI abruptly.")
         return True
-
+    
     def do_EOF(self, args):
         """Exit on Ctrl-D (EOF)."""
         print("Exiting CLI.")
