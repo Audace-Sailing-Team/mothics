@@ -237,13 +237,15 @@ system_manager = SystemManager()
 class MothicsCLI(Cmd):
     prompt = '(mothics) '
     intro = """
-    ===================================
+    ==============================================
     Mothics - Moth Analytics 
-    Audace Sailing Team - 2025
+    Iacopo Ricci - Audace Sailing Team - 2025
     
+    Default SSH address: \t 192.168.42.1
+    Default dashboard address: \t 192.168.42.1:5000
     Type "help" for available commands.
     Type "exit" or <CTRL-D> to quit.
-    ===================================
+    ==============================================
     """
     
     def do_start(self, args):
