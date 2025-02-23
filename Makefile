@@ -3,7 +3,7 @@ VENV = .venv
 PYTHON = $(VENV)/bin/python
 PIP = $(VENV)/bin/pip
 
-.PHONY: all venv install update pep8 clean
+.PHONY: all venv install update pep8 clean install-service setup
 
 # By default, create the virtual environment and install the package.
 all: venv install
@@ -37,3 +37,15 @@ clean:
 	find . -type d -name '__pycache__' -exec rm -rf {} +
 	find . -type f -name '*.pyc' -delete
 	rm -rf build/ dist/ *.egg-info
+
+# Install systemd service
+install-service:
+	@echo "Installing systemd service..."
+	sudo cp mothics.service /etc/systemd/system/mothics.service
+	sudo systemctl daemon-reload
+	sudo systemctl enable mothics.service
+	sudo systemctl start mothics.service
+
+# Setup target to run everything
+setup: all install-service
+	@echo "Setup complete: package installed and systemd service started."

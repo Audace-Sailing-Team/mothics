@@ -1,0 +1,13 @@
+[Unit]
+Description=Mothics CLI Service
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/mothics
+ExecStart=/usr/bin/tmux new-session -s mothics -d "python3 cli.py start live"
+ExecStop=/usr/bin/tmux kill-session -t mothics
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
