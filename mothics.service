@@ -4,10 +4,12 @@ After=network.target
 
 [Service]
 User=root
-WorkingDirectory=/root/mothics
-ExecStart=/usr/bin/tmux new-session -s mothics -d "python3 cli.py start live"
+WorkingDirectory=/root/central-unit
+ExecStart=/bin/bash /root/central-unit/cli.sh
 ExecStop=/usr/bin/tmux kill-session -t mothics
 Restart=on-failure
+Type=forking
 
 [Install]
 WantedBy=multi-user.target
+
