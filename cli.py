@@ -423,4 +423,10 @@ class MothicsCLI(Cmd):
             return False
 
 if __name__ == '__main__':
-    MothicsCLI().cmdloop()
+    cli = MothicsCLI()
+    if len(sys.argv) > 1:
+        # Execute the command passed as argument
+        command = " ".join(sys.argv[1:])
+        cli.onecmd(command)
+    # Now drop into the interactive CLI
+    cli.cmdloop()
