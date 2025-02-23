@@ -25,13 +25,11 @@ The following packages are required:
 > Note: Mothics is designed for use on DietPi and Ubuntu.
 
 ### Installation
-Clone the repository and set up the virtual environment
+Clone the repository and set up the package
 ```sh
-# Clone the repository
 git clone https://github.com/yourrepo/mothics.git
 cd mothics
 
-# Set up the virtual environment and install dependencies
 make
 ```
 
@@ -61,6 +59,7 @@ ssh root@192.168.42.1
 To manually run Mothics
 ```sh
 cd mothics
+. .venv/bin/activate
 python3 cli.py 
 ```
 
@@ -87,18 +86,21 @@ The dashboard allows you to:
 - view available tracks
 
 ## Integrated CLI
-Mothics includes a command-line interface (CLI) to manage tracks and system status. Start it with
+Mothics includes a command-line interface (CLI) to manage tracks and
+system status. Ensure the virtual environment is active, and start the
+CLI with
 ```sh
 python -m cli.py
 ```
 
-To exit the CLI, use `exit` or `CTRL-D`. Documentation for most CLI
-commands is available; run
+To exit the CLI, use `exit` or `CTRL-D`. 
+
+Documentation for most CLI commands is available; run
 ```sh
 (mothics) help <command>
 ```
 
-### Available Commands:
+### Available commands
 - `start live`: starts real-time monitoring
 - `start replay <track_file>`: replays a saved track
 - `start database`: initializes the database
@@ -117,6 +119,10 @@ To see all available commands, run
 ```sh
 (mothics) help
 ```
+
+### Settings
+Mothics settings can be found in `config.toml`. After updating them,
+restart Mothics.
 
 ## Authors
  - [Iacopo Ricci](https://www.iricci.frama.io)
