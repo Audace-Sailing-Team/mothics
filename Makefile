@@ -3,7 +3,7 @@ VENV = .venv
 PYTHON = $(VENV)/bin/python
 PIP = $(VENV)/bin/pip
 
-.PHONY: all venv install update pep8 clean install-service setup
+.PHONY: all venv install update pep8 clean install-service
 
 # By default, create the virtual environment and install the package.
 all: venv install
@@ -19,7 +19,6 @@ install: venv
 	@if [ -f requirements.txt ]; then \
 		$(PIP) install -r requirements.txt; \
 	fi
-	$(PIP) install .
 
 # Update the package:
 # - Pull the latest changes from git
@@ -45,7 +44,3 @@ install-service:
 	sudo systemctl daemon-reload
 	sudo systemctl enable mothics.service
 	sudo systemctl start mothics.service
-
-# Setup target to run everything
-setup: all install-service
-	@echo "Setup complete: package installed and systemd service started."
