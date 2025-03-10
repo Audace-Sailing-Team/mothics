@@ -355,25 +355,79 @@ class MothicsCLI(Cmd):
             else:
                 print("Log file not found.")
 
+    # def do_resources(self, args):
+    #     """Show resource usage of the CLI and its dependencies."""
+    #     process = psutil.Process(os.getpid())  # Get current process info
+    #     mem_info = process.memory_info()
+    #     cpu_usage = process.cpu_percent(interval=0.1)
+    #     open_files = len(process.open_files())
+    #     threads = process.num_threads()
+
+    #     # Prepare data for tabulation
+    #     data = [
+    #         ["CPU usage (estimate)", f"{cpu_usage:.2f} %"],
+    #         ["Memory usage (RSS)", f"{mem_info.rss / 1024 ** 2:.2f} MB"],
+    #         ["Open file descriptors", open_files],
+    #         ["Thread count", threads]
+    #     ]
+
+    #     # Print as a table
+    #     print(f'\n{tabulate(data, headers=["Resource", "Usage"], tablefmt="github")}')
+
     def do_resources(self, args):
-        """Show resource usage of the CLI and its dependencies."""
-        process = psutil.Process(os.getpid())  # Get current process info
-        mem_info = process.memory_info()
-        cpu_usage = process.cpu_percent(interval=0.1)
-        open_files = len(process.open_files())
-        threads = process.num_threads()
+        """
+        Show resource usage.
+        
+        Usage:
+            resources mothics  - Show only CLI process resource usage.
+            resources system   - Show system-wide resource usage.
+            resources          - Show both.
+        """
+        parts = args.split()
+        mode = parts[0].lower() if parts else "both"
 
-        # Prepare data for tabulation
-        data = [
-            ["CPU usage (estimate)", f"{cpu_usage:.2f} %"],
-            ["Memory usage (RSS)", f"{mem_info.rss / 1024 ** 2:.2f} MB"],
-            ["Open file descriptors", open_files],
-            ["Thread count", threads]
-        ]
+        if mode not in ["mothics", "system", "both"]:
+            print("Invalid option. Use 'resources mothics', 'resources system', or 'resources'.")
+            return
 
-        # Print as a table
-        print(f'\n{tabulate(data, headers=["Resource", "Usage"], tablefmt="github")}')
+        data_cli, data_system = [], []
 
+        system_cpu = psutil.cpu_percent(interval=0.1)
+        system_memory = psutil.virtual_memory()
+        system_swap = psutil.swap_memory()
+        system_disk = psutil.disk_usage('/')
+        system_processes = len(psutil.pids())
+        
+        # process-specific info (Mothics CLI)
+        if mode in ["mothics", "both"]:
+            process = psutil.Process(os.getpid())  # Get current process info
+            mem_info = process.memory_info()
+            cpu_usage = process.cpu_percent(interval=0.1)
+            open_files = len(process.open_files())
+            threads = process.num_threads()
+
+            data_cli.extend([
+                ["CPU usage", f"{cpu_usage:.2f} %"],
+                ["Memory (RSS)", f"{mem_info.rss / 1024 ** 2:.2f} MB / {system_memory.total / 1024 ** 2:.2f} MB"],
+                ["Open file descriptors", open_files],
+                ["Thread count", threads],
+            ])
+            print('Mothics CLI')
+            print(f'{tabulate(data_cli, headers=["Resource", "Usage"], tablefmt="github")}\n')
+        # system-wide info (like `htop`)
+        if mode in ["system", "both"]:
+            data_system.extend([
+                ["CPU usage", f"{system_cpu:.2f} %"],
+                ["Memory usage", f"{system_memory.used / 1024 ** 2:.2f} MB / {system_memory.total / 1024 ** 2:.2f} MB"],
+                ["Swap usage", f"{system_swap.used / 1024 ** 2:.2f} MB / {system_swap.total / 1024 ** 2:.2f} MB"],
+                ["Disk usage", f"{system_disk.used / 1024 ** 2:.2f} GB / {system_disk.total / 1024 ** 2:.2f} GB"],
+                ["Running processes", system_processes],
+            ])
+        
+            print('System')
+            print(f'{tabulate(data_system, headers=["Resource", "Usage"], tablefmt="github")}\n')
+
+        
     def do_shell(self, args):
         """Execute shell commands without exiting the CLI.
         
