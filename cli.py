@@ -423,7 +423,17 @@ class MothicsCLI(Cmd):
                 ["Disk usage", f"{system_disk.used / 1024 ** 2:.2f} GB / {system_disk.total / 1024 ** 2:.2f} GB"],
                 ["Running processes", system_processes],
             ])
-        
+            # try fetching temperature info
+            try:
+                temps = psutil.sensors_temperatures()
+                if temps:
+                    for name, entries in temps.items():
+                        if name == 'coretemp':
+                            coretemps = [e.current for e in entries]
+                            data_system.append([f"CPU avg temp ({name})", f"{sum(coretemps)/len(coretemps):.1f}°C"])
+            except AttributeError:
+                data_system.append(["CPU temperature", "not available"])
+            
             print('System')
             print(f'{tabulate(data_system, headers=["Resource", "Usage"], tablefmt="github")}\n')
 
