@@ -423,7 +423,29 @@ class MothicsCLI(Cmd):
             return True
         except:
             return False
+        
+    def do_interface_refresh(self, args):
+        """
+        Refresh the communicator (re-connect new or disconnected interfaces).
+        Usage:
+            refresh
+            refresh force
+        If 'force' is specified, all interfaces will be disconnected and then reconnected.
+        """
+        if not system_manager.communicator:
+            print("Communicator not initialized, nothing to refresh.")
+            return
 
+        force = False
+        parts = args.split()
+        if parts and parts[0].lower() == "force":
+            force = True
+        try:
+            system_manager.communicator.refresh(force_reconnect=force)
+        except Exception as e:
+            print(f"error refreshing communicator: {e}")
+
+            
 if __name__ == '__main__':
     cli = MothicsCLI()
     if len(sys.argv) > 1:

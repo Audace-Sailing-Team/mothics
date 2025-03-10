@@ -85,6 +85,10 @@ The dashboard allows you to:
 - manage track saving
 - view available tracks
 
+> **Note**: the first startup should be done with an active internet
+> connection. Without it, needed CDNs will not be available and the
+> dashboard won't load properly.
+
 ## Integrated CLI
 Mothics includes a command-line interface (CLI) to manage tracks and
 system status. Ensure the virtual environment is active, and start the
