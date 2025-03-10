@@ -428,9 +428,13 @@ class MothicsCLI(Cmd):
                 temps = psutil.sensors_temperatures()
                 if temps:
                     for name, entries in temps.items():
+                        # 'coretemp': temperature readings for ubuntu
                         if name == 'coretemp':
                             coretemps = [e.current for e in entries]
                             data_system.append([f"CPU avg temp ({name})", f"{sum(coretemps)/len(coretemps):.1f}°C"])
+                        # 'cpu_thermal': temperature readings for dietpi
+                        elif name == 'cpu_thermal':
+                            data_system.append([f"CPU avg temp ({name})", f"{entries[0].current:.1f}°C"])
             except AttributeError:
                 data_system.append(["CPU temperature", "not available"])
             
