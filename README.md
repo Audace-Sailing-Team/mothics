@@ -110,12 +110,15 @@ Documentation for most CLI commands is available; run
 - `start database`: initializes the database
 - `stop`: stops the running system
 - `restart`: restarts the system
+- `interface_refresh`: refresh communication interfaces
 - `status`: shows system status
 - `list_tracks`: lists available tracks
 - `select_track <index>`: selects a track by index
 - `log show`: displays logs
 - `log clear`: clears logs
 - `resources`: shows resource usage
+- `resources mothics`: shows resource usage due to Mothics
+- `resources system`: shows system-wide resource usage
 - `!<command>`: executes a shell command
 - `exit`: exits the CLI
 
