@@ -16,7 +16,7 @@ from .helpers import setup_logger, tipify
 
 class BaseInterface:
     """Base Interface class for communications"""
-    
+
     def connect(self):
         """Establish a connection."""
         pass
@@ -51,7 +51,9 @@ class SerialInterface(BaseInterface):
         """Client topics to subscribe to"""
         self.raw_data = {k: [] for k in self.topics}
         """Dictionary of all raw data fetched from available topics. Topics are keys, list of {timestamp: quantity} as values"""
-
+        self.connected = False
+        """Connection status flag"""
+        
         # Setup logger
         self.logger = logging.getLogger("Serial-Interface")
         self.logger.info("-------------Serial Interface-------------")
@@ -61,6 +63,7 @@ class SerialInterface(BaseInterface):
         try:
             self.serial_conn = serial.Serial(self.port, self.baudrate, timeout=1)
             self.logger.info(f"connected to {self.port} at {self.baudrate} baud.")
+            self.connected = True
         except serial.SerialException as e:
             self.logger.critical(f"failed to connect to {self.port}: {e}")
             raise RuntimeError(f"failed to connect to {self.port}: {e}")
@@ -94,7 +97,7 @@ class SerialInterface(BaseInterface):
             try:
                 line = self.serial_conn.readline().decode('utf-8').strip()
                 if line:
-                    self.logger.info(f"received: {line}")
+                    self.logger.debug(f"received: {line}")
                     message = json.loads(line)
                     # Suboptimal way to get topic and value, given a
                     # single topic-value pair is passed at each serial
@@ -122,7 +125,8 @@ class SerialInterface(BaseInterface):
         if self.serial_conn and self.serial_conn.is_open:
             self.serial_conn.close()
             self.logger.info("serial connection closed.")
-
+        self.connected = False
+            
     def publish(self, topic: str, payload):
         """Send data over serial."""
         if not self.serial_conn or not self.serial_conn.is_open:
@@ -155,6 +159,8 @@ class MQTTInterface(BaseInterface):
         """Client topics to subscribe to"""
         self.raw_data = {k: [] for k in self.topics}
         """Dictionary of all raw data fetched from available topics. Topics are keys, list of {timestamp: quantity} as values"""
+        self.connected = False
+        """Connection status flag"""
         
         # Initialize client
         self.client = mqtt.Client()
@@ -196,7 +202,7 @@ class MQTTInterface(BaseInterface):
         
         :param msg: The MQTT message received.
         """
-        self.logger.info(f"message received on {msg.topic}: {msg.payload.decode()}")
+        self.logger.debug(f"message received on {msg.topic}: {msg.payload.decode()}")
         try:
             data = tipify(msg.payload.decode())
             # Pass topic and data to the external handler
@@ -211,6 +217,7 @@ class MQTTInterface(BaseInterface):
         try:
             self.client.connect(self.hostname, self.port, keepalive=self.keep_alive)
             self.logger.info(f"connected to {self.hostname} at port {self.port}.")
+            self.connected = True
         except (MQTTException, OSError) as e:
             self.logger.critical(f"failed to connect to {self.hostname} at port {self.port}: {e}")
             raise RuntimeError(f"failed to connect to {self.hostname} at port {self.port}: {e}")
@@ -224,6 +231,7 @@ class MQTTInterface(BaseInterface):
         self.client.loop_stop()
         # Close connection
         self.client.disconnect()
+        self.connected = False
         
     def on_message_callback(self, topic, data):
         """Aggregate raw data from messages into dict"""
@@ -335,8 +343,7 @@ class Communicator:
                 failed_interfaces.append(name)
 
         if failed_interfaces == list(self.interfaces.keys()):
-            self.logger.critical('failed to start all interfaces')
-            raise RuntimeError('failed to start all interfaces')
+            self.logger.warning('failed to start all interfaces')
 
         if failed_interfaces:
             error_msg = f"Failed to start interfaces: {', '.join(failed_interfaces)}"
@@ -407,7 +414,41 @@ class Communicator:
             except Exception as e:
                 self.logger.warning(f"failed to publish to {interface_name}: {e}")
 
+    def refresh(self, force_reconnect=False):
+        """
+        Refresh the communicator by connecting any new interfaces and optionally
+        reconnecting existing ones
+        
+        Args:
+            force_reconnect (bool): If True, forcibly disconnect and reconnect
+                                    all existing interfaces
+        """
+        
+        if force_reconnect:
+            # Disconnect everything first
+            self.logger.info("force reconnect: stopping all interfaces before refresh")
+            for name, interface in list(self.interfaces.items()):
+                try:
+                    interface.disconnect()
+                except Exception as e:
+                    self.logger.warning(f"error stopping {name}: {e}")
 
+        # Now connect all (or reconnect in the case of 'force_reconnect')
+        failed_interfaces = []
+        for name, interface in self.interfaces.items():
+            if not interface.connected:
+                try:
+                    interface.connect()
+                    self.logger.info(f"refreshed and started {name}")
+                except Exception as e:
+                    self.logger.warning(f"failed to refresh {name}: {e}")
+                    failed_interfaces.append(name)
+
+        if failed_interfaces:
+            error_msg = f"failed to refresh interfaces: {', '.join(failed_interfaces)}"
+            self.logger.warning(error_msg)
+            
+                
 if __name__ == "__main__":
     pass
 #    # Test code
