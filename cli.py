@@ -325,7 +325,7 @@ class MothicsCLI(Cmd):
             
             # Compare commits
             if local_commit != remote_commit:
-                print("\033[93m[UPDATE AVAILABLE]\033[0m A new version is available! Run:\n  git pull")
+                print("\033[93m[UPDATE AVAILABLE]\033[0m A new version is available! Run: git pull")
                         
         except subprocess.CalledProcessError as e:
             print(f"\033[91m[GIT ERROR]\033[0m Unable to check for updates: {e}")
