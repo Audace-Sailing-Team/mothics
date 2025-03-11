@@ -284,10 +284,8 @@ class MothicsCLI(Cmd):
     system_manager = SystemManager()
 
     def preloop(self):
-        """Check for updates before entering the CLI loop."""
-
-        print("\nChecking for updates...")
-
+        
+        # Check for updates before entering the CLI loop
         # Skip if no internet
         if not check_internet_connectivity():
             print("\033[91m[WARNING]\033[0m No internet connection. Skipping update check.")
@@ -305,7 +303,6 @@ class MothicsCLI(Cmd):
 
             # Use the first available remote instead of assuming "origin"
             remote_name = remotes[0]
-            print(f"\033[94m[INFO]\033[0m Using remote: {remote_name}")
 
             # Fetch latest changes from the detected remote
             subprocess.run(["git", "fetch", remote_name], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
