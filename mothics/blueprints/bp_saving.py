@@ -15,7 +15,7 @@ def start_save():
 @save_bp.route('/end_save', methods=['POST'])
 def end_save():
     try:
-        current_app.config['SETTERS']['end_save']()
+        current_app.config['SETTERS']['stop_save']()
         return jsonify({'status': 'success', 'message': 'Continuous sampling ended.'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500

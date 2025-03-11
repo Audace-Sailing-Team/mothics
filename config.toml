@@ -10,13 +10,20 @@ topics = ["rm1/gps/lat", "rm1/gps/long"]
 
 [aggregator]
 interval = 1
+
+[saving]
+# Default data-logging mode: 'continuous' or 'on-demand'
+default_mode = "continuous"
+
+[files]
+# Please use '_fname' for files and '_dir' for directories
+logger_fname = "default.log"
+cdn_dir = "mothics/static"
 output_dir = "data"
 
 [webapp]
-logger_fname = "default.log"
 track_manager_directory = "data/"
-# Remote unit names mapping.
+# Remote unit names mapping
 rm_thesaurus = {rm1 = "GPS+IMU", rm2 = "Anemometer"}
 # CDNs to download
 cdns = ["https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css", "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js", "https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.js", "https://cdn.bokeh.org/bokeh/release/bokeh-widgets-3.6.2.min.js", "https://cdn.bokeh.org/bokeh/release/bokeh-tables-3.6.2.min.js"]
-cdn_directory = "mothics/static"

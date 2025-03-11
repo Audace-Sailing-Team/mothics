@@ -110,6 +110,8 @@ Documentation for most CLI commands is available; run
 - `start database`: initializes the database
 - `stop`: stops the running system
 - `restart`: restarts the system
+- `restart reload_config`: restarts the system and reload the
+  configuration file
 - `interface_refresh`: refresh communication interfaces
 - `status`: shows system status
 - `list_tracks`: lists available tracks
@@ -129,7 +131,7 @@ To see all available commands, run
 
 ### Settings
 Mothics settings can be found in `config.toml`. After updating them,
-restart Mothics.
+restart Mothics or use `restart reload_config`.
 
 ## Authors
  - [Iacopo Ricci](https://www.iricci.frama.io)
