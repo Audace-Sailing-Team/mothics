@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import copy
 import requests
 import psutil
 import argh
@@ -22,112 +23,149 @@ from typing import Optional, List, Dict, Any
 from mothics.aggregator import Aggregator
 from mothics.comm_interface import MQTTInterface, SerialInterface, Communicator
 from mothics.webapp import WebApp
-from mothics.helpers import setup_logger, tipify, check_cdn_availability, download_cdn
+from mothics.helpers import setup_logger, tipify, check_cdn_availability, download_cdn, check_internet_connectivity
 from mothics.track import Track
 from mothics.database import Database
 
 
+# Default configuration values to be used if `config.toml` cannot be found
+DEFAULT_CONFIG = {
+    "serial": {
+        "port": "/dev/ttyACM0",
+        "baudrate": 9600,
+        "topics": "rm2/wind/speed"
+    },
+    "mqtt": {
+        "hostname": "test.mosquitto.org",
+        "topics": ["rm1/gps/lat", "rm1/gps/long"]
+    },
+    "aggregator": {
+        "interval": 1
+    },
+    "saving": {
+        "default_mode": "continuous"
+    },
+    "files": {
+        "logger_fname": "default.log",
+        "cdn_dir": "mothics/static",
+        "output_dir": "data"
+    },
+    "webapp": {
+        "track_manager_directory": "data/",
+        "rm_thesaurus": {
+            "rm1": "GPS+IMU",
+            "rm2": "Anemometer"
+        }
+    }
+}
+
+
+# System manager
 class SystemManager:
     def __init__(self, config_file="config.toml"):
         self.mode = None  # "live" or "replay"
-        self.config = {}
+        self.config_file = config_file
         self.communicator = None
         self.aggregator = None
         self.webapp = None
         self.track = None
         self.database = None
-        self.load_config(config_file)
+        self.config = copy.deepcopy(DEFAULT_CONFIG)  # Always start with default settings as a failsafe
+        
+        self.load_config()
 
     def _setup_logger(self, logger_fname):
         setup_logger('logger', fname=logger_fname, silent=False)
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger("SystemManager")
-        
-    def load_config(self, config_file):
-        if os.path.exists(config_file):
-            try:
-                self.config = toml.load(config_file)
-                
-                # Setup logger
-                logger_fname = self.config.get("logging", {}).get("logger_fname", os.path.join(os.getcwd(), 'default.log'))    
-                self._setup_logger(logger_fname)
-                
-                self.logger.info(f"loaded configuration from {config_file}")
-            except Exception as e:
-                self.logger = logging.getLogger("SystemManager")
-                self.logger.critical(f"error loading configuration from {config_file}: {e}")
-        else:
-            self.logger.info(f"no configuration file '{config_file}' found. Using defaults.")
 
+    def load_config(self):
+        """Loads the configuration file and merges it with defaults."""
+        config_from_file = {}
+        
+        if os.path.exists(self.config_file):
+            try:
+                config_from_file = toml.load(self.config_file)
+            except Exception as e:
+                # Initialize the logger even if config loading fails
+                self._setup_logger(self.config["files"]["logger_fname"])
+                
+                self.logger.warning(f"error loading configuration from {self.config_file}: {e}. Using defaults.")
+        else:
+            # If the config file doesn't exist, log a warning but keep using defaults
+            self._setup_logger(self.config["files"]["logger_fname"])
+            
+            self.logger.info(f"no configuration file '{self.config_file}' found. Using defaults.")
+
+        # Merge loaded config into defaults (config values overwrite defaults)
+        for section, defaults in DEFAULT_CONFIG.items():
+            self.config[section] = {**defaults, **config_from_file.get(section, {})}
+
+        # Set up the logger using the final merged config
+        logger_fname = self.config["files"]["logger_fname"]
+        self._setup_logger(logger_fname)
+        self.logger.info(f"configuration loaded successfully from {self.config_file if config_from_file else 'defaults'}.")
+        
     def initialize_cdns(self):
         """ Initializes CDNs for webapp display """
         # Get CDN URLs from configuration
-        cdn_urls = self.config.get("webapp", {}).get("cdns", [])
+        cdn_urls = self.config["webapp"]["cdns"]
         if not cdn_urls:
             self.logger.warning("no CDN URLs specified in configuration. Skipping CDN initialization")
             return
 
         # Check if required CDN files are already cached locally
-        cdn_dir = os.path.join(os.getcwd(), self.config.get("webapp", {}).get("cdn_directory", []))
+        cdn_dir = os.path.join(os.getcwd(), self.config["files"]["cdn_dir"])
         missing_files = check_cdn_availability(urls=cdn_urls, outdir=cdn_dir)
         if not missing_files:
             self.logger.info("all required CDN files are cached")
             return
-
-        # Check internet connectivity before attempting to download missing files
-        try:
-            # Use a HEAD request to a well-known website to verify connectivity.
-            response = requests.head("https://www.google.com", timeout=5)
-            if response.status_code != 200:
-                raise Exception(f"connectivity check returned unexpected status code: {response.status_code}")
-        except Exception as e:
-            self.logger.warning(f"internet connectivity is not available. Cannot download missing CDNs, got: {e}")
-            self.logger.warning("proceeding without updated CDN files")
+        
+        # Check internet connectivity before downloading missing files
+        if not check_internet_connectivity():
+            self.logger.warning("Internet connectivity is not available. Cannot download missing CDNs.")
+            self.logger.warning("Proceeding without updated CDN files")
             return
 
-        # Download missing CDN files using the existing download_cdn function
-        self.logger.info(f"internet available. Downloading missing CDN files to {cdn_dir}")
+        # Download missing CDN files
+        self.logger.info(f"Internet available. Downloading missing CDN files to {cdn_dir}")
         download_cdn(urls=cdn_urls, outdir=cdn_dir)
-    
-    def initialize_database(self, aggregator_config=None, webapp_config=None):
-        """ Initializes the database. """
-        # Get configs
-        webapp_config = webapp_config or self.config.get("webapp", {"logger_fname": "mockup.log"})
-        aggregator_config = aggregator_config or self.config.get("aggregator", {"interval": 1, "output_dir": "data"})
-        output_dir = aggregator_config.get("output_dir", "data")
 
+    def initialize_database(self):
+        """ Initializes the database. """                                      
+        output_dir = self.config["files"]["output_dir"]
+        rm_thesaurus = self.config["webapp"]["rm_thesaurus"]
+                               
         # Start database
-        self.database = Database(output_dir, rm_thesaurus=webapp_config.get("rm_thesaurus", {}))        
+        self.database = Database(output_dir, rm_thesaurus=rm_thesaurus)
         
-    def initialize_common_components(self, mode, track_file=None, aggregator_config=None, webapp_config=None):
+    def initialize_common_components(self, mode, track_file=None):
         """ Initializes shared components for live and replay modes. """
         self.mode = mode
-        self.logger.info(f"Initializing {mode} mode")
-
-        aggregator_config = aggregator_config or self.config.get("aggregator", {"interval": 1, "output_dir": "data"})
-        webapp_config = webapp_config or self.config.get("webapp", {"logger_fname": "mockup.log"})
-        output_dir = aggregator_config.get("output_dir", "data")
-
+        self.logger.info(f"initializing {mode} mode")
+                               
+        output_dir = self.config["files"]["output_dir"]
         self.initialize_database()
 
         # Initialize track
         self.track = Track(mode=mode, output_dir=output_dir)
+        # Load from file if specified
         if mode == "replay" and track_file:
             self.track.load(track_file)
+        # Set default saving mode
+        self.track.save_mode = self.config["saving"]["default_mode"]
 
-        return aggregator_config, webapp_config, output_dir
-
-    def initialize_aggregator(self, raw_data_getter, aggregator_config, output_dir):
+    def initialize_aggregator(self, raw_data_getter):
         """ Initializes the aggregator with the given raw data source. """
         self.aggregator = Aggregator(
             raw_data_getter=raw_data_getter,
-            interval=aggregator_config.get("interval", 1),
+            interval=self.config["aggregator"]["interval"],
             database=self.track,
-            output_dir=output_dir
+            output_dir=self.config["files"]["output_dir"]
         )
         self.aggregator.start()
 
-    def initialize_webapp(self, webapp_config, output_dir):
+    def initialize_webapp(self):
         """ Initializes the web application with necessary getters and setters. """
         if not self.webapp:
             # Initialize CDNs
@@ -145,46 +183,42 @@ class SystemManager:
             self.webapp = WebApp(
                 getters=getters,
                 setters=setters,
-                logger_fname=webapp_config.get("logger_fname", "mockup.log"),
-                rm_thesaurus=webapp_config.get("rm_thesaurus", {}),
-                track_manager_directory=output_dir
+                logger_fname=self.config["files"]["logger_fname"],
+                rm_thesaurus=self.config["webapp"]["rm_thesaurus"],
+                track_manager_directory=self.config["files"]["output_dir"]
             )
             self.webapp.run()
 
-    def start_live(self, serial_config=None, mqtt_config=None, aggregator_config=None, webapp_config=None):
-        aggregator_config, webapp_config, output_dir = self.initialize_common_components("live", aggregator_config=aggregator_config, webapp_config=webapp_config)
+    def start_live(self):
+        self.initialize_common_components("live")
 
-        # Initialize interfaces and communicator
-        serial_config = serial_config or self.config.get("serial", {})
-        mqtt_config = mqtt_config or self.config.get("mqtt", {})
+        # Initialize interfaces (MQTT and serial) and communicator
         interfaces = {}
-        if serial_config:
-            interfaces[SerialInterface] = serial_config
-        if mqtt_config:
-            interfaces[MQTTInterface] = mqtt_config
+        interfaces[SerialInterface] = self.config["serial"]
+        interfaces[MQTTInterface] = self.config["mqtt"]
 
         self.communicator = Communicator(interfaces=interfaces)
         self.communicator.connect()
 
         # Set up aggregator
         raw_data_getter = lambda: self.communicator.raw_data
-        self.initialize_aggregator(raw_data_getter, aggregator_config, output_dir)
+        self.initialize_aggregator(raw_data_getter)
 
         # Set up web app
-        self.initialize_webapp(webapp_config, output_dir)
+        self.initialize_webapp()
 
         self.mode = 'live'
         self.logger.info("live mode started")
 
-    def start_replay(self, track_file=None, aggregator_config=None, webapp_config=None):
-        aggregator_config, webapp_config, output_dir = self.initialize_common_components("replay", track_file, aggregator_config, webapp_config)
+    def start_replay(self, track_file=None):
+        self.initialize_common_components("replay", track_file, aggregator_config, webapp_config)
 
         # Set up aggregator
         raw_data_getter = lambda: self.track.get_current()
-        self.initialize_aggregator(raw_data_getter, aggregator_config, output_dir)
+        self.initialize_aggregator(raw_data_getter)
 
         # Set up web app
-        self.initialize_webapp(webapp_config, output_dir)
+        self.initialize_webapp()
 
         self.mode = 'replay'
         self.logger.info("replay mode started")
@@ -205,8 +239,12 @@ class SystemManager:
                 self.logger.warning('cannot stop webapp')
         self.logger.info("system stopped")
 
-    def restart(self, mode=None):
+    def restart(self, mode=None, reload_config=False):
         self.logger.info("restarting system")
+        if reload_config:
+            self.logger.info("reloading configuration from file before restart")
+            self.load_config()
+        
         if mode is None:
             mode = self.mode
         self.stop()
@@ -228,11 +266,7 @@ class SystemManager:
             "database": "available" if self.database else "not initialized",
         }
 
-
-# Global instance of SystemManager
-system_manager = SystemManager()
-
-
+                               
 # CLI
 class MothicsCLI(Cmd):
     prompt = '(mothics) '
@@ -247,7 +281,8 @@ class MothicsCLI(Cmd):
     Type "exit" or <CTRL-D> to quit.
     ==============================================
     """
-    
+    system_manager = SystemManager()
+                               
     def do_start(self, args):
         """
         Start the system.
@@ -263,11 +298,11 @@ class MothicsCLI(Cmd):
 
         mode = parts[0].lower()
         if mode == "live":
-            system_manager.start_live()
+            self.system_manager.start_live()
         elif mode == "replay":            
             # Start database
-            if not system_manager.database:
-                system_manager.initialize_database()
+            if not self.system_manager.database:
+                self.system_manager.initialize_database()
 
             if len(parts) <= 1:
                 print("Please specify a track filename")
@@ -277,32 +312,41 @@ class MothicsCLI(Cmd):
                 
             # Handle indices
             fname = tipify(parts[1])
-            track_file = system_manager.database.get_track_path(fname)
-            system_manager.start_replay(track_file=track_file)
+            track_file = self.system_manager.database.get_track_path(fname)
+            self.system_manager.start_replay(track_file=track_file)
         elif mode == "database":
-            system_manager.initialize_database()
+            self.system_manager.initialize_database()
         else:
             print("Invalid mode. Please choose 'live' or 'replay'.")
 
     def do_stop(self, args):
         """Stop the running system."""
-        system_manager.stop()
+        self.system_manager.stop()
 
     def do_restart(self, args):
-        """Restart the system."""
-        system_manager.restart()
+        """
+        Restart the system.
+        
+        Usage:
+            restart
+            restart reload_config
+        """
+        parts = args.split()
+        reload_config = "reload_config" in parts
 
+        self.system_manager.restart(reload_config=reload_config)
+        
     def do_status(self, args):
         """Display the current system status."""
-        status = system_manager.get_status()
+        status = self.system_manager.get_status()
         for key, value in status.items():
             print(f"{key}: {value}")
 
     def do_list_tracks(self, args):
         """List tracks from Database"""
-        if not system_manager.database:
-            system_manager.initialize_database()
-        system_manager.database.list_tracks()
+        if not self.system_manager.database:
+            self.system_manager.initialize_database()
+        self.system_manager.database.list_tracks()
 
     def do_select_track(self, args):
         """
@@ -319,10 +363,10 @@ class MothicsCLI(Cmd):
             print("Please specify a track index")
             return
         
-        if system_manager.database:
-            track_meta = system_manager.database.select_track(index)
+        if self.system_manager.database:
+            track_meta = self.system_manager.database.select_track(index)
             if track_meta:
-                print("Selected Track Metadata:")
+                print("Selected track metadata:")
                 for key, value in track_meta.items():
                     print(f"{key}: {value}")
         else:
@@ -335,7 +379,7 @@ class MothicsCLI(Cmd):
             log show
             log clear
         """        
-        log_file = str(system_manager.config.get("webapp", {}).get("logger_fname", "default.log"))
+        log_file = str(self.system_manager.config["webapp"]["logger_fname"])
 
         parts = args.split()
         if not parts:
@@ -354,25 +398,6 @@ class MothicsCLI(Cmd):
                     open(log_file, 'w').close()
             else:
                 print("Log file not found.")
-
-    # def do_resources(self, args):
-    #     """Show resource usage of the CLI and its dependencies."""
-    #     process = psutil.Process(os.getpid())  # Get current process info
-    #     mem_info = process.memory_info()
-    #     cpu_usage = process.cpu_percent(interval=0.1)
-    #     open_files = len(process.open_files())
-    #     threads = process.num_threads()
-
-    #     # Prepare data for tabulation
-    #     data = [
-    #         ["CPU usage (estimate)", f"{cpu_usage:.2f} %"],
-    #         ["Memory usage (RSS)", f"{mem_info.rss / 1024 ** 2:.2f} MB"],
-    #         ["Open file descriptors", open_files],
-    #         ["Thread count", threads]
-    #     ]
-
-    #     # Print as a table
-    #     print(f'\n{tabulate(data, headers=["Resource", "Usage"], tablefmt="github")}')
 
     def do_resources(self, args):
         """
@@ -467,7 +492,6 @@ class MothicsCLI(Cmd):
             self.do_shell(line[1:])
         else:
             print(f"Unknown command: {line}")
-
         
     def do_exit(self, args):
         """Exit the CLI stopping processes."""
@@ -500,7 +524,7 @@ class MothicsCLI(Cmd):
             refresh force
         If 'force' is specified, all interfaces will be disconnected and then reconnected.
         """
-        if not system_manager.communicator:
+        if not self.system_manager.communicator:
             print("Communicator not initialized, nothing to refresh.")
             return
 
@@ -509,7 +533,7 @@ class MothicsCLI(Cmd):
         if parts and parts[0].lower() == "force":
             force = True
         try:
-            system_manager.communicator.refresh(force_reconnect=force)
+            self.system_manager.communicator.refresh(force_reconnect=force)
         except Exception as e:
             print(f"error refreshing communicator: {e}")
 

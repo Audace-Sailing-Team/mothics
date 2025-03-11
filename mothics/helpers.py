@@ -148,3 +148,22 @@ def check_cdn_availability(urls=None, outdir='static'):
             missing_files.append(dest)
     
     return missing_files
+
+import requests
+
+def check_internet_connectivity(test_url="https://www.google.com", timeout=5):
+    """
+    Checks for an active internet connection by sending a HEAD request to a well-known website.
+    
+    Args:
+        test_url (str): The URL to test connectivity.
+        timeout (int): The timeout for the request in seconds.
+        
+    Returns:
+        bool: True if the internet is available, False otherwise.
+    """
+    try:
+        response = requests.head(test_url, timeout=timeout)
+        return response.status_code == 200
+    except requests.RequestException as e:
+        return False
