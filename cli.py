@@ -282,7 +282,57 @@ class MothicsCLI(Cmd):
     ==============================================
     """
     system_manager = SystemManager()
-                               
+
+    def preloop(self):
+        """Check for updates before entering the CLI loop."""
+
+        print("\nChecking for updates...")
+
+        # Skip if no internet
+        if not check_internet_connectivity():
+            print("\033[91m[WARNING]\033[0m No internet connection. Skipping update check.")
+            return
+
+        try:
+            # Ensure we are inside a Git repository
+            subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+            # Get the list of remotes
+            remotes = subprocess.check_output(["git", "remote"]).decode("utf-8").strip().split("\n")
+            if not remotes:
+                print("\033[91m[GIT WARNING]\033[0m No remote repository found. Skipping update check.")
+                return
+
+            # Use the first available remote instead of assuming "origin"
+            remote_name = remotes[0]
+            print(f"\033[94m[INFO]\033[0m Using remote: {remote_name}")
+
+            # Fetch latest changes from the detected remote
+            subprocess.run(["git", "fetch", remote_name], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            # Detect the default branch dynamically
+            try:
+                branch = subprocess.check_output(
+                    ["git", "symbolic-ref", f"refs/remotes/{remote_name}/HEAD"],
+                    stderr=subprocess.DEVNULL
+                ).decode("utf-8").strip().split("/")[-1]
+            except subprocess.CalledProcessError:
+                # Fallback: Check if main exists, otherwise use master
+                branch = "main" if f"{remote_name}/main" in subprocess.getoutput("git branch -r") else "master"
+                
+            # Get the latest commit on the remote branch
+            remote_commit = subprocess.check_output(["git", "rev-parse", f"{remote_name}/{branch}"]).decode("utf-8").strip()
+
+            # Get the current local commit
+            local_commit = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
+            
+            # Compare commits
+            if local_commit != remote_commit:
+                print("\033[93m[UPDATE AVAILABLE]\033[0m A new version is available! Run:\n  git pull")
+                        
+        except subprocess.CalledProcessError as e:
+            print(f"\033[91m[GIT ERROR]\033[0m Unable to check for updates: {e}")
+                
     def do_start(self, args):
         """
         Start the system.
