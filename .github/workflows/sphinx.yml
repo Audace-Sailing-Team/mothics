@@ -15,6 +15,5 @@ jobs:
           git-username: 'AST'
           git-email: 'youremail@users.noreply.github.com'
           project-path: 'mothics'
-          files-pattern: 'examples/*example*.py'
           commit-message: 'Update docs'
           github-token: ${{ secrets.GITHUB_TOKEN }}
