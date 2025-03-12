@@ -3,9 +3,9 @@ Description=Mothics CLI Service
 After=network.target
 
 [Service]
-User=root
-WorkingDirectory=/root/central-unit
-ExecStart=/bin/bash /root/central-unit/cli.sh
+User=%i
+WorkingDirectory=%h/central-unit
+ExecStart=/bin/bash %h/central-unit/cli.sh
 ExecStop=/usr/bin/tmux kill-session -t mothics
 Restart=on-failure
 Type=forking
