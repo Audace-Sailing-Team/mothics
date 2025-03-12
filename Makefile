@@ -40,7 +40,7 @@ clean:
 # Install systemd service
 install-service:
 	@echo "Installing systemd service..."
-	sudo cp mothics.service /etc/systemd/system/mothics.service
+	sudo cp mothics.service /etc/systemd/system/mothics@.service
 	sudo systemctl daemon-reload
-	sudo systemctl enable mothics.service
-	sudo systemctl start mothics.service
+	sudo systemctl enable mothics@$(USER)
+	sudo systemctl start mothics@$(USER)
