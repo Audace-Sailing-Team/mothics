@@ -25,11 +25,14 @@ The following packages are required:
 > Note: Mothics is designed for use on DietPi and Ubuntu.
 
 ### Installation
-Clone the repository and set up the package
+Clone the repository
 ```sh
-git clone https://github.com/yourrepo/mothics.git
+git clone https://github.com/Audace-Sailing-Team/mothics.git
 cd mothics
+```
 
+Set up the package
+```
 make
 ```
 
