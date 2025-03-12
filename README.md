@@ -10,7 +10,9 @@ and system management tools to analyze navigation tracks.
 ## Documentation
 Partial documentation is available on the [internal website](https://audace-sailing-team.github.io) of the Sensor Technology department of Audace Sailing Team.  
 
-The API and full documentation will be released soon.
+The API is available [here](https://audace-sailing-team.github.io/mothics/). 
+
+Full documentation will be released soon.
 
 ## Quick setup
 ### Prerequisites
