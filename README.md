@@ -123,6 +123,9 @@ Documentation for most CLI commands is available; run
 - `resources system`: shows system-wide resource usage
 - `!<command>`: executes a shell command
 - `exit`: exits the CLI
+- `shutdown`: stops the running system and shuts down the device 
+- `reboot`: stops the running system and reboots the device 
+- `update`: updates the CLI (akin to running `git pull`)
 
 To see all available commands, run
 ```sh
