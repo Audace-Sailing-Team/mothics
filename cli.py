@@ -285,7 +285,7 @@ class MothicsCLI(Cmd):
 
     def _confirm_action(self, action):
         """Prompt the user for confirmation before executing shutdown or reboot."""
-        response = input(f"\033[93m[CONFIRM]\033[0m Are you sure you want to {action}? [Y/n]: ").strip().lower()
+        response = input(f"\033[93m[WARNING]\033[0m Are you sure you want to {action}? [Y/n]: ").strip().lower()
         return response in ["y", "yes", ""]
     
     def print(self, message, level="info"):
