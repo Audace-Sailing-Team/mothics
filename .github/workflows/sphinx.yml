@@ -32,7 +32,7 @@ jobs:
         - name: Generate API Documentation
           run: |
             mkdir -p docs
-            pdoc --html mothics --output-dir docs --force && pdoc --html cli.py --output-dir docs --force
+            pdoc --html cli.py mothics --output-dir docs --force
 
         - name: Upload Documentation Artifact
           uses: actions/upload-pages-artifact@v3
