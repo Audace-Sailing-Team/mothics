@@ -269,26 +269,46 @@ class SystemManager:
                                
 # CLI
 class MothicsCLI(Cmd):
-    prompt = '(mothics) '
+    prompt = '\033[1;32m(mothics) \033[0m'
     intro = """
     ==============================================
-    Mothics - Moth Analytics 
+    \033[1;36mMothics - Moth Analytics\033[0m
     Iacopo Ricci - Audace Sailing Team - 2025
     
-    Default SSH address: \t 192.168.42.1
+    \033[2mDefault SSH address: \t 192.168.42.1
     Default dashboard address: \t 192.168.42.1:5000
     Type "help" for available commands.
-    Type "exit" or <CTRL-D> to quit.
+    Type "exit" or <CTRL-D> to quit.\033[0m
     ==============================================
     """
     system_manager = SystemManager()
 
-    def preloop(self):
+    def _confirm_action(self, action):
+        """Prompt the user for confirmation before executing shutdown or reboot."""
+        response = input(f"\033[93m[CONFIRM]\033[0m Are you sure you want to {action}? [Y/n]: ").strip().lower()
+        return response in ["y", "yes", ""]
+    
+    def print(self, message, level="info"):
+        """
+        Prints messages with standardized formatting.
         
+        level can be: "info", "warning", "error", "success", "update"
+        """
+        colors = {
+            "info": "\033[94m[INFO]\033[0m",  # Blue
+            "warning": "\033[93m[WARNING]\033[0m",  # Yellow
+            "error": "\033[91m[ERROR]\033[0m",  # Red
+            "success": "\033[92m[SUCCESS]\033[0m",  # Green
+            "update": "\033[96m[UPDATE]\033[0m",  # Cyan
+        }
+        print(f"{colors.get(level, '[INFO]')} {message}")
+
+    
+    def preloop(self):
         # Check for updates before entering the CLI loop
         # Skip if no internet
         if not check_internet_connectivity():
-            print("\033[91m[WARNING]\033[0m No internet connection. Skipping update check.")
+            self.print("No internet connection. Skipping update check.", level='warning')
             return
 
         try:
@@ -298,7 +318,7 @@ class MothicsCLI(Cmd):
             # Get the list of remotes
             remotes = subprocess.check_output(["git", "remote"]).decode("utf-8").strip().split("\n")
             if not remotes:
-                print("\033[91m[GIT WARNING]\033[0m No remote repository found. Skipping update check.")
+                self.print("No remote repository found. Skipping update check.", level='error')
                 return
 
             # Use the first available remote instead of assuming "origin"
@@ -325,10 +345,10 @@ class MothicsCLI(Cmd):
             
             # Compare commits
             if local_commit != remote_commit:
-                print("\033[93m[UPDATE AVAILABLE]\033[0m A new version is available! Run: git pull")
+                self.print("A new version is available! Run \033[2mupdate\033[0m or \033[2mgit pull\033[0m after exiting Mothics", level='update')
                         
         except subprocess.CalledProcessError as e:
-            print(f"\033[91m[GIT ERROR]\033[0m Unable to check for updates: {e}")
+            self.print(f"Unable to check for updates: {e}", level='error')
                 
     def do_start(self, args):
         """
@@ -340,7 +360,7 @@ class MothicsCLI(Cmd):
         """
         parts = args.split()
         if not parts:
-            print("Please specify a mode: live, replay or database")
+            self.print("Please specify a mode: live, replay or database", level='warning')
             return
 
         mode = parts[0].lower()
@@ -352,7 +372,7 @@ class MothicsCLI(Cmd):
                 self.system_manager.initialize_database()
 
             if len(parts) <= 1:
-                print("Please specify a track filename")
+                self.print("Please specify a track filename", level='warning')
                 print("Available tracks:")
                 self.do_list_tracks(args)
                 return
@@ -364,7 +384,7 @@ class MothicsCLI(Cmd):
         elif mode == "database":
             self.system_manager.initialize_database()
         else:
-            print("Invalid mode. Please choose 'live' or 'replay'.")
+            self.print("Invalid mode. Please choose 'live' or 'replay'.", level='error')
 
     def do_stop(self, args):
         """Stop the running system."""
@@ -382,12 +402,36 @@ class MothicsCLI(Cmd):
         reload_config = "reload_config" in parts
 
         self.system_manager.restart(reload_config=reload_config)
-        
+
     def do_status(self, args):
-        """Display the current system status."""
+        """Display the current system status with color-coded output."""
         status = self.system_manager.get_status()
-        for key, value in status.items():
-            print(f"{key}: {value}")
+
+        if not status:
+            self.print("No status data available.", level='warning')
+            return
+
+        # Define ANSI color codes
+        color_map = {
+            "stopped": "\033[91m",       # Red
+            "running": "\033[92m",       # Green
+            "active": "\033[92m",        # Green
+            "not active": "\033[91m",    # Red
+            "available": "\033[92m",     # Green
+            "not initialized": "\033[91m", # Red
+            "live": "",                   # No color change
+            "replay": ""                   # No color change
+        }
+        reset_color = "\033[0m"
+
+        # Apply color mapping
+        status_table = [
+            [key, f"{color_map.get(value, '')}{value}{reset_color}"] for key, value in status.items()
+        ]
+
+        # Print the table
+        print(tabulate(status_table, headers=["Component", "Status"], tablefmt="github"))
+        print()
 
     def do_list_tracks(self, args):
         """List tracks from Database"""
@@ -401,7 +445,7 @@ class MothicsCLI(Cmd):
         """
         parts = args.split()
         if not parts:
-            print("Please specify a track index")
+            self.print("Please specify a track index", level='warning')
             return
         
         index = tipify(parts[0])
@@ -413,11 +457,11 @@ class MothicsCLI(Cmd):
         if self.system_manager.database:
             track_meta = self.system_manager.database.select_track(index)
             if track_meta:
-                print("Selected track metadata:")
+                self.print("Selected track metadata:", level='info')
                 for key, value in track_meta.items():
                     print(f"{key}: {value}")
         else:
-            print("Database not initialized.")
+            self.print("Database not initialized.", level='error')
 
     def do_log(self, args):
         """
@@ -430,7 +474,7 @@ class MothicsCLI(Cmd):
 
         parts = args.split()
         if not parts:
-            print("Please specify a mode: show or clear")
+            self.print("Please specify a mode: show or clear", level='warning')
             return
 
         if parts[0] == 'show':
@@ -444,7 +488,7 @@ class MothicsCLI(Cmd):
                 with open(log_file, "w") as f:
                     open(log_file, 'w').close()
             else:
-                print("Log file not found.")
+                self.print("Log file not found.", level='error')
 
     def do_resources(self, args):
         """
@@ -459,7 +503,7 @@ class MothicsCLI(Cmd):
         mode = parts[0].lower() if parts else "both"
 
         if mode not in ["mothics", "system", "both"]:
-            print("Invalid option. Use 'resources mothics', 'resources system', or 'resources'.")
+            self.print("Invalid option. Use 'resources mothics', 'resources system', or 'resources'.", level='error')
             return
 
         data_cli, data_system = [], []
@@ -512,7 +556,6 @@ class MothicsCLI(Cmd):
             
             print('System')
             print(f'{tabulate(data_system, headers=["Resource", "Usage"], tablefmt="github")}\n')
-
         
     def do_shell(self, args):
         """Execute shell commands without exiting the CLI.
@@ -522,27 +565,27 @@ class MothicsCLI(Cmd):
             !<command>  (shortcut)
         """
         if not args:
-            print("Please provide a shell command.")
+            self.print("Please provide a shell command.", level='warning')
             return
 
         try:
             result = subprocess.run(args, shell=True, text=True, capture_output=True)
             print(result.stdout)  # Print command output
             if result.stderr:
-                print("Error:", result.stderr)
+                self.print(result.stderr, level='error')
         except Exception as e:
-            print(f"Error executing command: {e}")
+            self.print(f"Error executing command: {e}", level='error')
 
     def default(self, line):
         """Allows using '!' as a shortcut to run shell commands."""
         if line.startswith("!"):
             self.do_shell(line[1:])
         else:
-            print(f"Unknown command: {line}")
+            self.print(f"Unknown command: {line}", level='error')
         
     def do_exit(self, args):
         """Exit the CLI stopping processes."""
-        print("Exiting CLI.")
+        self.print("Exiting CLI.", level='info')
         try:
             self.do_stop(args)
             return True
@@ -551,12 +594,12 @@ class MothicsCLI(Cmd):
         
     def do_kill(self, args):
         """Exit the CLI abruptly."""
-        print("Exiting CLI abruptly.")
+        self.print("Exiting CLI abruptly.", level='info')
         return True
     
     def do_EOF(self, args):
         """Exit on Ctrl-D (EOF)."""
-        print("Exiting CLI.")
+        self.print("Exiting CLI.", level='info')
         try:
             self.do_stop(args)
             return True
@@ -572,7 +615,7 @@ class MothicsCLI(Cmd):
         If 'force' is specified, all interfaces will be disconnected and then reconnected.
         """
         if not self.system_manager.communicator:
-            print("Communicator not initialized, nothing to refresh.")
+            self.print("Communicator not initialized, nothing to refresh.", level='error')
             return
 
         force = False
@@ -582,8 +625,54 @@ class MothicsCLI(Cmd):
         try:
             self.system_manager.communicator.refresh(force_reconnect=force)
         except Exception as e:
-            print(f"error refreshing communicator: {e}")
+            self.print(f"error refreshing communicator: {e}", level='error')
 
+    def do_update(self, args):
+        """Update the CLI by pulling the latest changes from Git."""
+        try:
+            subprocess.run(["git", "pull"], check=True)
+            self.print("Update complete: restart the CLI to apply changes.", level='info')
+        except subprocess.CalledProcessError:
+            self.print("Update failed. Check your Git settings or internet connection.", level='error')
+
+    def do_shutdown(self, args):
+        """Safely shuts down the system with user confirmation."""
+        if not self._confirm_action("shut down the system"):
+            self.print("Shutdown canceled.", level='warning')
+            return
+
+        self.system_manager.stop()
+        self.print("Shutting down the system.", level='info')
+
+        try:
+            if sys.platform.startswith("linux") or sys.platform == "darwin":
+                os.system("sudo shutdown now")
+            elif sys.platform == "win32":
+                os.system("shutdown /s /t 0")
+            else:
+                self.print("Shutdown command not supported on this OS.", level='error')
+        except Exception as e:
+            self.print(f"Unable to shutdown: {e}", level='error')
+
+    def do_reboot(self, args):
+        """Safely reboots the system with user confirmation."""
+        if not self._confirm_action("reboot the system"):
+            self.print("Reboot canceled.", level='warning')
+            return
+
+        self.system_manager.stop()
+        self.print("Rebooting the system.", level='info')
+
+        try:
+            if sys.platform.startswith("linux") or sys.platform == "darwin":
+                os.system("sudo reboot")
+            elif sys.platform == "win32":
+                os.system("shutdown /r /t 0")
+            else:
+                self.print("Reboot command not supported on this OS.", level='error')
+        except Exception as e:
+            self.print(f"Unable to reboot: {e}", level='error')
+            
             
 if __name__ == '__main__':
     cli = MothicsCLI()
