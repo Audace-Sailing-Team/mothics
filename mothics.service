@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 User=%i
-WorkingDirectory=%h/mothics
-ExecStart=/bin/bash %h/mothics/cli.sh
+WorkingDirectory=/home/%i/mothics
+ExecStart=/bin/bash /home/%i/mothics/cli.sh
 ExecStop=/usr/bin/tmux kill-session -t mothics
 Restart=on-failure
 Type=forking
