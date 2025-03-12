@@ -2,7 +2,7 @@
 on:
   push:
     branches:
-      - main
+      - master
     # Alternative: only build for tags.
     # tags:
     #   - '*'
@@ -14,22 +14,30 @@ permissions:
 jobs:
   # Build the documentation and upload the static HTML files as an artifact.
   build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
+      runs-on: ubuntu-latest
+      steps:
+        - name: Checkout Repository
+          uses: actions/checkout@v4
 
-      # ADJUST THIS: install all dependencies (including pdoc)
-      - run: pip install -e .
-      # ADJUST THIS: build your documentation into docs/.
-      # We use a custom build script for pdoc itself, ideally you just run `pdoc -o docs/ ...` here.
-      - run: python docs/make.py
+        - name: Set up Python
+          uses: actions/setup-python@v5
+          with:
+            python-version: '3.10'  # Change to match your project’s Python version
 
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs/
+        - name: Install Dependencies
+          run: |
+            pip install -r requirements.txt
+            pip install pdoc3
+
+        - name: Generate API Documentation
+          run: |
+            mkdir -p docs
+            pdoc --html mothics --output-dir docs --force
+
+        - name: Upload Documentation Artifact
+          uses: actions/upload-pages-artifact@v3
+          with:
+            path: docs/mothics  # Adjusted to point to the generated docs folder
 
   # Deploy the artifact to GitHub pages.
   # This is a separate job so that only actions/deploy-pages has the necessary permissions.
