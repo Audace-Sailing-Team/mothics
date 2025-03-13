@@ -20,8 +20,12 @@
   <!-- Header and Navigation -->
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
   <div class="container-fluid">
-    <a class="navbar-brand" href="/">Dashboard</a>
-
+    <!-- Title -->
+    <a class="navbar-brand" href="/">
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="AST logo" height="30">
+      Mothics
+    </a>
+    
     <!-- Toggler Button for Small Screens -->
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
@@ -49,7 +53,7 @@
 
     <!-- Main Content Block -->
     <div class="container mt-4">
-    <h1 class="mb-4">Database Dashboard</h1>
+    <h1 class="mb-4" align="center">Dashboard</h1>
 
     <div class="dashboard-container">
       <!-- Remote Unit Status -->
