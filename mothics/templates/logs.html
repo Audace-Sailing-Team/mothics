@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h2>Real-Time Logs</h2>
+<h2>Logs</h2>
 <div class="mb-2">
     <button id="clear-log-btn" class="btn btn-secondary">Clear On-Screen Logs</button>
     <button id="empty-logfile-btn" class="btn btn-danger">Empty Log File</button>
@@ -10,6 +10,26 @@
 <div id="log-container" style="background-color: #333; color: #fff; font-family: monospace; padding: 10px; height: 400px; overflow-y: auto;">
     <!-- Log entries will appear here dynamically -->
 </div>
+
+<!-- Confirmation Modal -->
+<div id="confirmClearLogs" class="modal fade" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Log Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete all logs? This action <strong>cannot</strong> be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <script>
     const logContainer = document.getElementById('log-container');
@@ -39,19 +59,26 @@
     });
 
     // Empty log file
-    document.getElementById('empty-logfile-btn').addEventListener('click', async () => {
+    document.getElementById("empty-logfile-btn").addEventListener("click", function() {
+        let modal = new bootstrap.Modal(document.getElementById("confirmClearLogs"));
+        modal.show();
+    });
+
+    document.getElementById("confirmDelete").addEventListener("click", async function() {
         try {
             const response = await fetch('/empty_log_file', { method: 'POST' });
             if (response.ok) {
-                logContainer.innerHTML = '';
-                alert('Log file emptied successfully.');
+                alert("Logs cleared successfully.");
             } else {
-                alert('Failed to empty the log file.');
+                alert("Failed to clear logs.");
             }
         } catch (error) {
-            console.error('Error emptying log file:', error);
-            alert('An error occurred while emptying the log file.');
+            console.error("Error clearing logs:", error);
+            alert("An error occurred.");
         }
+        let modal = bootstrap.Modal.getInstance(document.getElementById("confirmClearLogs"));
+        modal.hide();
     });
 </script>
+
 {% endblock %}
