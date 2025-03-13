@@ -1,40 +1,16 @@
-<table class="table table-bordered">
-    <thead>
-        <tr>
-            <th>Timestamp</th>
-            {% if table_data %}
-            {% for field in table_data[0].keys() if field != "timestamp" %}
-            <th>{{ field }}</th>
-            {% endfor %}
-            {% else %}
-            <p>No data available.</p>
-            {% endif %}
-        </tr>
-    </thead>
-    <tbody>
+<div class="data-grid">
+    {% if table_data %}
         {% for row in table_data %}
-        <tr>
-	    <td>{{ row["timestamp"] | replace("T", " ") | truncate(22) }}</td>
-            <!-- <td>{{ row["timestamp"] }}</td> -->
             {% for field, value in row.items() if field != "timestamp" %}
-            <td>{{ value }}</td>
+                <div class="data-card">
+                    <h3>{{ field.replace("_", " ").title() }}</h3>
+                    <p class="value">{{ value }}</p>
+                    <p class="timestamp">Last Sampled: {{ row["timestamp"] | replace("T", " ") | truncate(22) }}</p>
+                </div>
             {% endfor %}
-        </tr>
         {% endfor %}
-    </tbody>
-</table>
+    {% else %}
+        <p>No data available.</p>
+    {% endif %}
+</div>
 
-<!-- <div class="card-container"> -->
-<!--     {% for row in table_data %} -->
-<!--     <div class="card"> -->
-<!--         <div class="card-header"> -->
-<!--             <h5>Timestamp: {{ row["timestamp"] }}</h5> -->
-<!--         </div> -->
-<!--         <div class="card-body"> -->
-<!--             {% for field, value in row.items() if field != "timestamp" %} -->
-<!--             <p><strong>{{ field }}:</strong> {{ value }}</p> -->
-<!--             {% endfor %} -->
-<!--         </div> -->
-<!--     </div> -->
-<!--     {% endfor %} -->
-<!-- </div> -->

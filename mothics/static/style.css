@@ -53,33 +53,81 @@ body {
 
 /* Styling for the plot container */
 .plot-container {
+    /* display: flex; */
+    /* justify-content: space-between; */
+    /* align-items: flex-start; */
+    /* flex-wrap: wrap; /\* Allows stacking when needed *\/ */
+    /* gap: 20px; */
     display: flex;
     flex-direction: column;
     align-items: center; /* Center-align plot container */
     gap: 20px;
 }
 
-.card-container {
+.data-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 1rem;
+    gap: 15px;
     justify-content: center;
+    margin-top: 20px;
 }
 
-.card {
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    padding: 1rem;
-    width: 300px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.data-card {
+    background: #ffffff;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    width: 220px;
+    text-align: center;
+    transition: 0.3s;
 }
 
-.card-header {
-    background-color: #f8f9fa;
-    padding: 0.5rem;
-    border-bottom: 1px solid #ddd;
+.data-card:hover {
+    transform: scale(1.05);
 }
 
-.card-body {
-    padding: 0.5rem;
+.value {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.timestamp {
+    font-size: 14px;
+    color: gray;
+}
+
+/* Wrapper to hold both status and data sections */
+.dashboard-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap; /* Allows stacking when needed */
+    gap: 20px;
+}
+
+/* Ensures both sections take equal width on larger screens */
+.status-section, .data-section {
+    flex: 1;
+    min-width: 300px; /* Ensures they don't shrink too much */
+}
+
+/* Status container styling */
+.status-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+/* Responsive: Stacks items when viewport is narrow */
+@media (max-width: 768px) {
+    .dashboard-container {
+        flex-direction: column; /* Stack on small screens */
+    }
+    .status-section, .data-section {
+        width: 100%;
+    }
 }
