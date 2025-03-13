@@ -1,10 +1,12 @@
 from datetime import datetime
+from pprint import pprint
 from bokeh.embed import components
 from bokeh.plotting import figure, show
 from bokeh.models import ColumnDataSource, Range1d, Slider
 from bokeh.layouts import gridplot, column
-from pprint import pprint
 
+    
+# Static plots
 
 def create_bokeh_plots(database):
     """Creates Bokeh plots for the time evolution of data."""
@@ -50,8 +52,6 @@ def create_bokeh_plots(database):
         
         min_x, max_x = min(data["timestamp"]), max(data["timestamp"])
         min_y, max_y = min(data["value"]), max(data["value"])
-
-        print(min_y, max_y)
         
         y_padding = (max_y - min_y) * 0.05 if max_y != min_y else max_y * 0.05
         
