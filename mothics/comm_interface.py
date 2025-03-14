@@ -100,11 +100,6 @@ class SerialInterface(BaseInterface):
                     self.logger.debug(f"received: {line}")
                     message = json.loads(line)
                     for topic, value in message.items():
-                        # # Suboptimal way to get topic and value, given a
-                        # # single topic-value pair is passed at each serial
-                        # # entry
-                        # topic = list(message.keys())[0]
-                        # value = list(message.values())[0]
                         self.on_message_callback(topic, value)
             except Exception as e:
                 self.logger.critical(f"error processing incoming data: {e}")
@@ -262,7 +257,7 @@ class MQTTInterface(BaseInterface):
 class Communicator:
     """Class to manage multiple communication interfaces and merge their data."""
     
-    def __init__(self, interfaces=None):
+    def __init__(self, interfaces=None, max_values=1e3, trim_fraction=0.5):
         """
         Initialize communicator with optional interfaces.
         
@@ -272,7 +267,12 @@ class Communicator:
         """
         self.interfaces = {}
         """Initialized interfaces"""
-                
+        # Parameters
+        self.max_values = max_values
+        """Trim threshold for raw_data dict"""
+        self.trim_fraction = trim_fraction
+        """Fraction of values to trim from raw_data"""
+        
         # Setup logger
         self.logger = logging.getLogger("Communicator")
         self.logger.info("-------------Communicator-------------")
@@ -382,6 +382,12 @@ class Communicator:
         # Merge data from all interfaces
         for interface in self.interfaces.values():
             for topic, data_list in interface.raw_data.items():
+                # Ensure each interface does not exceed max values to avoid memory leaks
+                if len(data_list) > self.max_values:
+                    trim_count = int(len(data_list) * self.trim_fraction)
+                    interface.raw_data[topic] = data_list[trim_count:]  # Trim oldest data
+                    self.logger.info(f"Trimmed {trim_count} entries from {topic} in {interface.__class__.__name__}")
+                
                 if topic not in merged_data:
                     merged_data[topic] = []
                 merged_data[topic].extend(data_list)
@@ -389,8 +395,8 @@ class Communicator:
         # Sort data by timestamp for each topic
         for topic in merged_data:
             merged_data[topic].sort(key=lambda x: list(x.keys())[0])
-
-        return merged_data
+            
+        return merged_data        
     
     def publish(self, topic, payload, interfaces=None):
         """

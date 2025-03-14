@@ -8,13 +8,24 @@ topics = "rm2/wind/speed"
 hostname = "test.mosquitto.org"
 topics = ["rm1/gps/lat", "rm1/gps/long"]
 
+[communicator]
+# Trim threshold for raw_data dict
+max_values = 2e1
+# Fraction of values to trim from raw_data 
+trim_fraction = 0.5
+
 [aggregator]
+# Sampling interval in seconds
 interval = 1
 
 [track]
+# Interval in seconds for checkpoint generation
 checkpoint_interval = 30
+# Maximum number of checkpoint files to keep in `data/chk/`
 max_checkpoint_files = 3
+# Fraction of values to trim from track
 trim_fraction = 0.5
+# Trim threshold for track
 max_datapoints = 1e5
 
 [saving]
@@ -25,6 +36,7 @@ default_mode = "continuous"
 # Please use '_fname' for files and '_dir' for directories
 logger_fname = "default.log"
 cdn_dir = "mothics/static"
+# Data output directory
 output_dir = "data"
 
 [webapp]
