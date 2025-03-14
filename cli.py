@@ -51,7 +51,6 @@ DEFAULT_CONFIG = {
         "output_dir": "data"
     },
     "webapp": {
-        "track_manager_directory": "data/",
         "rm_thesaurus": {
             "rm1": "GPS+IMU",
             "rm2": "Anemometer"
@@ -470,7 +469,7 @@ class MothicsCLI(Cmd):
             log show
             log clear
         """        
-        log_file = str(self.system_manager.config["webapp"]["logger_fname"])
+        log_file = str(self.system_manager.config["files"]["logger_fname"])
 
         parts = args.split()
         if not parts:
