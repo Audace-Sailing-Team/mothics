@@ -73,9 +73,9 @@ class SystemManager:
         
         self.load_config()
 
-    def _setup_logger(self, logger_fname):
+    def _setup_logger(self, logger_fname, level=logging.INFO):
         setup_logger('logger', fname=logger_fname, silent=False)
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(level=level)
         self.logger = logging.getLogger("SystemManager")
 
     def load_config(self):
