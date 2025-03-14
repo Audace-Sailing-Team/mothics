@@ -1,3 +1,4 @@
+import re
 import glob
 import os
 import csv
@@ -39,15 +40,24 @@ class Track:
                  save_mode: Optional[str] = 'continuous',
                  checkpoint_interval: Optional[int] = 30,
                  max_checkpoint_files: Optional[int] = 3,
+                 trim_fraction: Optional[float] = 0.5,
+                 max_datapoints: Optional[int] = 1e5,
                  output_dir: Optional[str] = None):
         # Initialize the fields with defaults
         self.data_points = data_points if data_points is not None else []
         self.field_names = field_names
         self.mode = mode
+        """Replay or live mode toggle"""
         self.save_mode = save_mode
         self.checkpoint_interval = checkpoint_interval
+        """Time in seconds between two checkpoint files""" 
         self.max_checkpoint_files = max_checkpoint_files
+        """Maximum number of checkpoint files to keep"""
         self.output_dir = output_dir if output_dir is not None else 'data'
+        self.trim_fraction = trim_fraction
+        """Fraction of points to trim before starting save run"""
+        self.max_datapoints = max_datapoints
+        """Maximum number of datapoints stored before full removal"""
         
         # Internal attributes not exposed as parameters
         self._replay_index = 0
@@ -108,12 +118,36 @@ class Track:
         except Exception as e:
             self.logger.critical(f'error in saving track: {e}')
 
+    def _remove_datapoints(self, start=0, fraction=0.1):
+        """Remove data points from memory according to a specified percentage from a given starting point (i.e., point index).
+
+        Args:
+            start (int): The index from where deletion should begin.
+            fraction (float): The fraction of total data points to remove (0.1 = 10%).
+        """
+        if not self.data_points:
+            self.logger.warn("no data points to clear")
+            return
+
+        fraction = max(0.0, min(fraction, 1.0))
+        num_to_remove = int(len(self.data_points) * fraction)
+
+        start = max(0, min(start, len(self.data_points) - 1))
+        end = min(start + num_to_remove, len(self.data_points))
+
+        # Remove the specified range
+        del self.data_points[start:end]
+        self.logger.info(f"cleared {num_to_remove} data points from index {start} to {end-1}; remaining: {len(self.data_points)}")
+                
     def start_run(self):
         """Start a sampling run"""
         if self.save_mode == 'on-demand':
             self.save_mode = 'continuous'
             # Save index of first frame to be saved
             self._save_interval_start = len(self.data_points) - 1
+            # Trim "useless" data points before first frame
+            if self._save_interval_start > 0:
+                self._remove_datapoints(fraction=self.trim_fraction)
             self.logger.info('logging data')
         elif self.save_mode == 'continuous':
             self.logger.warning(f'cannot start track saving on demand; current saving mode is {self.save_mode}')
@@ -136,20 +170,26 @@ class Track:
         else:
             self.logger.warning(f'cannot end track saving; current saving mode is {self.save_mode}')
     
-    def _save_checkpoint(self):
+    def _save_checkpoint(self, force=False, specifier=None):
         """Save a checkpoint after a certain amount of seconds"""
         if self.save_mode == 'continuous' and self.checkpoint_interval is not None:
             now = datetime.now()
             # Save a checkpoint if above time threshold (or no points are available)
-            if self._last_checkpoint is None or (now - self._last_checkpoint).total_seconds() > self.checkpoint_interval:
+            if self._last_checkpoint is None or (now - self._last_checkpoint).total_seconds() > self.checkpoint_interval or force:
                 self._last_checkpoint = now
                 interval = slice(self._save_interval_start, len(self.data_points) - 1)
-                self.save(interval=interval, fname=os.path.join(self.checkpoint_dir, f'{now.strftime("%Y%m%d-%H%M%S")}.chk'))
+                fname=os.path.join(self.checkpoint_dir, f'{now.strftime("%Y%m%d-%H%M%S")}.chk')
+                if specifier is not None:
+                    fname=os.path.join(self.checkpoint_dir, f'{now.strftime("%Y%m%d-%H%M%S")+str(specifier)}.chk')
+                self.save(interval=interval, fname=fname)
 
             # Remove older files from checkpoint directory
-            if len(os.listdir(self.checkpoint_dir)) > self.max_checkpoint_files:
-                chk_files = glob.glob(os.path.join(self.checkpoint_dir, "*.chk.json"))
-                chk_files.sort(key=os.path.getmtime)
+            chk_files_all= glob.glob(os.path.join(self.checkpoint_dir, "*.chk.json"))
+            # Remove all checkpoints with the `-full` specifier
+            chk_files = [f for f in chk_files_all if not re.search(r"-full\.chk\.json$", f)]
+            chk_files.sort(key=os.path.getmtime)
+            
+            if len(chk_files) > self.max_checkpoint_files:
                 # Delete the oldest file
                 os.remove(chk_files[0])
 
@@ -186,8 +226,20 @@ class Track:
         # Validate or establish field consistency
         # NOTE: if no field names are passed, no checks are performed
         if self.field_names is not None and set(self.field_names) != set(data.keys()):
-            raise ValueError(f"Inconsistent fields. Expected {self.field_names}, got {list(data.keys())}")
-            
+            raise ValueError(f"inconsistent fields. Expected {self.field_names}, got {list(data.keys())}")
+
+        # NOTE: if the number of datapoints exceeds the threshold
+        # `max_datapoints`, all points are deleted from memory after
+        # saving a special checkpoint, a full track and raising a
+        # warning. This allows the user to replay the two saved tracks
+        # one after the other, without overlaps.
+        if len(self.data_points) > self.max_datapoints:
+            self.logger.warning("maximum number of datapoints reached; saving a checkpoint and wiping cache")
+            self._save_checkpoint(force=True, specifier='-full')
+            # Fraction of points to trim
+            fraction = (len(self.data_points)-1)/len(self.data_points)
+            self._remove_datapoints(fraction=fraction)
+        
         self.data_points.append(DataPoint(timestamp, data))
         # Run checkpointing
         self._save_checkpoint()
