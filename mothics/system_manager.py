@@ -39,6 +39,10 @@ DEFAULT_CONFIG = {
         "hostname": "test.mosquitto.org",
         "topics": ["rm1/gps/lat", "rm1/gps/long"]
     },
+    "communicator": {
+        "max_values": 1e3,
+        "trim_fraction": 0.5
+    },
     "aggregator": {
         "interval": 1
     },
@@ -216,7 +220,9 @@ class SystemManager:
         interfaces[MQTTInterface] = self.config["mqtt"]
 
         try:
-            self.communicator = Communicator(interfaces=interfaces)
+            self.communicator = Communicator(interfaces=interfaces,
+                                             max_values=self.config["communicator"]["max_values"],
+                                             trim_fraction=self.config["communicator"]["trim_fraction"])
         except Exception as e:
             self.logger.critical(f"error in initializing communicator, got {e}")
         self.communicator.connect()
