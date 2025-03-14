@@ -99,12 +99,13 @@ class SerialInterface(BaseInterface):
                 if line:
                     self.logger.debug(f"received: {line}")
                     message = json.loads(line)
-                    # Suboptimal way to get topic and value, given a
-                    # single topic-value pair is passed at each serial
-                    # entry
-                    topic = list(message.keys())[0]
-                    value = list(message.values())[0]
-                    self.on_message_callback(topic, value)
+                    for topic, value in message.items():
+                        # # Suboptimal way to get topic and value, given a
+                        # # single topic-value pair is passed at each serial
+                        # # entry
+                        # topic = list(message.keys())[0]
+                        # value = list(message.values())[0]
+                        self.on_message_callback(topic, value)
             except Exception as e:
                 self.logger.critical(f"error processing incoming data: {e}")
 
