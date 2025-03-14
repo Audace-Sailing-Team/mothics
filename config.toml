@@ -11,6 +11,12 @@ topics = ["rm1/gps/lat", "rm1/gps/long"]
 [aggregator]
 interval = 1
 
+[track]
+checkpoint_interval = 30
+max_checkpoint_files = 3
+trim_fraction = 0.5
+max_datapoints = 1e5
+
 [saving]
 # Default data-logging mode: 'continuous' or 'on-demand'
 default_mode = "continuous"
@@ -22,6 +28,11 @@ cdn_dir = "mothics/static"
 output_dir = "data"
 
 [webapp]
+# Dashboard data refresh time in seconds 
+data_refresh = 2
+# Timeouts in seconds for remote unit status
+timeout_offline = 60
+timeout_noncomm = 30
 # Remote unit names mapping
 rm_thesaurus = {rm1 = "GPS+IMU", rm2 = "Anemometer"}
 # CDNs to download
