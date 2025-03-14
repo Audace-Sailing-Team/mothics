@@ -3,7 +3,7 @@
         {% for row in table_data %}
             {% for field, value in row.items() if field != "timestamp" %}
                 <div class="data-card">
-                    <h3>{{ field.replace("_", " ").title() }}</h3>
+                    <h4>{{ field.replace("_", " ").title() }}</h4>
                     <p class="value">{{ value }}</p>
                     <p class="timestamp">Last Sampled: {{ row["timestamp"] | replace("T", " ") | truncate(22) }}</p>
                 </div>

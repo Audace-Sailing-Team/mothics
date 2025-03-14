@@ -67,9 +67,21 @@
       <!-- Latest Data -->
       <div class="status-section">
 	<h2>Latest Data</h2>
+	<!-- Dropdown for Card Selection -->
+	<div class="dropdown">
+	  <button class="btn btn-secondary dropdown-toggle" type="button" id="cardDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+	    Select Metrics
+	  </button>
+	  <ul class="dropdown-menu" aria-labelledby="cardDropdown" id="cardSelectionMenu">
+	    <!-- Options will be dynamically filled -->
+	  </ul>
+	</div>
+
+	<!-- Data Cards Container -->
 	<div id="table-container">
 	  <!-- Cards will be dynamically inserted here -->
 	</div>
+	
       </div>
     </div>
 	
@@ -96,16 +108,32 @@
     
     </div>
 
-
-    <script>
+<script>
     const auto_refresh = {{ auto_refresh }};
-      
+    let selectedMetrics = new Set(JSON.parse(localStorage.getItem("selectedMetrics")) || []);
+
     // Function to update the dashboard dynamically
     async function updateDashboard() {
         try {
+            // Fetch and update the latest data cards
             const tableResponse = await fetch('/get_table');
             const tableHtml = await tableResponse.text();
             document.getElementById('table-container').innerHTML = tableHtml;
+
+            // Populate dropdown if it's empty
+            if (document.getElementById("cardSelectionMenu").children.length === 0) {
+                populateDropdown();
+            }
+
+            // Restore previous selections from localStorage
+            document.querySelectorAll('.data-card').forEach(card => {
+                let metricName = card.querySelector('h4')?.textContent.trim();
+                if (selectedMetrics.size > 0 && !selectedMetrics.has(metricName)) {
+                    card.style.display = 'none';
+                } else {
+                    card.style.display = 'block';
+                }
+            });
 
             // Fetch and update the remote unit status
             const statusResponse = await fetch('/get_status');
@@ -116,45 +144,105 @@
             const samplingResponse = await fetch('/sampling_status');
             const samplingData = await samplingResponse.json();
             const indicator = document.getElementById('samplingStatusIndicator');
-            if (samplingData.save_mode === 'continuous') {
-		indicator.textContent = 'Continuous Sampling Active';
-		indicator.className = 'badge bg-success';
-            } else {
-		indicator.textContent = 'Not Sampling';
-		indicator.className = 'badge bg-secondary';
-            }
-	    
+            indicator.textContent = samplingData.save_mode === 'continuous' ? 'Continuous Sampling Active' : 'Not Sampling';
+            indicator.className = samplingData.save_mode === 'continuous' ? 'badge bg-success' : 'badge bg-secondary';
+
         } catch (error) {
             console.error("Error updating dashboard:", error);
         }
     }
 
+    async function populateDropdown() {
+        try {
+            let tableContainer = document.getElementById("table-container");
+            let observer = new MutationObserver(mutations => {
+                mutations.forEach(mutation => {
+                    if (mutation.addedNodes.length > 0) {
+                        fillDropdown();
+                    }
+                });
+            });
+
+            observer.observe(tableContainer, { childList: true, subtree: true });
+
+        } catch (error) {
+            console.error("Error populating dropdown:", error);
+        }
+    }
+
+    function fillDropdown() {
+        let metrics = new Set();
+        document.querySelectorAll('.data-card h4').forEach(title => {
+            metrics.add(title.textContent.trim());
+        });
+
+        let dropdownMenu = document.getElementById("cardSelectionMenu");
+        dropdownMenu.innerHTML = ""; 
+
+        // Add "Select All / Unselect All" button
+        let selectAllItem = document.createElement("li");
+        selectAllItem.innerHTML = `<button id="selectAllBtn" class="dropdown-item">Select All</button>`;
+        dropdownMenu.appendChild(selectAllItem);
+
+        metrics.forEach(metric => {
+            let isChecked = selectedMetrics.has(metric);
+            let listItem = document.createElement("li");
+            listItem.innerHTML = `<label class="dropdown-item">
+                <input type="checkbox" value="${metric}" ${isChecked ? "checked" : ""}> ${metric}
+            </label>`;
+            dropdownMenu.appendChild(listItem);
+        });
+
+        // Handle checkbox changes and persist selection
+        dropdownMenu.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function () {
+                if (this.checked) {
+                    selectedMetrics.add(this.value);
+                } else {
+                    selectedMetrics.delete(this.value);
+                }
+                localStorage.setItem("selectedMetrics", JSON.stringify([...selectedMetrics]));
+                updateDashboard();
+            });
+        });
+
+        // Select All Button
+        document.getElementById('selectAllBtn').addEventListener('click', function () {
+            selectedMetrics = new Set(metrics);
+            localStorage.setItem("selectedMetrics", JSON.stringify([...selectedMetrics]));
+            dropdownMenu.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = true;
+            });
+            updateDashboard();
+        });
+    }
+
     // Button handlers for starting and stopping sampling
     document.getElementById('startSamplingBtn').addEventListener('click', async () => {
-      try {
-        const response = await fetch('/start_save', { method: 'POST' });
-        const result = await response.json();
-        console.log(result.message);
-        updateDashboard();  // refresh all after starting sampling
-      } catch (error) {
-        console.error("Error starting sampling:", error);
-      }
+        try {
+            const response = await fetch('/start_save', { method: 'POST' });
+            console.log(await response.json().message);
+            updateDashboard();
+        } catch (error) {
+            console.error("Error starting sampling:", error);
+        }
     });
 
     document.getElementById('stopSamplingBtn').addEventListener('click', async () => {
-      try {
-        const response = await fetch('/end_save', { method: 'POST' });
-        const result = await response.json();
-        console.log(result.message);
-        updateDashboard();  // refresh all after stopping sampling
-      } catch (error) {
-        console.error("Error stopping sampling:", error);
-      }
+        try {
+            const response = await fetch('/end_save', { method: 'POST' });
+            console.log(await response.json().message);
+            updateDashboard();
+        } catch (error) {
+            console.error("Error stopping sampling:", error);
+        }
     });
-      
+
     // Automatically refresh the dashboard at the specified interval
     setInterval(updateDashboard, auto_refresh);
     updateDashboard();
-    </script>
+    populateDropdown();
+</script>
+    
 </body>
 </html>
