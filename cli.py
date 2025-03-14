@@ -53,9 +53,8 @@ class MothicsCLI(Cmd):
         }
         print(f"{colors.get(level, '[INFO]')} {message}")
 
-    
-    def preloop(self):
-        # Check for updates before entering the CLI loop
+    def _check_updates(self):
+        """Check for updates"""
         # Skip if no internet
         if not check_internet_connectivity():
             self.print("No internet connection. Skipping update check.", level='warning')
@@ -71,7 +70,7 @@ class MothicsCLI(Cmd):
                 self.print("No remote repository found. Skipping update check.", level='error')
                 return
 
-            # Use the first available remote instead of assuming "origin"
+            # Use the first available remote
             remote_name = remotes[0]
 
             # Fetch latest changes from the detected remote
@@ -95,11 +94,15 @@ class MothicsCLI(Cmd):
             
             # Compare commits
             if local_commit != remote_commit:
-                self.print("A new version is available! Run \033[2mupdate\033[0m or \033[2mgit pull\033[0m after exiting Mothics", level='update')
+                self.print("A new version is available! Run \033[2mupdate\033[0m now or \033[2mgit pull\033[0m after exiting Mothics", level='update')
                         
         except subprocess.CalledProcessError as e:
             self.print(f"Unable to check for updates: {e}", level='error')
-                
+            return
+        
+    def preloop(self):
+        self._check_updates()
+        
     def do_start(self, args):
         """
         Start the system.
@@ -419,6 +422,9 @@ class MothicsCLI(Cmd):
 
     def do_update(self, args):
         """Update the CLI by pulling the latest changes from Git."""
+        # Check for updates
+        self._check_updates()
+        
         try:
             subprocess.run(["git", "pull"], check=True)
             self.print("Update complete: restart the CLI to apply changes.", level='info')
