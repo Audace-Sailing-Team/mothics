@@ -386,7 +386,7 @@ class Communicator:
                 if len(data_list) > self.max_values:
                     trim_count = int(len(data_list) * self.trim_fraction)
                     interface.raw_data[topic] = data_list[trim_count:]  # Trim oldest data
-                    self.logger.info(f"Trimmed {trim_count} entries from {topic} in {interface.__class__.__name__}")
+                    self.logger.debug(f"trimmed {trim_count} entries from {topic} in {interface.__class__.__name__}")
                 
                 if topic not in merged_data:
                     merged_data[topic] = []
