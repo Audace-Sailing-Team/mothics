@@ -126,7 +126,8 @@ Documentation for most CLI commands is available; run
 - `resources`: shows resource usage
 - `resources mothics`: shows resource usage due to Mothics
 - `resources system`: shows system-wide resource usage
-- `!<command>`: executes a shell command
+- `serial_stream`: shows serial port data stream for debugging purposes 
+- `shell <command>` or `!<command>`: executes a shell command
 - `exit`: exits the CLI
 - `shutdown`: stops the running system and shuts down the device 
 - `reboot`: stops the running system and reboots the device 
