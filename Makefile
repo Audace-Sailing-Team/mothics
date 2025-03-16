@@ -2,6 +2,7 @@ PACKAGE = mothics
 VENV = .venv
 PYTHON = $(VENV)/bin/python
 PIP = $(VENV)/bin/pip
+ALIAS_FILE = ~/.bashrc  # Change to ~/.zshrc if using Zsh
 
 .PHONY: all venv install update pep8 clean install-service
 
@@ -44,3 +45,12 @@ install-service:
 	sudo systemctl daemon-reload
 	sudo systemctl enable mothics@$(USER)
 	sudo systemctl start mothics@$(USER)
+
+# Add an alias for quickly attaching to the tmux session
+alias-tmux:
+	@if ! grep -q "alias mothics-join=" $(ALIAS_FILE); then \
+		echo "alias mothics-join='tmux attach -t mothics'" >> $(ALIAS_FILE); \
+		echo "Alias 'mothics-join' added to $(ALIAS_FILE)"; \
+	fi
+	@. $(ALIAS_FILE); echo "Alias 'mothics-join' is now available in this session."
+
