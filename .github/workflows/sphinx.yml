@@ -1,46 +1,50 @@
-# build the documentation whenever there are new commits on main
+name: Deploy Documentation
+
 on:
   push:
     branches:
       - master
-    # Alternative: only build for tags.
-    # tags:
-    #   - '*'
 
-# security: restrict permissions for CI jobs.
 permissions:
   contents: read
 
 jobs:
-  # Build the documentation and upload the static HTML files as an artifact.
   build:
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout Repository
-          uses: actions/checkout@v4
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-        - name: Set up Python
-          uses: actions/setup-python@v5
-          with:
-            python-version: '3.10'  # Change to match your project’s Python version
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'  # Change if needed
 
-        - name: Install Dependencies
-          run: |
-            pip install -r requirements.txt
-            pip install pdoc3
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pdoc3 sphinx sphinx-rtd-theme
 
-        - name: Generate API Documentation
-          run: |
-            mkdir -p docs
-            pdoc --html cli.py mothics --output-dir docs --force
+      # Generate API Documentation with pdoc3
+      - name: Generate API Documentation (pdoc3)
+        run: |
+          mkdir -p docs/mothics/api
+          pdoc --html cli.py mothics --output-dir docs/mothics/api --force
 
-        - name: Upload Documentation Artifact
-          uses: actions/upload-pages-artifact@v3
-          with:
-            path: docs/mothics  # Adjusted to point to the generated docs folder
+      # Generate Documentation with Sphinx
+      - name: Build Sphinx Documentation
+        run: |
+          cd docs  # Assuming 'docs' contains conf.py and index.rst
+          make html
+          mkdir -p mothics/docs
+          mv _build/html/* mothics/docs/
 
-  # Deploy the artifact to GitHub pages.
-  # This is a separate job so that only actions/deploy-pages has the necessary permissions.
+      # Upload full documentation (pdoc3 + Sphinx) as artifact
+      - name: Upload Documentation Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/mothics
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
