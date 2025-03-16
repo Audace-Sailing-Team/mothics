@@ -50,6 +50,7 @@ install-service:
 alias-tmux:
 	@if ! grep -q "alias mothics-join=" $(ALIAS_FILE); then \
 		echo "alias mothics-join='tmux attach -t mothics'" >> $(ALIAS_FILE); \
+		source $(ALIAS_FILE);\
 		echo "Alias 'mothics-join' added to $(ALIAS_FILE)"; \
 	fi
 	@. $(ALIAS_FILE); echo "Alias 'mothics-join' is now available in this session."
