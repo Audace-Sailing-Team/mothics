@@ -76,6 +76,10 @@ To connect to the automatically started session
 tmux attach -t mothics
 ```
 
+> **Note:** by running `make alias-tmux`, you can join the active
+> Mothics session by using the command `mothics-join` - which is far
+> easier to remember!
+
 To detach from the session (keeping it active), press `CTRL + B`, then `D`.
 
 ## Dashboard
@@ -96,8 +100,12 @@ The dashboard allows you to:
 
 ## Integrated CLI
 Mothics includes a command-line interface (CLI) to manage tracks and
-system status. Ensure the virtual environment is active, and start the
-CLI with
+system status. Ensure the virtual environment is active
+```sh
+. .venv/bin/activate
+```
+
+and start the CLI with
 ```sh
 python -m cli.py
 ```
@@ -117,7 +125,7 @@ Documentation for most CLI commands is available; run
 - `restart`: restarts the system
 - `restart reload_config`: restarts the system and reload the
   configuration file
-- `interface_refresh`: refresh communication interfaces
+- `interface_refresh`: refreshes communication interfaces
 - `status`: shows system status
 - `list_tracks`: lists available tracks
 - `select_track <index>`: selects a track by index
