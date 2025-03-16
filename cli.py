@@ -351,7 +351,7 @@ class MothicsCLI(Cmd):
             # Single-time execution
             print(display_resources())
 
-    def do_serial_read(self, args):
+    def do_serial_stream(self, args):
         """
         Read and display the serial stream.
 
