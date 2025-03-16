@@ -9,6 +9,7 @@ keeping resource usage to a minimum. Nonetheless, it also runs on most
 Linux-based machines.
 
 Before installing Mothics, ensure you have the following dependencies installed
+
 - `make`
 - `python3`
 - `python3-venv`
