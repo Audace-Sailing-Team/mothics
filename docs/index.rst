@@ -1,17 +1,31 @@
-.. mothics documentation master file, created by
-   sphinx-quickstart on Sun Mar 16 16:04:55 2025.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. Mothics documentation master file, created by Sphinx.
 
-mothics documentation
+Mothics documentation
 =====================
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
+Mothics is a package for acquiring, aggregating, and analyzing data
+collected from remote sensors (henceforth called *Remote Units*) for
+sailing on moth boats.
 
+Mothics is developed by the Electronics department of `Audace Sailing
+Team <https://audace.units.it/>`_, University of Trieste.
+
+Contents:
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Contents
 
+   setup
+   basics
+   dashboard
+   cli
+   configuration
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
+	  
