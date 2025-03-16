@@ -98,11 +98,21 @@ class SerialInterface(BaseInterface):
                 line = self.serial_conn.readline().decode('utf-8').strip()
                 if line:
                     self.logger.debug(f"received: {line}")
-                    message = json.loads(line)
-                    for topic, value in message.items():
-                        self.on_message_callback(topic, value)
+                    try:
+                        for json_obj in line.split("}{"):  # Handles multiple JSON objects
+                            if not json_obj.startswith("{"):
+                                json_obj = "{" + json_obj
+                            if not json_obj.endswith("}"):
+                                json_obj = json_obj + "}"
+                            message = json.loads(json_obj)
+                            for topic, value in message.items():
+                                self.on_message_callback(topic, value)
+                    except json.JSONDecodeError as e:
+                        self.logger.warning(f"error processing incoming data: {e} - raw: {line}")
+                        continue
             except Exception as e:
-                self.logger.critical(f"error processing incoming data: {e}")
+                self.logger.warning(f"error processing incoming data: {e} - raw: {line}")
+                continue
 
     def on_message_callback(self, topic, data):
         """Aggregate raw data from messages into dict"""
