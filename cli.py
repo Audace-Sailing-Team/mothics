@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import serial
 import psutil
 import argh
 import logging
@@ -349,7 +350,35 @@ class MothicsCLI(Cmd):
         else:
             # Single-time execution
             print(display_resources())
-                        
+
+    def do_serial_read(self, args):
+        """
+        Read and display the serial stream.
+
+        Usage:
+            serial_read       - Starts reading from the serial port.
+            serial_read stop  - Stops the serial reading.
+        """
+        serial_port = self.system_manager.config["serial"]["port"]
+        baudrate = self.system_manager.config["serial"]["baudrate"]
+        if not serial_port:
+            self.print("Serial port not configured.", level='error')
+            return
+
+        try:
+            with serial.Serial(serial_port, baudrate=baudrate, timeout=1) as ser:
+                self.print(f"Reading from {serial_port} (Press CTRL-C to stop)", level='info')
+                try:
+                    while True:
+                        line = ser.readline().decode("utf-8", errors="ignore").strip()
+                        if line:
+                            print(line)
+                except KeyboardInterrupt:
+                    self.print("Serial read stopped.", level='warning')
+        except serial.SerialException as e:
+            self.print(f"Error opening serial port: {e}", level='error')
+
+            
     def do_shell(self, args):
         """Execute shell commands without exiting the CLI.
         
