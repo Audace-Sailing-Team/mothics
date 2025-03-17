@@ -78,7 +78,10 @@ options. Since the project revolves around easy usage in rough
 conditions (*e.g.* on a Raspberry Pi inside a watertight box on a
 moth!), running Mothics without user interaction is essential.
 
-To run Mothics at startup (as a service with `systemd`), make sure to
+Start Mothics at startup
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+To **run Mothics at startup** (as a service with `systemd`), make sure to
 clone the package in the `/home/<user>` directory; then, run
 
 .. code-block:: sh
@@ -89,7 +92,18 @@ Mothics-as-a-service lives inside a `tmux` session to allow users to
 access the currently running Mothics instance and to use the command
 line interface (CLI).
 
-To attach the current shell session to the running `tmux` session, run
+When Mothics runs as a service, it automatically runs the command
+
+.. code-block:: sh
+
+   start live
+
+(more on this in Basics/Commands!)
+
+Aliases
+^^^^^^^
+
+To **attach the current shell** session to the running `tmux` session, run
 
 .. code-block:: sh
 
@@ -108,13 +122,36 @@ which allows the user to access the current Mothics CLI using
 
    mothics-join
 
-Furthermore, to check for Mothics updates, run
+**Starting Mothics manually** is quite bothersome too, since the virtual
+environment needs to be started before starting the CLI
+
+.. code-block:: sh
+
+   . .venv/bin/activate
+   python3 cli.py
+
+we can make it more memorable by running
+
+.. code-block:: sh
+
+    make alias-start
+
+which enables the command
+
+.. code-block:: sh
+
+   mothics-start
+   
+Update and clean
+^^^^^^^^^^^^^^^^
+   
+Furthermore, to check for **Mothics updates**, run
 
 .. code-block:: sh
 
    make update
 
-and to clean up files generated during the installation process and
+and to **clean up** files generated during the installation process and
 normal usage, run
 
 .. code-block:: sh
