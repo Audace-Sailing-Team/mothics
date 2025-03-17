@@ -43,6 +43,7 @@ To **start** the CLI, run
    mothics-start
 
 or, alternatively
+
 .. code-block:: sh
 
    . .venv/bin/activate
@@ -58,7 +59,7 @@ Commands
 ^^^^^^^^
 
 Once Mothics is installed and running, you will often need to interact
-with it through the command-line interface (CLI). This allows you to
+with it through the **command-line interface (CLI)**. This allows you to
 start and stop the system, monitor its performance, manage its
 operation, and troubleshoot any issues that arise. Below is a complete
 guide on how to properly operate Mothics using the available CLI
@@ -69,11 +70,9 @@ Starting, stopping, and restarting Mothics
 
 The core of Mothics consists of several processes that handle
 different tasks, including data acquisition from sensors, logging, and
-visualization through the web-based dashboard. To ensure proper
-operation, it is important to know how to start, stop, and restart
-Mothics correctly.
+visualization through the web-based dashboard.
 
-To launch the entire system and begin real-time data collection, use
+To **launch** the entire system and begin real-time data collection, use
 the command
 
 .. code-block:: sh
@@ -86,7 +85,7 @@ visualization. The web dashboard will become accessible at its usual
 address (`192.168.42.1:5000`), and real-time data tracking will
 begin. 
 
-If at any point you need to stop the system without closing Mothics, you
+If at any point you need to **stop the system** without closing Mothics, you
 can do so by running
 
 .. code-block:: sh
@@ -102,7 +101,7 @@ remains active, together with the current track and database.
 
 If you suspect that something is not functioning correctly, or if you
 have changed certain configuration settings and need to restart the
-system with those changes applied, you can restart Mothics using
+system with those changes applied, you can **restart** Mothics using
 
 .. code-block:: sh
 
@@ -111,7 +110,7 @@ system with those changes applied, you can restart Mothics using
 Restarting will first stop all running processes and then relaunch
 them, ensuring a fresh start without requiring a full system reboot.
 
-In some cases, you may want to reload the configuration file
+In some cases, you may want to **reload the configuration file**
 (`config.toml`) without closing Mothics. This is useful if you have
 made modifications to the configuration file and want
 those changes to take effect without completely stopping and
@@ -128,9 +127,10 @@ Monitoring system status
 ''''''''''''''''''''''''
 
 While Mothics is running, it is important to be able to check its
-status to ensure that everything is functioning properly. If you need
-to confirm that the system is running as expected, you can check its
-overall status using:
+status to ensure that everything is functioning properly.
+
+If you need to confirm that the system is running as expected, you can
+check its overall **status** using:
 
 .. code-block:: sh
 
@@ -143,7 +143,7 @@ situation.
 
 At times, the system may appear slow or unresponsive, and you may need
 to check whether resource usage is too high. Mothics provides a
-command that allows you to monitor resource consumption
+command that allows you to **monitor resource consumption**
 
 .. code-block:: sh
 
@@ -180,9 +180,10 @@ Managing Mothics
 ''''''''''''''''
 
 In addition to controlling Mothics itself, there are times when you
-may need to manage the Raspberry Pi on which it runs. For example, if
-you are finished using the system and want to power it down safely,
-you should use the shutdown command
+may need to manage the Raspberry Pi on which it runs.
+
+For example, if you are finished using the system and want to power it
+down safely, you should use the **shutdown** command
 
 .. code-block:: sh
 
@@ -192,8 +193,8 @@ This command will completely stop Mothics and power off the Raspberry
 Pi. You will need to manually turn the device back on if you want to
 use it again.
 
-If you need to shut down and restart the Raspberry Pi, run the reboot
-command
+If you need to shut down and restart the Raspberry Pi, run the
+**reboot** command
 
 .. code-block:: sh
 
@@ -201,8 +202,7 @@ command
 
 Mothics is frequently updated with improvements and bug fixes. To
 ensure that you are running the latest version, you should
-periodically update the software. This can be done using the update
-command:
+periodically **update** the software
 
 .. code-block:: sh
 
@@ -218,8 +218,8 @@ If Mothics (or any dependency, sensor, etc...) is not behaving as
 expected, there are several tools available to help diagnose and
 resolve issues.
 
-The first thing to check when encountering problems is the system
-logs. Logs provide detailed information about what Mothics is doing
+The first thing to check when encountering problems is the **system
+logs**. Logs provide detailed information about what Mothics is doing
 and can help identify errors or unusual behavior. To view the logs,
 run
 
@@ -236,20 +236,17 @@ cluttered with old information, you can clear them using
    log clear
 
 If you are experiencing communication issues between Mothics and the
-sensors, you may need to check the raw serial data stream. This allows
-you to see exactly what data is being received from the remote sensors
-in real time. To start monitoring the serial data, use
+sensors, you may need to check the **raw serial data stream**
 
 .. code-block:: sh
 
    serial_stream
 
-Live data from the connected sensors will be shown on the terminal,
-which is helpful for debugging connectivity issues or verifying that
-the sensors are working correctly.
+this allows you to see exactly what data is being received from the
+remote sensors in real time
 
 You may need to run system commands directly from within the
-Mothics CLI. The CLI allows you to execute shell commands without
+Mothics CLI. The CLI allows you to **execute shell commands** without
 exiting
 
 .. code-block:: sh
@@ -271,7 +268,14 @@ what is available, you can access a complete list of commands
 
 .. code-block:: sh
 
-   (mothics) help
+   help
 
-This will display all available commands along with a brief
+this will display all available commands along with a brief
 description of their functions.
+
+Most command come with a brief description and some usage examples,
+available using the command
+
+.. code-block sh::
+
+   help <command>
