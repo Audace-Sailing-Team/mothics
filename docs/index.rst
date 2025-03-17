@@ -13,5 +13,6 @@ Team <https://audace.units.it/>`_, University of Trieste.
 .. toctree::
    :maxdepth: 2
    :caption: Contents
-	     setup
-	     basics
+
+   setup
+   basics
