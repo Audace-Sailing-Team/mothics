@@ -55,3 +55,10 @@ alias-tmux:
 	fi
 	@. $(ALIAS_FILE); echo "Alias 'mothics-join' is now available in this session."
 
+# Add an alias to start the Mothics CLI
+alias-start:
+	@if ! grep -q "alias mothics-start=" $(ALIAS_FILE); then \
+		echo "alias mothics-start='. $(VENV)/bin/activate && python3 cli.py'" >> $(ALIAS_FILE); \
+		echo "Alias 'mothics-start' added to $(ALIAS_FILE)"; \
+	fi
+	@. $(ALIAS_FILE); echo "Alias 'mothics-start' is now available in this session."
