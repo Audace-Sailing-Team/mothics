@@ -55,6 +55,9 @@ The welcome screen should pop up
 
 .. image:: welcome.png
 
+> **Note:** henceforth, commands to be run inside the Mothics CLI are
+indicated by the `(mothics)` prompt.
+
 Commands
 ^^^^^^^^
 
@@ -77,7 +80,7 @@ the command
 
 .. code-block:: sh
 
-   start live
+   (mothics) start live
 
 When this command is executed, Mothics will initialize all necessary
 components, including sensor data collection, storage, and live
@@ -90,7 +93,7 @@ can do so by running
 
 .. code-block:: sh
 
-   stop
+   (mothics) stop
 
 This command will terminate all Mothics-related processes, including
 the dashboard interface, data logging, and sensor monitoring. The
@@ -105,7 +108,7 @@ system with those changes applied, you can **restart** Mothics using
 
 .. code-block:: sh
 
-   restart
+   (mothics) restart
 
 Restarting will first stop all running processes and then relaunch
 them, ensuring a fresh start without requiring a full system reboot.
@@ -118,7 +121,7 @@ restarting the entire software stack. To do this, you can use
 
 .. code-block:: sh
 
-   restart reload_config
+   (mothics) restart reload_config
 
 Unlike a full restart, this command will apply new configuration
 settings dynamically while keeping the system active.
@@ -134,7 +137,7 @@ check its overall **status** using:
 
 .. code-block:: sh
 
-   status
+   (mothics) status
 
 This command provides an overview of the system, including which
 services are currently active. If Mothics is not working correctly,
@@ -147,7 +150,7 @@ command that allows you to **monitor resource consumption**
 
 .. code-block:: sh
 
-   resources
+   (mothics) resources
 
 Running this command will show you details about CPU usage, memory
 consumption, and other relevant system statistics. If you want to see
@@ -156,7 +159,7 @@ system, you can run:
 
 .. code-block:: sh
 
-   resources mothics
+   (mothics) resources mothics
 
 Alternatively, if you are interested in seeing overall system-wide
 resource consumption, including all processes running on the device,
@@ -164,16 +167,16 @@ you can use:
 
 .. code-block:: sh
 
-   resources system
+   (mothics) resources system
 
 Akin to the `watch` command in Unix, `resources` can be continuously
 updated every two seconds by running one of the following commands
 
 .. code-block:: sh
 
-   resources watch
-   resources mothics watch
-   resources system watch
+   (mothics) resources watch
+   (mothics) resources mothics watch
+   (mothics) resources system watch
    
    
 Managing Mothics
@@ -187,7 +190,7 @@ down safely, you should use the **shutdown** command
 
 .. code-block:: sh
 
-   shutdown
+   (mothics) shutdown
 
 This command will completely stop Mothics and power off the Raspberry
 Pi. You will need to manually turn the device back on if you want to
@@ -198,7 +201,7 @@ If you need to shut down and restart the Raspberry Pi, run the
 
 .. code-block:: sh
 
-   reboot
+   (mothics) reboot
 
 Mothics is frequently updated with improvements and bug fixes. To
 ensure that you are running the latest version, you should
@@ -206,7 +209,7 @@ periodically **update** the software
 
 .. code-block:: sh
 
-   update
+   (mothics) update
 
 it will fetch the latest updates and apply them automatically. For the
 updates to take effect, you need to close and reopen Mothics.
@@ -225,7 +228,7 @@ run
 
 .. code-block:: sh
 
-   log show
+   (mothics) log show
 
 This will display a real-time feed of system logs, which can be useful
 for identifying the cause of issues. If the logs become too large or
@@ -233,14 +236,14 @@ cluttered with old information, you can clear them using
 
 .. code-block:: sh
 
-   log clear
+   (mothics) log clear
 
 If you are experiencing communication issues between Mothics and the
 sensors, you may need to check the **raw serial data stream**
 
 .. code-block:: sh
 
-   serial_stream
+   (mothics) serial_stream
 
 this allows you to see exactly what data is being received from the
 remote sensors in real time
@@ -251,13 +254,13 @@ exiting
 
 .. code-block:: sh
 
-   shell <command>
+   (mothics) shell <command>
 
 or a shorthand version
 
 .. code-block:: sh
 
-   !<command>
+   (mothics) !<command>
 
 
 Help!
@@ -268,7 +271,7 @@ what is available, you can access a complete list of commands
 
 .. code-block:: sh
 
-   help
+   (mothics) help
 
 this will display all available commands along with a brief
 description of their functions.
@@ -278,4 +281,4 @@ available using the command
 
 .. code-block sh::
 
-   help <command>
+   (mothics) help <command>
