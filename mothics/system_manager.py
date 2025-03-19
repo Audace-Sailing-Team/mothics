@@ -31,9 +31,12 @@ from .database import Database
 # Default configuration values to be used if `config.toml` cannot be found
 DEFAULT_CONFIG = {
     "serial": {
-        "port": "/dev/ttyACM0",
-        "baudrate": 9600,
-        "topics": "rm2/wind/speed"
+        "port1": {
+            "name": "Port 1",
+            "port": "/dev/ttyACM0",
+            "baudrate": 9600,
+            "topics": "rm2/wind/speed"
+        }
     },
     "mqtt": {
         "hostname": "test.mosquitto.org",
@@ -214,17 +217,22 @@ class SystemManager:
     def start_live(self):
         self.initialize_common_components("live")
 
-        # Initialize interfaces (MQTT and serial) and communicator
         interfaces = {}
-        interfaces[SerialInterface] = self.config["serial"]
+
+        # Initialize serial interfaces
+        interfaces[SerialInterface] = list(self.config['serial'].values())
+        
+        # Initialize MQTT interfaces
         interfaces[MQTTInterface] = self.config["mqtt"]
 
+        # Initialize Communicator
         try:
             self.communicator = Communicator(interfaces=interfaces,
                                              max_values=self.config["communicator"]["max_values"],
                                              trim_fraction=self.config["communicator"]["trim_fraction"])
         except Exception as e:
             self.logger.critical(f"error in initializing communicator, got {e}")
+            
         self.communicator.connect()
 
         # Set up aggregator

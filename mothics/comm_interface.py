@@ -33,7 +33,7 @@ class BaseInterface:
 class SerialInterface(BaseInterface):
     """Interface class for communication via USB Serial."""
     
-    def __init__(self, port, baudrate=9600, topics=None):
+    def __init__(self, port, baudrate=9600, topics=None, name=None):
         self.port = port
         self.baudrate = baudrate
         self.serial_conn = None
@@ -49,13 +49,15 @@ class SerialInterface(BaseInterface):
             topics = [topics]
         self.topics = topics
         """Client topics to subscribe to"""
+        self.name = name
+        """Interface name"""
         self.raw_data = {k: [] for k in self.topics}
         """Dictionary of all raw data fetched from available topics. Topics are keys, list of {timestamp: quantity} as values"""
         self.connected = False
         """Connection status flag"""
         
         # Setup logger
-        self.logger = logging.getLogger("Serial-Interface")
+        self.logger = logging.getLogger(f"Serial-Interface - {self.name}")
         self.logger.info("-------------Serial Interface-------------")
         
     def connect(self):
@@ -308,17 +310,21 @@ class Communicator:
             
         # Initialize each interface            
         for interface_class, kwargs in interfaces.items():
-            class_name = interface_class.__name__
-            if class_name in self.interfaces:
-                self.logger.warning(f"interface {class_name} already exists, skipping")
-                continue
+            if isinstance(kwargs, list):
+                for kwarg in kwargs:
+                    class_name = interface_class.__name__
+                    if kwarg['name'] is not None:
+                        class_name = interface_class.__name__+'_'+kwarg['name']
+                    if class_name in self.interfaces:
+                        self.logger.warning(f"interface {class_name} already exists, skipping")
+                        continue
                 
-            try:
-                self.interfaces[class_name] = interface_class(**kwargs)
-                self.logger.info(f"initialized {class_name} with kwargs: {kwargs}")
-            except Exception as e:
-                self.logger.critical(f"failed to initialize {class_name}: {e}")
-                raise RuntimeError(f"failed to initialize {class_name}: {e}")
+                    try:
+                        self.interfaces[class_name] = interface_class(**kwarg)
+                        self.logger.info(f"initialized {class_name} with kwargs: {kwargs}")
+                    except Exception as e:
+                        self.logger.critical(f"failed to initialize {class_name}: {e}")
+                        raise RuntimeError(f"failed to initialize {class_name}: {e}")
     
     def remove_interface(self, interface_class):
         """
