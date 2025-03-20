@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import RPi.GPIO as GPIO
 import threading
 import glob
 import serial
@@ -35,13 +36,55 @@ class MothicsCLI(Cmd):
     ==============================================
     """
     system_manager = SystemManager()
-
+    gpio_thread = None
+    serial_threads = []
+    keep_streaming = False
+    available_ports = []
+    button_pin = 21
+    
     def __init__(self):
         super().__init__()
-        self.serial_threads = []
-        self.keep_streaming = False
-        self.available_ports = []
-    
+        self._start_gpio_monitor()    
+
+    def _start_gpio_monitor(self):
+        """Starts a background thread to monitor the GPIO button for shutdown/reboot."""
+        def gpio_listener():
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(self.button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+            
+            try:
+                while True:
+                    if GPIO.input(self.button_pin) == GPIO.LOW:
+                        self._shutdown_or_reboot()
+                    time.sleep(0.1)
+            except KeyboardInterrupt:
+                self._cleanup_gpio()
+            except Exception as e:
+                self.print(f"GPIO Error: {e}", level='error')
+
+        # Run GPIO monitoring in a separate thread
+        self.gpio_thread = threading.Thread(target=gpio_listener, daemon=True)
+        self.gpio_thread.start()
+
+    def _shutdown_or_reboot(self):
+        """Determines whether to reboot or shut down based on button press duration."""
+        start_time = time.time()
+
+        while GPIO.input(self.button_pin) == GPIO.LOW:
+            time.sleep(0.1)
+
+        press_duration = time.time() - start_time
+
+        if press_duration > 2 and press_duration < 5:
+            self._shutdown(confirm=False)
+        elif press_duration > 5:
+            self._reboot(confirm=False)
+
+    def _cleanup_gpio(self):
+        """Cleans up GPIO resources on exit."""
+        GPIO.cleanup()
+        print("GPIO cleanup completed.")
+
     def _confirm_action(self, action):
         """Prompt the user for confirmation before executing shutdown or reboot."""
         response = input(f"\033[93m[WARNING]\033[0m Are you sure you want to {action}? [Y/n]: ").strip().lower()
@@ -251,35 +294,6 @@ class MothicsCLI(Cmd):
                     open(log_file, 'w').close()
             else:
                 self.print("Log file not found.", level='error')
-
-    # def _get_system_resources(self):
-    #     """Gather system-wide resource usage."""
-    #     system_cpu = psutil.cpu_percent(interval=0.1)
-    #     system_memory = psutil.virtual_memory()
-    #     system_swap = psutil.swap_memory()
-    #     system_disk = psutil.disk_usage('/')
-    #     system_processes = len(psutil.pids())
-
-    #     data = [
-    #         ["CPU usage", f"{system_cpu:.2f} %"],
-    #         ["Memory usage", f"{system_memory.used / 1024 ** 2:.2f} MB / {system_memory.total / 1024 ** 2:.2f} MB"],
-    #         ["Swap usage", f"{system_swap.used / 1024 ** 2:.2f} MB / {system_swap.total / 1024 ** 2:.2f} MB"],
-    #         ["Disk usage", f"{system_disk.used / 1024 ** 2:.2f} GB / {system_disk.total / 1024 ** 2:.2f} GB"],
-    #         ["Running processes", system_processes],
-    #     ]
-
-    #     # Fetch CPU temperature (if available)
-    #     try:
-    #         temps = psutil.sensors_temperatures()
-    #         if temps:
-    #             for name, entries in temps.items():
-    #                 if name in ['coretemp', 'cpu_thermal']:
-    #                     avg_temp = sum(e.current for e in entries) / len(entries)
-    #                     data.append([f"CPU avg temp ({name})", f"{avg_temp:.1f}°C"])
-    #     except AttributeError:
-    #         data.append(["CPU temperature", "not available"])
-
-    #     return data
 
     def _get_system_resources(self):
         """Gather system-wide resource usage, including get_throttled status."""
@@ -610,11 +624,13 @@ class MothicsCLI(Cmd):
         except subprocess.CalledProcessError:
             self.print("Update failed. Check your Git settings or internet connection.", level='error')
 
-    def do_shutdown(self, args):
+    def _shutdown(self, confirm=True):
         """Safely shuts down the system with user confirmation."""
-        if not self._confirm_action("shut down the system"):
-            self.print("Shutdown canceled.", level='warning')
-            return
+
+        if confirm:
+            if not self._confirm_action("shut down the system"):
+                self.print("Shutdown canceled.", level='warning')
+                return
 
         self.system_manager.stop()
         self.print("Shutting down the system.", level='info')
@@ -629,11 +645,12 @@ class MothicsCLI(Cmd):
         except Exception as e:
             self.print(f"Unable to shutdown: {e}", level='error')
 
-    def do_reboot(self, args):
+    def _reboot(self, confirm=True):
         """Safely reboots the system with user confirmation."""
-        if not self._confirm_action("reboot the system"):
-            self.print("Reboot canceled.", level='warning')
-            return
+        if confirm:
+            if not self._confirm_action("reboot the system"):
+                self.print("Reboot canceled.", level='warning')
+                return
 
         self.system_manager.stop()
         self.print("Rebooting the system.", level='info')
@@ -647,7 +664,14 @@ class MothicsCLI(Cmd):
                 self.print("Reboot command not supported on this OS.", level='error')
         except Exception as e:
             self.print(f"Unable to reboot: {e}", level='error')
-            
+
+    def do_shutdown(self, args):
+        """Safely shuts down the system with user confirmation."""
+        self._shutdown(confirm=True)
+
+    def do_reboot(self, args):
+        """Safely reboots the system with user confirmation."""
+        self._reboot(confirm=True)
             
 if __name__ == '__main__':
     cli = MothicsCLI()
