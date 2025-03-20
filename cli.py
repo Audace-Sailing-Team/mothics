@@ -15,6 +15,12 @@ from cmd import Cmd
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
+# Import GPIO and continue gracefully if we aren't on a RasPi
+try:
+    import RPi.GPIO as GPIO
+    IS_RASPI = True
+except:
+    IS_RASPI = False
 
 from mothics.helpers import setup_logger, tipify, check_internet_connectivity
 from mothics.system_manager import SystemManager
@@ -44,12 +50,10 @@ class MothicsCLI(Cmd):
         self.available_ports = []
         self.button_pin = self.system_manager.config['cli']['button_pin']
 
-        try:
-            import RPi.GPIO as GPIO
+        if IS_RASPI:
             self._start_gpio_monitor()
-        except RuntimeError:
+        else:
             self.print("Shutdown button is not available.", level='warning')
-            pass
 
     def _start_gpio_monitor(self):
         """Starts a background thread to monitor the GPIO button for shutdown/reboot."""
