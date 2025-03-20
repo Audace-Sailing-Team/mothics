@@ -58,15 +58,18 @@
     <div class="dashboard-container">
       <!-- Remote Unit Status -->
       <div class="status-section">
-	<h2>Remote Unit Status</h2>
-	<div id="status-container" class="status-container">
-          <!-- Status will be updated here -->
-	</div>
+        <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#status-container"> Remote Unit Status <span class="arrow">&#9660;</span>
+        </div>
+            <div id="status-container" class="collapse show">
+              <!-- Status will be updated here -->
+            </div>
       </div>
       
       <!-- Latest Data -->
       <div class="status-section">
-	<h2>Latest Data</h2>
+	<div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#table-container"> Latest Data <span class="arrow">&#9660;</span>
+	</div>
+
 	<!-- Dropdown for Card Selection -->
 	<div class="dropdown">
 	  <button class="btn btn-secondary dropdown-toggle" type="button" id="cardDropdown" data-bs-toggle="dropdown" aria-expanded="false">
@@ -86,23 +89,29 @@
     </div>
 	
     <!-- Time Evolution -->
-    <div class="plot-container my-4" id="plot-container">
-      <h2>Time Evolution</h2>
-      {{ script | safe }}
-      {{ div | safe }}
+    <div class="plot-container my-4">
+      <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#plot-container"> Time Evolution <span class="arrow">&#9660;</span>
+      </div>
+      <div id="plot-container" class="collapse show">
+        {{ script | safe }}
+        {{ div | safe }}
+      </div>
     </div>
-
+    
     <!-- Sampling Control Buttons and Indicator -->
     <div class="status-section">
-      <h2>Controls</h2>
-      <div class="row mb-3 align-items-center">
-	<div class="col-auto">
-          <button id="startSamplingBtn" class="btn btn-success">Start Sampling</button>
-          <button id="stopSamplingBtn" class="btn btn-danger">Stop Sampling</button>
-	</div>
-	<div class="col-auto">
-          <span id="samplingStatusIndicator" class="badge bg-secondary">Not Sampling</span>
-	</div>
+      <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#control-container"> Controls <span class="arrow">&#9660;</span>
+      </div>
+      <div id="control-container" class="collapse show">
+        <div class="row mb-3">
+          <div class="col-auto">
+            <button id="startSamplingBtn" class="btn btn-success">Start Sampling</button>
+            <button id="stopSamplingBtn" class="btn btn-danger">Stop Sampling</button>
+          </div>
+          <div class="col-auto">
+            <span id="samplingStatusIndicator" class="badge bg-secondary">Not Sampling</span>
+          </div>
+        </div>
       </div>
     </div>
     

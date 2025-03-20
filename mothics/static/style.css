@@ -131,3 +131,24 @@ body {
         width: 100%;
     }
 }
+
+.toggle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    padding: 5px;
+    user-select: none;
+}
+
+.toggle-header .arrow {
+    font-size: 1.2rem;
+    transition: transform 0.2s ease-in-out;
+}
+
+.collapsed .arrow {
+    transform: rotate(-90deg);
+}
