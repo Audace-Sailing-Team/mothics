@@ -25,6 +25,15 @@ def index():
 def get_table():
     database = current_app.config['GETTERS']['database']()
     latest_data = [{key: value for key, value in database.data_points[-1].to_dict().items() if '/last_timestamp' not in key}] if database.data_points else []
+
+    # Apply the data thesaurus
+    data_thesaurus = current_app.config['DATA_THESAURUS']
+    if data_thesaurus is not None:
+        for row in latest_data:
+            for key in list(row.keys()):
+                if key in data_thesaurus:
+                    row[data_thesaurus[key]] = row.pop(key)
+                
     return render_template("table.html", table_data=latest_data)
 
 @monitor_bp.route("/get_status")

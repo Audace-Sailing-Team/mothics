@@ -16,17 +16,28 @@ from .blueprints.bp_database import database_bp
 
 
 class WebApp:
-    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None, plot_mode='static'):
+    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None, plot_mode='static'):
         self.getters = getters or {}
+        """Getter methods from other Mothics components"""
         self.setters = setters or {}
+        """Setter methods for settings, etc..."""
         self.logger_fname = logger_fname
+        """Logger filename"""
         self.auto_refresh_table = auto_refresh_table * 1000  # milliseconds
+        """Auto refresh interval for the data cards (and the whole dashboard)"""
         self.rm_thesaurus = rm_thesaurus
+        """Aliases for remote unit names"""
+        self.data_thesaurus = data_thesaurus
+        """Aliases for sensor data names"""
         self.timeout_offline = timeout_offline
+        """Threshold to set remote unit as offline"""
         self.timeout_noncomm = timeout_noncomm
-        self.track_manager_directory = track_manager_directory 
-        self.track_manager = None
+        """Threshold to set remote unit as non communicative"""
+        self.track_manager_directory = track_manager_directory
+        """Database directory"""
         self.plot_mode = plot_mode
+        """Data plot mode - `static` or `real-time`"""
+        self.track_manager = None
         self.plot_realtime_url = "http://localhost:5006/bokeh_app"
         
         # Setup logger
@@ -42,6 +53,7 @@ class WebApp:
             'SETTERS': self.setters,
             'AUTO_REFRESH_TABLE': self.auto_refresh_table,
             'RM_THESAURUS': self.rm_thesaurus,
+            'DATA_THESAURUS': self.data_thesaurus,
             'TIMEOUT_OFFLINE': self.timeout_offline,
             'TIMEOUT_NONCOMM': self.timeout_noncomm,
             'LOGGER_FNAME': self.logger_fname,
