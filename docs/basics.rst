@@ -18,6 +18,12 @@ To **access the dashboard**, open a web browser and navigate to:
 
    http://192.168.42.1:5000
 
+or, if you properly set up a custom hostname (see Setup/Hostname)
+
+.. code-block:: sh
+
+   http://mothics.local:5000
+
 > **Note:** The first time you start Mothics, ensure you have an
 active internet connection. Without it, some resources (such as
 external scripts and stylesheets) may not load properly.
@@ -85,8 +91,8 @@ the command
 When this command is executed, Mothics will initialize all necessary
 components, including sensor data collection, storage, and live
 visualization. The web dashboard will become accessible at its usual
-address (`192.168.42.1:5000`), and real-time data tracking will
-begin. 
+address (`192.168.42.1:5000` or `mothics.local:5000`), and real-time
+data tracking will begin.
 
 If at any point you need to **stop the system** without closing Mothics, you
 can do so by running

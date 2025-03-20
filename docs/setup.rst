@@ -17,9 +17,11 @@ Before installing Mothics, ensure you have the following dependencies installed
 - `git`
 - `tmux` (optional)
 - `systemd` (optional)
-
+- `avahi-daemon` (optional)
+  
 `tmux` and `systemd` are needed to install Mothics as a service and to
-run it at startup.
+run it at startup; `avahi-daemon` is needed to setup a different
+hostname.
 
 Installation
 ------------
@@ -54,6 +56,7 @@ to run Mothics, which are
 - `pyserial==3.5`
 - `psutil==7.0.0`
 - `requests==2.32.3`
+- `rpi-lgpio==0.6`
 - `tabulate==0.9.0`
 - `tinydb==4.8.2`
 - `toml==0.10.2`
@@ -157,3 +160,24 @@ normal usage, run
 .. code-block:: sh
 
    make clean
+
+Hostname
+^^^^^^^^
+
+DietPi allows to change hostname to allow for easy access to the web
+dashboard and via SSH. To do so, install `avahi-daemon` and use the
+default `dietpi-config` setup tool
+
+.. code-block:: sh
+
+   sudo apt install avahi-daemon
+   sudo dietpi-config
+
+For the purposes of this tutorial, we set `mothics` as the system
+hostname.
+
+> **Note:** by default, the standard DietPi hostname available after
+`avahi-daemon` is enabled, is `dietpi`.
+
+> **Note:** different Linux distributions offer different
+ways to modify the hostname.
