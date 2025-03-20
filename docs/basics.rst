@@ -74,6 +74,39 @@ operation, and troubleshoot any issues that arise. Below is a complete
 guide on how to properly operate Mothics using the available CLI
 commands.
 
+Joining, detaching and exiting the Mothics session
+''''''''''''''''''''''''''''''''''''''''''''''''''
+When Mothics-as-a-service is enabled (see Setup/Start Mothics at
+startup), a Mothics instance is started inside a `tmux` session, aptly
+named `mothics`.
+
+To **join the active Mothics session**, run
+
+.. code-block:: sh
+
+   mothics-join
+
+If you are not sure this worked properly, simply check if the Mothics
+prompt (and/or welcome screen) appear
+
+.. code-block:: sh
+
+   (mothics)
+
+Sometimes, it is useful to leave the current Mothics session without
+closing it completely (*i.e.* leave it running in the background while
+you do other stuff): this action is called *detaching* in `tmux`
+jargon.
+
+To **detach from the current Mothics session**, press `CTRL-B`, then
+`D`, or run the command
+
+.. code-block:: sh
+
+   (mothics) detach
+
+Every time you want to rejoin the active Mothics session, run `mothics-join`.
+   
 Starting, stopping, and restarting Mothics
 ''''''''''''''''''''''''''''''''''''''''''
 
@@ -245,15 +278,41 @@ cluttered with old information, you can clear them using
    (mothics) log clear
 
 If you are experiencing communication issues between Mothics and the
-sensors, you may need to check the **raw serial data stream**
+sensors connected via serial port, you may need to check the **raw
+serial data stream**. The `serial` command, with its subcommands, can
+list available serial devices and read their output.
+
+To list all available serial devices, run 
+.. code-block:: sh
+
+   (mothics) serial list
+
+which displays all available serial devices - or a warning if there
+isn't any available. Each serial device is identified by an index.
+
+Each device's **serial output** can be accessed using
 
 .. code-block:: sh
 
-   (mothics) serial_stream
-
+   (mothics) serial stream <index>
+   
 this allows you to see exactly what data is being received from the
-remote sensors in real time
+selected sensors in real time. Similarly, to get the output from all
+available serial devices, run
 
+.. code-block:: sh
+
+   (mothics) serial stream all
+
+Finally, to stop the serial stream, type
+
+.. code-block:: sh
+
+   (mothics) serial stop
+
+> **Note:** the stop command might get broken up by the incoming
+serial stream; this is just a visual bug - just press enter!
+   
 You may need to run system commands directly from within the
 Mothics CLI. The CLI allows you to **execute shell commands** without
 exiting
