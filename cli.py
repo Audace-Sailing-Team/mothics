@@ -317,7 +317,7 @@ class MothicsCLI(Cmd):
     def _get_throttled_status(self):
         """Runs 'vcgencmd get_throttled' and returns the raw and translated status."""
         try:
-            result = subprocess.run(["vcgencmd", "get_throttled"], capture_output=True, text=True, check=True)
+            result = subprocess.run(["sudo", "vcgencmd", "get_throttled"], capture_output=True, text=True, check=True)
             raw_value = result.stdout.strip().split("=")[-1]
             throttled_flags = int(raw_value, 16)  # Convert hex to int
             return throttled_flags, self._translate_throttled_flags(throttled_flags)
