@@ -71,6 +71,10 @@ DEFAULT_CONFIG = {
             "rm1": "GPS+IMU",
             "rm2": "Anemometer"
         }
+    },
+    "cli": {
+        "button_pin": 21
+        }
     }
 }
 

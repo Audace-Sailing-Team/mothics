@@ -35,19 +35,22 @@ class MothicsCLI(Cmd):
     Type "exit" or <CTRL-D> to quit.\033[0m
     ==============================================
     """
-    system_manager = SystemManager()
-    gpio_thread = None
-    serial_threads = []
-    keep_streaming = False
-    available_ports = []
-    button_pin = 21
     
     def __init__(self):
         super().__init__()
-        self._start_gpio_monitor()    
+        self.system_manager = SystemManager()
+        self.gpio_thread = None
+        self.serial_threads = []
+        self.keep_streaming = False
+        self.available_ports = []
+        self.button_pin = self.system_manager['cli']['button_pin']
+        self._start_gpio_monitor()
 
     def _start_gpio_monitor(self):
         """Starts a background thread to monitor the GPIO button for shutdown/reboot."""
+        if self.button_pin is None:
+            self.print('No shutdown button GPIO pin is specified. GPIO shutdown and reboot is not available.', level='warning')
+            
         def gpio_listener():
             GPIO.setmode(GPIO.BCM)
             GPIO.setup(self.button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
