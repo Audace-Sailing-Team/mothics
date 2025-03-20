@@ -252,8 +252,37 @@ class MothicsCLI(Cmd):
             else:
                 self.print("Log file not found.", level='error')
 
+    # def _get_system_resources(self):
+    #     """Gather system-wide resource usage."""
+    #     system_cpu = psutil.cpu_percent(interval=0.1)
+    #     system_memory = psutil.virtual_memory()
+    #     system_swap = psutil.swap_memory()
+    #     system_disk = psutil.disk_usage('/')
+    #     system_processes = len(psutil.pids())
+
+    #     data = [
+    #         ["CPU usage", f"{system_cpu:.2f} %"],
+    #         ["Memory usage", f"{system_memory.used / 1024 ** 2:.2f} MB / {system_memory.total / 1024 ** 2:.2f} MB"],
+    #         ["Swap usage", f"{system_swap.used / 1024 ** 2:.2f} MB / {system_swap.total / 1024 ** 2:.2f} MB"],
+    #         ["Disk usage", f"{system_disk.used / 1024 ** 2:.2f} GB / {system_disk.total / 1024 ** 2:.2f} GB"],
+    #         ["Running processes", system_processes],
+    #     ]
+
+    #     # Fetch CPU temperature (if available)
+    #     try:
+    #         temps = psutil.sensors_temperatures()
+    #         if temps:
+    #             for name, entries in temps.items():
+    #                 if name in ['coretemp', 'cpu_thermal']:
+    #                     avg_temp = sum(e.current for e in entries) / len(entries)
+    #                     data.append([f"CPU avg temp ({name})", f"{avg_temp:.1f}°C"])
+    #     except AttributeError:
+    #         data.append(["CPU temperature", "not available"])
+
+    #     return data
+
     def _get_system_resources(self):
-        """Gather system-wide resource usage."""
+        """Gather system-wide resource usage, including get_throttled status."""
         system_cpu = psutil.cpu_percent(interval=0.1)
         system_memory = psutil.virtual_memory()
         system_swap = psutil.swap_memory()
@@ -279,8 +308,43 @@ class MothicsCLI(Cmd):
         except AttributeError:
             data.append(["CPU temperature", "not available"])
 
+        # Fetch get_throttled status
+        throttled_flags, throttled_messages = self._get_throttled_status()
+        data.extend([["Throttling", hex(throttled_flags)+' - '+msg] for msg in throttled_messages])
+
         return data
 
+    def _get_throttled_status(self):
+        """Runs 'vcgencmd get_throttled' and returns the raw and translated status."""
+        try:
+            result = subprocess.run(["vcgencmd", "get_throttled"], capture_output=True, text=True, check=True)
+            raw_value = result.stdout.strip().split("=")[-1]
+            throttled_flags = int(raw_value, 16)  # Convert hex to int
+            return throttled_flags, self._translate_throttled_flags(throttled_flags)
+        except Exception as e:
+            self.print(f"Error checking get_throttled: {e}", level='error')
+            return 0, ["Could not retrieve throttling status"]
+
+    def _translate_throttled_flags(self, flags):
+        """Translates the get_throttled hex value into human-readable messages."""
+        issues = []
+        mapping = {
+            0x1: "Under-voltage detected",
+            0x2: "ARM frequency capped",
+            0x4: "Currently throttled",
+            0x8: "Soft temperature limit active",
+            0x10000: "Under-voltage has occurred",
+            0x20000: "ARM frequency cap has occurred",
+            0x40000: "Throttling has occurred",
+            0x80000: "Soft temperature limit has occurred"
+        }
+
+        for bitmask, message in mapping.items():
+            if flags & bitmask:
+                issues.append(message)
+
+        return issues if issues else ["No throttling detected"]
+    
     def _get_cli_resources(self):
         """Gather CLI-specific resource usage."""
         process = psutil.Process(os.getpid())
