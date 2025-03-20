@@ -24,17 +24,38 @@ def index():
 @monitor_bp.route("/get_table")
 def get_table():
     database = current_app.config['GETTERS']['database']()
-    latest_data = [{key: value for key, value in database.data_points[-1].to_dict().items() if '/last_timestamp' not in key}] if database.data_points else []
+    data_points = database.data_points
 
-    # Apply the data thesaurus
-    data_thesaurus = current_app.config['DATA_THESAURUS']
-    if data_thesaurus is not None:
-        for row in latest_data:
-            for key in list(row.keys()):
-                if key in data_thesaurus:
-                    row[data_thesaurus[key]] = row.pop(key)
+    if not data_points:
+        return render_template("table.html", table_data=[])
+
+    latest_row = data_points[-1].to_dict()
+    hidden = set(current_app.config.get('HIDDEN_DATA') or [])
+    data_thesaurus = current_app.config.get('DATA_THESAURUS', {})
+
+    # Filter + apply thesaurus in one loop
+    filtered_row = {
+        data_thesaurus.get(key, key): value
+        for key, value in latest_row.items()
+        if '/last_timestamp' not in key and key not in hidden
+    }
+
+    return render_template("table.html", table_data=[filtered_row])
+
+# @monitor_bp.route("/get_table")
+# def get_table():
+#     database = current_app.config['GETTERS']['database']()
+#     latest_data = [{key: value for key, value in database.data_points[-1].to_dict().items() if '/last_timestamp' not in key}] if database.data_points else []
+
+#     # Apply the data thesaurus
+#     data_thesaurus = current_app.config['DATA_THESAURUS']
+#     if data_thesaurus is not None:
+#         for row in latest_data:
+#             for key in list(row.keys()):
+#                 if key in data_thesaurus:
+#                     row[data_thesaurus[key]] = row.pop(key)
                 
-    return render_template("table.html", table_data=latest_data)
+#     return render_template("table.html", table_data=latest_data)
 
 @monitor_bp.route("/get_status")
 def get_status():

@@ -16,7 +16,7 @@ from .blueprints.bp_database import database_bp
 
 
 class WebApp:
-    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None, plot_mode='static'):
+    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None, plot_mode='static'):
         self.getters = getters or {}
         """Getter methods from other Mothics components"""
         self.setters = setters or {}
@@ -29,6 +29,8 @@ class WebApp:
         """Aliases for remote unit names"""
         self.data_thesaurus = data_thesaurus
         """Aliases for sensor data names"""
+        self.hidden_data = hidden_data
+        """Sensor data addresses hidden from card view"""
         self.timeout_offline = timeout_offline
         """Threshold to set remote unit as offline"""
         self.timeout_noncomm = timeout_noncomm
@@ -54,6 +56,7 @@ class WebApp:
             'AUTO_REFRESH_TABLE': self.auto_refresh_table,
             'RM_THESAURUS': self.rm_thesaurus,
             'DATA_THESAURUS': self.data_thesaurus,
+            'HIDDEN_DATA': self.hidden_data,
             'TIMEOUT_OFFLINE': self.timeout_offline,
             'TIMEOUT_NONCOMM': self.timeout_noncomm,
             'LOGGER_FNAME': self.logger_fname,
