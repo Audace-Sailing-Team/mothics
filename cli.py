@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import threading
+import glob
 import serial
 import psutil
 import argh
@@ -34,6 +36,12 @@ class MothicsCLI(Cmd):
     """
     system_manager = SystemManager()
 
+    def __init__(self):
+        super().__init__()
+        self.serial_threads = []
+        self.keep_streaming = False
+        self.available_ports = []
+    
     def _confirm_action(self, action):
         """Prompt the user for confirmation before executing shutdown or reboot."""
         response = input(f"\033[93m[WARNING]\033[0m Are you sure you want to {action}? [Y/n]: ").strip().lower()
@@ -103,7 +111,7 @@ class MothicsCLI(Cmd):
         
     def preloop(self):
         self._check_updates()
-        
+
     def do_start(self, args):
         """
         Start the system.
@@ -351,34 +359,99 @@ class MothicsCLI(Cmd):
             # Single-time execution
             print(display_resources())
 
-    def do_serial_stream(self, args):
+    def do_serial(self, args):
         """
-        Read and display the serial stream.
-
+        Manage serial connections.
+        
         Usage:
-            serial_read       - Starts reading from the serial port.
-            serial_read stop  - Stops the serial reading.
+            serial list                - List available serial ports
+            serial stream <index>      - Stream data from a selected port
+            serial stop                - Stop the active serial stream
         """
-        serial_port = self.system_manager.config["serial"]["port"]
-        baudrate = self.system_manager.config["serial"]["baudrate"]
-        if not serial_port:
-            self.print("Serial port not configured.", level='error')
+        parts = args.split()
+        if not parts:
+            self.print("Please specify a command: list, stream, or stop", level='warning')
             return
 
-        try:
-            with serial.Serial(serial_port, baudrate=baudrate, timeout=1) as ser:
-                self.print(f"Reading from {serial_port} (Press CTRL-C to stop)", level='info')
-                try:
-                    while True:
+        command = parts[0].lower()
+        if command == "list":
+            self._list_serial_ports()
+        elif command == "stream":
+            if len(parts) < 2:
+                self.print("Specify an index or use 'all' to stream from all ports.", level='warning')
+                return
+            self._start_serial_stream(parts[1])
+        elif command == "stop":
+            self._stop_serial_stream()
+        else:
+            self.print("Unknown serial command.", level='error')
+
+    def _list_serial_ports(self):
+        """Lists available serial devices with indexing."""
+        serial_ports = glob.glob("/dev/ttyACM*") + glob.glob("/dev/ttyUSB*")
+        if not serial_ports:
+            self.print("No serial devices found.", level='warning')
+            return
+        
+        self.available_ports = serial_ports
+        self.print("Available serial devices:", level='info')
+        for idx, port in enumerate(serial_ports, start=1):
+            print(f" {idx}: {port}")
+
+    def _start_serial_stream(self, selection):
+        """Starts streaming from a selected port or all ports."""
+        if not self.available_ports:
+            self.print("No serial ports found. Run 'serial list' first.", level='error')
+            return
+
+        self.keep_streaming = True
+
+        if selection.lower() == "all":
+            ports = self.available_ports
+        else:
+            try:
+                index = int(selection) - 1
+                if index < 0 or index >= len(self.available_ports):
+                    self.print("Invalid index. Use 'serial list' to see available ports.", level='error')
+                    return
+                ports = [self.available_ports[index]]
+            except ValueError:
+                self.print("Invalid input. Please provide a valid index or 'all'.", level='error')
+                return
+
+        def read_serial(port):
+            """Reads data from a specific serial port."""
+            baudrate = 9600  # Default baudrate, adjust if necessary
+            try:
+                with serial.Serial(port, baudrate=baudrate, timeout=1) as ser:
+                    self.print(f"Streaming from {port}... Press CTRL-C to stop.", level='info')
+                    while self.keep_streaming:
                         line = ser.readline().decode("utf-8", errors="ignore").strip()
                         if line:
-                            print(line)
-                except KeyboardInterrupt:
-                    self.print("Serial read stopped.", level='warning')
-        except serial.SerialException as e:
-            self.print(f"Error opening serial port: {e}", level='error')
+                            print(f"[{port}] {line}")
+            except serial.SerialException as e:
+                self.print(f"Error reading from {port}: {e}", level='error')
 
-            
+        # Start a thread for each port
+        for port in ports:
+            thread = threading.Thread(target=read_serial, args=(port,), daemon=True)
+            self.serial_threads.append(thread)
+            thread.start()
+
+    def _stop_serial_stream(self):
+        """Stops all active serial streams."""
+        if not self.keep_streaming:
+            self.print("No active serial stream to stop.", level='warning')
+            return
+        
+        self.keep_streaming = False
+        self.print("Stopping serial streams...", level='info')
+
+        for thread in self.serial_threads:
+            thread.join(timeout=2)
+
+        self.serial_threads = []  # Clear threads list
+                        
     def do_shell(self, args):
         """Execute shell commands without exiting the CLI.
         
@@ -505,5 +578,5 @@ if __name__ == '__main__':
         # Execute the command passed as argument
         command = " ".join(sys.argv[1:])
         cli.onecmd(command)
-    # Now drop into the interactive CLI
+    # Drop into the interactive CLI
     cli.cmdloop()
