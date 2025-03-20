@@ -208,6 +208,7 @@ class SystemManager:
                 auto_refresh_table=self.config["webapp"]["data_refresh"],
                 logger_fname=self.config["files"]["logger_fname"],
                 rm_thesaurus=self.config["webapp"]["rm_thesaurus"],
+                data_thesaurus=self.config["webapp"]["data_thesaurus"],
                 timeout_offline=self.config["webapp"]["timeout_offline"],
                 timeout_noncomm=self.config["webapp"]["timeout_noncomm"],
                 track_manager_directory=self.config["files"]["output_dir"]
