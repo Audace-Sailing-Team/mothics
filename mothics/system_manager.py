@@ -70,7 +70,9 @@ DEFAULT_CONFIG = {
         "rm_thesaurus": {
             "rm1": "GPS+IMU",
             "rm2": "Anemometer"
-        }
+        },
+        "data_thesaurus": None,
+        "hidden_data": None
     },
     "cli": {
         "button_pin": 21
@@ -212,6 +214,7 @@ class SystemManager:
                 logger_fname=self.config["files"]["logger_fname"],
                 rm_thesaurus=self.config["webapp"]["rm_thesaurus"],
                 data_thesaurus=self.config["webapp"]["data_thesaurus"],
+                hidden_data=self.config["webapp"]["hidden_data"],
                 timeout_offline=self.config["webapp"]["timeout_offline"],
                 timeout_noncomm=self.config["webapp"]["timeout_noncomm"],
                 track_manager_directory=self.config["files"]["output_dir"]
