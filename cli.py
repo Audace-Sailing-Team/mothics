@@ -451,7 +451,28 @@ class MothicsCLI(Cmd):
             thread.join(timeout=2)
 
         self.serial_threads = []  # Clear threads list
-                        
+
+    def do_interface_refresh(self, args):
+        """
+        Refresh the communicator (re-connect new or disconnected interfaces).
+        Usage:
+            refresh
+            refresh force
+        If 'force' is specified, all interfaces will be disconnected and then reconnected.
+        """
+        if not self.system_manager.communicator:
+            self.print("Communicator not initialized, nothing to refresh.", level='error')
+            return
+
+        force = False
+        parts = args.split()
+        if parts and parts[0].lower() == "force":
+            force = True
+        try:
+            self.system_manager.communicator.refresh(force_reconnect=force)
+        except Exception as e:
+            self.print(f"error refreshing communicator: {e}", level='error')
+        
     def do_shell(self, args):
         """Execute shell commands without exiting the CLI.
         
@@ -500,27 +521,19 @@ class MothicsCLI(Cmd):
             return True
         except:
             return False
-        
-    def do_interface_refresh(self, args):
-        """
-        Refresh the communicator (re-connect new or disconnected interfaces).
-        Usage:
-            refresh
-            refresh force
-        If 'force' is specified, all interfaces will be disconnected and then reconnected.
-        """
-        if not self.system_manager.communicator:
-            self.print("Communicator not initialized, nothing to refresh.", level='error')
-            return
 
-        force = False
-        parts = args.split()
-        if parts and parts[0].lower() == "force":
-            force = True
+    def do_detach(self, args):
+        """
+        Detach from the current tmux session without killing it.
+
+        Usage:
+            detach
+        """
         try:
-            self.system_manager.communicator.refresh(force_reconnect=force)
-        except Exception as e:
-            self.print(f"error refreshing communicator: {e}", level='error')
+            subprocess.run(["tmux", "detach-client"], check=True)
+            self.print("Detached from tmux session. You can reattach using 'tmux attach'.", level='info')
+        except subprocess.CalledProcessError as e:
+            self.print(f"Error detaching from tmux: {e}", level='error')        
 
     def do_update(self, args):
         """Update the CLI by pulling the latest changes from Git."""
