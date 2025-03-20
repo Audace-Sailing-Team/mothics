@@ -74,7 +74,6 @@ DEFAULT_CONFIG = {
     },
     "cli": {
         "button_pin": 21
-        }
     }
 }
 
