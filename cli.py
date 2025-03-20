@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import RPi.GPIO as GPIO
 import threading
 import glob
 import serial
@@ -43,8 +42,14 @@ class MothicsCLI(Cmd):
         self.serial_threads = []
         self.keep_streaming = False
         self.available_ports = []
-        self.button_pin = self.system_manager['cli']['button_pin']
-        self._start_gpio_monitor()
+        self.button_pin = self.system_manager.config['cli']['button_pin']
+
+        try:
+            import RPi.GPIO as GPIO
+            self._start_gpio_monitor()
+        except RuntimeError:
+            self.print("Shutdown button is not available.", level='warning')
+            pass
 
     def _start_gpio_monitor(self):
         """Starts a background thread to monitor the GPIO button for shutdown/reboot."""
