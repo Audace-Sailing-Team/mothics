@@ -321,7 +321,7 @@ class Communicator:
                 
                     try:
                         self.interfaces[class_name] = interface_class(**kwarg)
-                        self.logger.info(f"initialized {class_name} with kwargs: {kwargs}")
+                        self.logger.info(f"initialized {class_name} with kwargs: {kwarg}")
                     except Exception as e:
                         self.logger.critical(f"failed to initialize {class_name}: {e}")
                         raise RuntimeError(f"failed to initialize {class_name}: {e}")
