@@ -1,3 +1,4 @@
+import os
 import requests
 import time
 import logging
@@ -6,9 +7,9 @@ from threading import Thread
 from bokeh.server.server import Server
 from bokeh.application import Application
 from bokeh.application.handlers.function import FunctionHandler
+from tornado.log import access_log, app_log, gen_log
 
 from .bokeh_apps.server import create_realtime_bokeh_app
-
 from .blueprints.bp_monitoring import monitor_bp
 from .blueprints.bp_logging import log_bp
 from .blueprints.bp_saving import save_bp
@@ -43,6 +44,9 @@ class WebApp:
         self.plot_realtime_url = "http://localhost:5006/bokeh_app"
         """Real-time bokeh server URL"""        
         self.track_manager = None
+
+        # Setup logger
+        self.setup_logging()
         
         # Start bokeh server
         if self.plot_mode == "real-time":
@@ -60,10 +64,6 @@ class WebApp:
             self.bokeh_thread = Thread(target=bokeh_server_thread)
             self.bokeh_thread.daemon = True
             self.bokeh_thread.start()
-
-        # Setup logger
-        logging.getLogger("werkzeug").setLevel(logging.ERROR)
-        self.logger = logging.getLogger("WebApp")
         
         # Create the Flask app
         self.app = Flask(__name__, template_folder="templates", static_folder='static')
@@ -87,7 +87,27 @@ class WebApp:
         })
         
         self.setup_routes()
-        
+
+    def setup_logging(self):
+        # Silence Tornado
+        for tlog in [access_log, app_log, gen_log]:
+            tlog.setLevel(logging.ERROR)
+            tlog.propagate = False
+
+        # Silence Bokeh
+        for name in ["bokeh", "bokeh.server", "bokeh.server.server"]:
+            logger = logging.getLogger(name)
+            logger.handlers.clear()              
+            logger.setLevel(logging.ERROR)
+            logger.propagate = False
+
+        # Silence werkzeug
+        logging.getLogger("werkzeug").setLevel(logging.ERROR)
+
+        # Create the main logger
+        self.logger = logging.getLogger("WebApp")
+        self.logger.setLevel(logging.DEBUG)
+            
     def setup_routes(self):
         # Register the monitoring blueprint (and others if created)
         self.app.register_blueprint(monitor_bp)
@@ -95,7 +115,6 @@ class WebApp:
         self.app.register_blueprint(log_bp)
         self.app.register_blueprint(save_bp)
         self.app.register_blueprint(database_bp)
-        # self.app.register_blueprint(control_bp, url_prefix='/control')
 
     def run(self, host="0.0.0.0", port=5000, debug=False):
         # self.process = Process(target=self.app.run, kwargs={"host": host, "port": port, "debug": debug, "use_reloader": False})
