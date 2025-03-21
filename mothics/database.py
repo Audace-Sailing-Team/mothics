@@ -202,6 +202,8 @@ class Database:
         self.tracks = []
         self.load_tracks()
         self.rm_thesaurus = rm_thesaurus
+        self.logger = logging.getLogger("Database")
+        self.logger.info("-------------Database-------------")
 
     def validate_json(self, filepath: Path):
         """
