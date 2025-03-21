@@ -89,13 +89,9 @@
     </div>
 	
     <!-- Time Evolution -->
-    <div class="plot-container my-4">
-      <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#plot-container"> Time Evolution <span class="arrow">&#9660;</span>
-      </div>
-      <div id="plot-container" class="collapse show">
+    <div class="plot-container my-4" id="plot-container">
         {{ script | safe }}
         {{ div | safe }}
-      </div>
     </div>
     
     <!-- Sampling Control Buttons and Indicator -->
