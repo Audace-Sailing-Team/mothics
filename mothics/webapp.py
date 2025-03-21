@@ -1,3 +1,4 @@
+import socket
 import os
 import requests
 import time
@@ -41,14 +42,26 @@ class WebApp:
         """Database directory"""
         self.plot_mode = plot_mode
         """Data plot mode - `static` or `real-time`"""
-        self.plot_realtime_url = "http://localhost:5006/bokeh_app"
-        """Real-time bokeh server URL"""        
         self.track_manager = None
-
+        
         # Setup logger
         self.setup_logging()
+
+        # Start bokeh server	
+        hostname = socket.gethostname()
+        local_ip = socket.gethostbyname(hostname)
         
-        # Start bokeh server
+        self.plot_realtime_url = f"http://{hostname}.local:5006/bokeh_app"
+        """Real-time bokeh server URL"""        
+
+        allowed_origins = [
+            "localhost:5000", "127.0.0.1:5000",
+            f"{hostname}:5000", f"{local_ip}:5000",
+            "localhost:5006", "127.0.0.1:5006",
+            f"{hostname}:5006", f"{local_ip}:5006",
+            "mothics.local:5000", "mothics.local:5006"
+        ]
+	
         if self.plot_mode == "real-time":
             def bokeh_server_thread():
                 database_instance = self.getters["database"]()
@@ -56,7 +69,8 @@ class WebApp:
                 server = Server(
                     {"/bokeh_app": app},
                     port=5006,
-                    allow_websocket_origin=["localhost:5000", "127.0.0.1:5000", "localhost:5006"]
+                    allow_websocket_origin=allowed_origins,
+                    address="0.0.0.0"
                 )
                 server.start()
                 server.io_loop.start()
@@ -64,7 +78,7 @@ class WebApp:
             self.bokeh_thread = Thread(target=bokeh_server_thread)
             self.bokeh_thread.daemon = True
             self.bokeh_thread.start()
-        
+    
         # Create the Flask app
         self.app = Flask(__name__, template_folder="templates", static_folder='static')
         
@@ -117,14 +131,6 @@ class WebApp:
         self.app.register_blueprint(database_bp)
 
     def run(self, host="0.0.0.0", port=5000, debug=False):
-        # self.process = Process(target=self.app.run, kwargs={"host": host, "port": port, "debug": debug, "use_reloader": False})
         self.process = Thread(target=self.app.run, kwargs={"host": host, "port": port, "debug": debug, "use_reloader": False})
         self.process.daemon = True
         self.process.start()
-
-    # def stop(self):
-    #     try:            
-    #         self.process.terminate()
-    #         self.logger.info("server shutdown successfully.")
-    #     except Exception as e:
-    #         self.logger.critical(f"error shutting down WebApp: {e}")
