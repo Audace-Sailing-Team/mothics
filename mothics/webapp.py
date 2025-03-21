@@ -4,7 +4,6 @@ import logging
 from flask import Flask, render_template, jsonify, request, Response
 from threading import Thread
 from multiprocessing import Process
-from .bokeh_plots import create_bokeh_plots
 from .helpers import tipify, compute_status
 from .database import Database
 
