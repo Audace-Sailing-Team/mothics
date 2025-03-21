@@ -53,6 +53,7 @@ to run Mothics, which are
 - `jsonschema-specifications==2024.10.1`
 - `numpy==2.1.3`
 - `paho-mqtt==2.1.0`
+- `pyproj==3.7.1`
 - `pyserial==3.5`
 - `psutil==7.0.0`
 - `requests==2.32.3`
