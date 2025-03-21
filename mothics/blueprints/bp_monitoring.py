@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, jsonify, request, Response, current_app
 from bokeh.embed import server_document
-from ..bokeh_plots import create_bokeh_plots
+from ..bokeh_apps.static import create_bokeh_plots
 from ..helpers import compute_status
 
 monitor_bp = Blueprint('monitor', __name__)
