@@ -53,12 +53,20 @@ body {
 
 /* Styling for the plot container */
 .plot-container {
-    /* display: flex; */
-    /* justify-content: space-between; */
-    /* align-items: flex-start; */
-    /* flex-wrap: wrap; /\* Allows stacking when needed *\/ */
-    /* gap: 20px; */
+    width: 100%;            /* Allow full horizontal stretch */
+    max-width: 100%;        /* Prevent internal limit */
+    margin: 0 auto;         /* Center it if needed */
     display: flex;
+    flex-direction: column;
+    align-items: center; /* Center-align plot container */
+    gap: 20px;
+}
+
+.plot-container-inner {
+    width: 100%;            /* Allow full horizontal stretch */
+    max-width: 100%;        /* Prevent internal limit */
+    margin: 0 auto;         /* Center it if needed */
+    display: block;         /* Avoid flex-based centering */
     flex-direction: column;
     align-items: center; /* Center-align plot container */
     gap: 20px;
@@ -151,4 +159,28 @@ body {
 
 .collapsed .arrow {
     transform: rotate(-90deg);
+}
+
+.bk-root {
+    width: 100% !important;
+    max-width: none !important;
+}
+.bokeh-container {
+    width: 100% !important;
+    display: block !important;
+}
+
+/* Custom class for Bokeh slider row layout */
+.bokeh-slider-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start;
+    gap: 10px;
+}
+
+/* Target individual Bokeh slider containers */
+.bokeh-slider-row .bk-slider {
+    flex: 1 1 300px !important;
+    min-width: 250px !important;
+    max-width: 100%;
 }

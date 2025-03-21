@@ -1,11 +1,13 @@
 import requests
 import time
 import logging
-from flask import Flask, render_template, jsonify, request, Response
+from flask import Flask
 from threading import Thread
-from multiprocessing import Process
-from .helpers import tipify, compute_status
-from .database import Database
+from bokeh.server.server import Server
+from bokeh.application import Application
+from bokeh.application.handlers.function import FunctionHandler
+
+from .bokeh_apps.server import create_realtime_bokeh_app
 
 from .blueprints.bp_monitoring import monitor_bp
 from .blueprints.bp_logging import log_bp
@@ -15,7 +17,7 @@ from .blueprints.bp_database import database_bp
 
 
 class WebApp:
-    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None, plot_mode='static'):
+    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None, plot_mode='real-time'):
         self.getters = getters or {}
         """Getter methods from other Mothics components"""
         self.setters = setters or {}
@@ -38,9 +40,27 @@ class WebApp:
         """Database directory"""
         self.plot_mode = plot_mode
         """Data plot mode - `static` or `real-time`"""
-        self.track_manager = None
         self.plot_realtime_url = "http://localhost:5006/bokeh_app"
+        """Real-time bokeh server URL"""        
+        self.track_manager = None
         
+        # Start bokeh server
+        if self.plot_mode == "real-time":
+            def bokeh_server_thread():
+                database_instance = self.getters["database"]()
+                app = Application(FunctionHandler(lambda doc: create_realtime_bokeh_app(doc, database_instance)))
+                server = Server(
+                    {"/bokeh_app": app},
+                    port=5006,
+                    allow_websocket_origin=["localhost:5000", "127.0.0.1:5000", "localhost:5006"]
+                )
+                server.start()
+                server.io_loop.start()
+
+            self.bokeh_thread = Thread(target=bokeh_server_thread)
+            self.bokeh_thread.daemon = True
+            self.bokeh_thread.start()
+
         # Setup logger
         logging.getLogger("werkzeug").setLevel(logging.ERROR)
         self.logger = logging.getLogger("WebApp")
