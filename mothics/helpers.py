@@ -92,13 +92,15 @@ def format_duration(seconds):
     """
     Convert seconds into a string in the format "Hh Mm Ss".
     """
-    if seconds is None:
+    try:
+        if seconds is None:
+            return "N/A"
+        seconds = int(seconds)
+        hours, remainder = divmod(seconds, 3600)
+        minutes, secs = divmod(remainder, 60)
+        return f"{hours}h:{minutes}m:{secs}s"
+    except (ValueError, TypeError):
         return "N/A"
-    seconds = int(seconds)
-    hours, remainder = divmod(seconds, 3600)
-    minutes, secs = divmod(remainder, 60)
-    return f"{hours}h:{minutes}m:{secs}s"
-
 
 def download_file(url, dest_path):
     """Download a file from the URL if it doesn't already exist."""
