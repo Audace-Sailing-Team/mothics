@@ -23,7 +23,7 @@ from typing import Optional, List, Dict, Any
 from .aggregator import Aggregator
 from .comm_interface import MQTTInterface, SerialInterface, Communicator
 from .webapp import WebApp
-from .helpers import setup_logger, tipify, check_cdn_availability, download_cdn, check_internet_connectivity
+from .helpers import setup_logger, tipify, check_cdn_availability, download_cdn, check_internet_connectivity, download_tiles, list_required_tiles
 from .track import Track
 from .database import Database
 
@@ -64,7 +64,8 @@ DEFAULT_CONFIG = {
     "files": {
         "logger_fname": "default.log",
         "cdn_dir": "mothics/static",
-        "output_dir": "data"
+        "output_dir": "data",
+        "tile_dir": "mothics/static/tiles"
     },
     "webapp": {
         "data_refresh": 2,
@@ -155,6 +156,32 @@ class SystemManager:
         self.logger.info(f"Internet available. Downloading missing CDN files to {cdn_dir}")
         download_cdn(urls=cdn_urls, outdir=cdn_dir)
 
+    def initialize_tiles(self):
+        """Download map tiles for GPS map visualization."""
+        # Check for internet availability
+        if not check_internet_connectivity():
+            self.logger.warning("Internet connectivity is not available. Cannot download map tiles.")
+            return
+        
+        # Get lat/long range from config 
+        lat_range = self.config["webapp"]["lat_range"]
+        lon_range = self.config["webapp"]["lon_range"]
+        zoom_levels = self.config["webapp"]["zoom_levels"]
+        output_dir = self.config["files"]["tile_dir"]
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Get map tiles to download based on lat/long range
+        try:
+            self.logger.info(f"downloading map tiles for lat={lat_range}, lon={lon_range}, zoom={zoom_levels}")
+            self.logger.info(f"number tiles to download: {len(list_required_tiles(lat_range, lon_range, zoom_levels))} in ~{len(list_required_tiles(lat_range, lon_range, zoom_levels)) * 0.25}s")
+            download_tiles(lat_range=tuple(lat_range),
+                           lon_range=tuple(lon_range),
+                           zoom_levels=zoom_levels,
+                           output_dir=output_dir)
+            self.logger.info(f"tile download completed and stored in {output_dir}")
+        except Exception as e:
+            self.logger.warning(f"error while downloading map tiles: {e}")
+        
     def initialize_database(self):
         """ Initializes the database. """                                      
         # Start database
@@ -200,6 +227,8 @@ class SystemManager:
         if not self.webapp:
             # Initialize CDNs
             self.initialize_cdns()
+            # Initialize tiles
+            self.initialize_tiles()
             # Initialize Webapp
             getters = {
                 'database': lambda: self.track.get_current(),
