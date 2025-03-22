@@ -6,19 +6,26 @@ from bokeh.layouts import column
 from bokeh.models import WMTSTileSource
 from pyproj import Transformer
 import math
-
+import numbers
 
 # Data fetching (shared)
 def extract_time_series(database, hidden_data=None):
+    hidden_set = set(hidden_data or [])
     time_series = {}
+
     for dp in database.data_points:
-        for key, value in dp.to_dict().items() or key in hidden_data:
-            if key == 'timestamp' or 'last_timestamp' in key:
+        ts = dp.timestamp
+        if isinstance(ts, str):
+            ts = datetime.fromisoformat(ts)
+
+        for key, value in dp.to_dict().items():
+            if key == 'timestamp' or 'last_timestamp' in key or key in hidden_set:
                 continue
-            time_series.setdefault(key, {"timestamp": [], "value": []})
             if value is not None:
-                time_series[key]["timestamp"].append(dp.timestamp)
+                time_series.setdefault(key, {"timestamp": [], "value": []})
+                time_series[key]["timestamp"].append(ts)
                 time_series[key]["value"].append(value)
+
     return time_series
 
 
@@ -28,10 +35,24 @@ def create_static_bokeh_plots(database, hidden_data=None):
     plots = []
 
     for key, data in time_series.items():
-        if not data["timestamp"] or not data["value"]:
-            continue
+        # Filter out invalid timestamp/value pairs
+        x_vals = []
+        y_vals = []
+        for t, v in zip(data["timestamp"], data["value"]):
+            if isinstance(t, str):
+                try:
+                    t = datetime.fromisoformat(t)
+                except Exception:
+                    continue
+            if isinstance(t, datetime) and isinstance(v, numbers.Number):
+                x_vals.append(t)
+                y_vals.append(v)
 
-        source = ColumnDataSource(data={"x": data["timestamp"], "y": data["value"]})
+        if not x_vals or not y_vals:
+            continue  # Nothing to plot
+
+        source = ColumnDataSource(data={"x": x_vals, "y": y_vals})
+
         p = figure(
             x_axis_type="datetime",
             title=f"Time Evolution of {key}",
@@ -45,13 +66,13 @@ def create_static_bokeh_plots(database, hidden_data=None):
         p.xaxis.axis_label = 'Timestamp'
         p.yaxis.axis_label = key
 
-        if len(data['timestamp']) > 1:
-            p.x_range = Range1d(start=min(data["timestamp"]), end=max(data["timestamp"]))
-        if len(data['value']) > 1:
-            y_padding = (max(data["value"]) - min(data["value"])) * 0.05
+        if len(x_vals) > 1:
+            p.x_range = Range1d(start=min(x_vals), end=max(x_vals))
+        if len(y_vals) > 1:
+            y_padding = (max(y_vals) - min(y_vals)) * 0.05
             p.y_range = Range1d(
-                start=min(data["value"]) - y_padding,
-                end=max(data["value"]) + y_padding
+                start=min(y_vals) - y_padding,
+                end=max(y_vals) + y_padding
             )
 
         plots.append(p)
@@ -67,7 +88,7 @@ def create_static_bokeh_plots(database, hidden_data=None):
 def create_gps_tab(database, transformer, tile_server_url, zoom_level=13, initial_margin=1024, bounds_margin=8192):
     if not database.data_points:
         return None
-    
+
     initial_data = database.data_points[-1].to_dict()
     lat_key = next((k for k in initial_data if k.endswith('/gps/lat')), None)
     lon_key = next((k for k in initial_data if k.endswith('/gps/long')), None)
@@ -121,7 +142,7 @@ class PlotDispatcher:
 
     def _render_static(self):
         database = self.config['GETTERS']['database']()
-        hidden = set(current_app.config.get('HIDDEN_DATA_CARDS') or [])
+        hidden = set(self.config.get('HIDDEN_DATA_PLOTS') or [])
         return create_static_bokeh_plots(database, hidden_data=hidden)
 
     def _render_realtime(self):
@@ -161,7 +182,7 @@ def create_realtime_bokeh_app(doc, database, hidden_data=None):
     time_window_slider.on_change("value", on_time_window_change)
     refresh_slider.on_change("value", on_refresh_change)
 
-    series = extract_time_series(database)
+    series = extract_time_series(database, hidden_data=hidden_data)
     for key, data in series.items():
         if not data["timestamp"] or not data["value"]:
             continue
