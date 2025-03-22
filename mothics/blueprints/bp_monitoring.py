@@ -3,26 +3,10 @@ from datetime import datetime, timedelta
 from flask import Blueprint, render_template, jsonify, request, Response, current_app, abort, send_file
 from bokeh.embed import server_document
 from ..bokeh_plots import PlotDispatcher
-# from ..bokeh_apps.static import create_bokeh_plots
 from ..helpers import compute_status
 
 monitor_bp = Blueprint('monitor', __name__)
 
-
-# @monitor_bp.route("/")
-# def index():
-#     # Select plot source
-#     mode = current_app.config['PLOT_MODE']
-#     if mode == 'real-time':
-#         # Use server_document to generate the script that will embed the Bokeh app.
-#         script = server_document(current_app.config['PLOT_REALTIME_URL'])
-#         div = ""
-#     else:
-#         database = current_app.config['GETTERS']['database']()
-#         script, div = create_bokeh_plots(database)
-        
-#     auto_refresh = current_app.config['AUTO_REFRESH_TABLE']
-#     return render_template("index.html", script=script, div=div, auto_refresh=auto_refresh)
 
 @monitor_bp.route("/")
 def index():
