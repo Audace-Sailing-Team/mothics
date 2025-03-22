@@ -79,30 +79,16 @@ class WebApp:
         })
         
         # Start bokeh server
-        allowed_origins = [
+        self.allowed_origins = [
             "localhost:5000", "127.0.0.1:5000",
             f"{hostname}:5000", f"{local_ip}:5000",
             "localhost:5006", "127.0.0.1:5006",
             f"{hostname}:5006", f"{local_ip}:5006",
             "mothics.local:5000", "mothics.local:5006"
         ]
-	
-        if self.plot_mode == "real-time":
-            def bokeh_server_thread():
-                database_instance = self.getters["database"]()
-                app = Application(FunctionHandler(lambda doc: create_realtime_bokeh_app(doc, database_instance, hidden_data=self.hidden_data_plots, data_thesaurus=self.data_thesaurus)))
-                server = Server(
-                    {"/bokeh_app": app},
-                    port=5006,
-                    allow_websocket_origin=allowed_origins,
-                    address="0.0.0.0"
-                )
-                server.start()
-                server.io_loop.start()
 
-            self.bokeh_thread = Thread(target=bokeh_server_thread)
-            self.bokeh_thread.daemon = True
-            self.bokeh_thread.start()
+        if self.plot_mode == "real-time":
+            self.start_bokeh_server()
     
         # Setup routes
         self.setup_routes()
@@ -126,7 +112,73 @@ class WebApp:
         # Create the main logger
         self.logger = logging.getLogger("WebApp")
         self.logger.setLevel(logging.DEBUG)
-            
+
+    def start_bokeh_server(self):
+        """Launches the Bokeh server in a new thread."""
+        if self.bokeh_thread is not None:
+            self.logger.warning("Bokeh server already running.")
+            return
+
+        def bokeh_server_thread():
+            try:
+                database_instance = self.getters["database"]()
+                app = Application(FunctionHandler(
+                    lambda doc: create_realtime_bokeh_app(
+                        doc,
+                        database_instance,
+                        hidden_data=self.hidden_data_plots,
+                        data_thesaurus=self.data_thesaurus
+                    )
+                ))
+
+                self.bokeh_server = Server(
+                    {"/bokeh_app": app},
+                    port=5006,
+                    allow_websocket_origin=self.allowed_origins,
+                    address="0.0.0.0"
+                )
+
+                self.bokeh_server.start()
+                self.logger.info("Bokeh server started.")
+                self.bokeh_server.io_loop.start()
+            except Exception as e:
+                self.logger.error(f"Bokeh server failed to start: {e}")
+
+        self.bokeh_thread = Thread(target=bokeh_server_thread)
+        self.bokeh_thread.daemon = True
+        self.bokeh_thread.start()
+
+    def stop_bokeh_server(self):
+        """Stops the running Bokeh server cleanly."""
+        if not self.bokeh_server:
+            self.logger.warning("No Bokeh server to stop.")
+            return
+
+        def shutdown():
+            try:
+                self.bokeh_server.stop()
+                self.logger.info("Bokeh server stopped.")
+                self.bokeh_server.io_loop.stop()
+            except Exception as e:
+                self.logger.error(f"Error while stopping Bokeh server: {e}")
+
+        try:
+            self.bokeh_server.io_loop.add_callback(shutdown)
+            self.bokeh_thread.join(timeout=2)
+        except Exception as e:
+            self.logger.error(f"Failed to join Bokeh thread: {e}")
+        finally:
+            self.bokeh_server = None
+            self.bokeh_thread = None
+
+    def restart_bokeh_server(self):
+        """Restarts the Bokeh server."""
+        self.logger.info("Restarting Bokeh server...")
+        self.stop_bokeh_server()
+        time.sleep(1)  # Give time for port to release
+        self.start_bokeh_server()
+
+        
     def setup_routes(self):
         # Register the monitoring blueprint (and others if created)
         self.app.register_blueprint(monitor_bp)
