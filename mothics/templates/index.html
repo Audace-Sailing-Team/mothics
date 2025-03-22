@@ -86,11 +86,27 @@
 	<!-- Data Cards Container -->
 	<div id="table-container">
 	  <!-- Cards will be dynamically inserted here -->
+	</div>	
+      </div>
+
+      <!-- Sampling Control Buttons and Indicator -->
+      <div class="status-section">
+	<div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#control-container"> Controls <span class="arrow">&#9660;</span>
 	</div>
-	
+	<div id="control-container" class="collapse show">
+          <div class="row mb-3">
+            <div class="col-auto">
+              <button id="startSamplingBtn" class="btn btn-success">Start Sampling</button>
+              <button id="stopSamplingBtn" class="btn btn-danger">Stop Sampling</button>
+            </div>
+            <div class="col-auto">
+              <span id="samplingStatusIndicator" class="badge bg-secondary">Not Sampling</span>
+            </div>
+          </div>
+	</div>
       </div>
     </div>
-
+    
     <!-- Leaflet GPS Map -->
     <div class="status-section">
       <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#leaflet-map-container">
@@ -128,25 +144,16 @@
         {{ div | safe }}
       </div>
     </div>
-    
-    <!-- Sampling Control Buttons and Indicator -->
-    <div class="status-section">
-      <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#control-container"> Controls <span class="arrow">&#9660;</span>
+
+    <!-- Footer -->
+    <footer class="bg-light text-center text-muted py-3 border-top">
+      <div class="container">
+	<small>&copy; {{ current_year or 2025 }} - Iacopo
+	  Ricci for Audace Sailing Team </small>
       </div>
-      <div id="control-container" class="collapse show">
-        <div class="row mb-3">
-          <div class="col-auto">
-            <button id="startSamplingBtn" class="btn btn-success">Start Sampling</button>
-            <button id="stopSamplingBtn" class="btn btn-danger">Stop Sampling</button>
-          </div>
-          <div class="col-auto">
-            <span id="samplingStatusIndicator" class="badge bg-secondary">Not Sampling</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    </footer>
     
-    </div>
+</div>
 
 <!-- Dashboard update -->
 <script>
