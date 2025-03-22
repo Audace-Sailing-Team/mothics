@@ -180,3 +180,33 @@ body {
     min-width: 250px !important;
     max-width: 100%;
 }
+
+#leaflet-map {
+    height: 500px;
+    width: 100%;
+    border: 1px solid #ccc;
+    margin-top: 20px;
+}
+
+.plot-container#leaflet-map-container {
+    margin-top: 2rem;
+}
+
+#leaflet-map-container {
+    position: relative; /* anchor for absolutely positioned child */
+}
+
+#gps-flag {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background-color: rgba(255, 230, 180, 0.95);
+    color: #555;
+    font-size: 0.85rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.15);
+    z-index: 800;
+    display: none;
+    pointer-events: none;
+}
