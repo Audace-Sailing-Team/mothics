@@ -22,7 +22,7 @@ try:
 except:
     IS_RASPI = False
 
-from mothics.helpers import setup_logger, tipify, check_internet_connectivity
+from mothics.helpers import setup_logger, tipify, check_internet_connectivity, list_required_tiles, download_tiles
 from mothics.system_manager import SystemManager
 
                                
@@ -449,6 +449,88 @@ class MothicsCLI(Cmd):
             # Single-time execution
             print(display_resources())
 
+    def do_download(self, args):
+        """
+        Download data assets (e.g., map tiles).
+
+        Usage:
+            download tiles <lat_min> <lat_max> <lon_min> <lon_max> <zoom_start> <zoom_end>
+            download tiles         (interactive mode)
+        """
+        parts = args.strip().split()
+
+        if not parts:
+            self.print("Usage: download <subcommand>", level='warning')
+            self.print("Available subcommands: tiles", level='info')
+            return
+
+        subcommand = parts[0].lower()
+        subargs = parts[1:]
+
+        if subcommand == "tiles":
+            self._handle_tile_download(subargs)
+        else:
+            self.print(f"Unknown subcommand: {subcommand}", level='error')
+            self.print("Available subcommands: tiles", level='info')
+
+    def _handle_tile_download(self, subargs):
+        """Handles downloading of map tiles with optional path and tile count/size estimation."""
+        try:
+            custom_path = None
+
+            if len(subargs) in [6, 7]:
+                lat_min, lat_max = float(subargs[0]), float(subargs[1])
+                lon_min, lon_max = float(subargs[2]), float(subargs[3])
+                zoom_start, zoom_end = int(subargs[4]), int(subargs[5])
+                if len(subargs) == 7:
+                    custom_path = subargs[6]
+            elif not subargs:
+                print("Enter bounding box coordinates:")
+                lat_min = float(input("  Latitude min: "))
+                lat_max = float(input("  Latitude max: "))
+                lon_min = float(input("  Longitude min: "))
+                lon_max = float(input("  Longitude max: "))
+                print("Enter zoom level range:")
+                zoom_start = int(input("  Zoom start (e.g., 12): "))
+                zoom_end = int(input("  Zoom end (e.g., 15): "))
+                custom_path = input("Optional output path [leave empty for default]: ").strip() or None
+            else:
+                self.print("Usage: download tiles <lat_min> <lat_max> <lon_min> <lon_max> <zoom_start> <zoom_end> [output_dir]", level='warning')
+                return
+
+            zoom_levels = range(zoom_start, zoom_end + 1)
+            tiles_needed = list_required_tiles((lat_min, lat_max), (lon_min, lon_max), zoom_levels)
+            tile_count = len(tiles_needed)
+            avg_tile_size_kb = 25
+            est_total_kb = tile_count * avg_tile_size_kb
+            est_total_mb = est_total_kb / 1024
+
+            self.print(f"Estimated tiles to download: {tile_count}", level='info')
+            self.print(f"Estimated total size: {est_total_mb:.2f} MB", level='info')
+            if tile_count > 500:
+                self.print("Warning: large download, you may hit OpenStreetMap rate limits.", level='warning')
+
+            confirm = input("Proceed with download? [Y/n]: ").strip().lower()
+            if confirm not in ["", "y", "yes"]:
+                self.print("Download cancelled.", level='warning')
+                return
+
+            output_path = os.path.abspath(custom_path) if custom_path else os.path.abspath(self.system_manager.config["files"]["tile_dir"])
+            self.print(f"Downloading tiles to: {output_path}", level='info')
+
+            download_tiles(
+                (lat_min, lat_max),
+                (lon_min, lon_max),
+                zoom_levels,
+                output_dir=output_path
+            )
+
+            self.print("Tile download complete.", level='success')
+        except ValueError:
+            self.print("Invalid input. Please enter numbers for coordinates and zoom levels.", level='error')
+        except Exception as e:
+            self.print(f"Tile download failed: {e}", level='error')
+            
     def do_serial(self, args):
         """
         Manage serial connections.
@@ -684,7 +766,7 @@ class MothicsCLI(Cmd):
     def do_reboot(self, args):
         """Safely reboots the system with user confirmation."""
         self._reboot(confirm=True)
-            
+
 if __name__ == '__main__':
     cli = MothicsCLI()
     if len(sys.argv) > 1:

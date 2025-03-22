@@ -115,7 +115,6 @@ def download_file(url, dest_path):
 
     with open(dest_path, 'wb') as f:
         f.write(response.content)
-
     
 def download_cdn(urls=None, outdir='static'):
     if urls is None:
