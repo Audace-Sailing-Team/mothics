@@ -24,7 +24,7 @@ def get_table():
         return render_template("table.html", table_data=[])
 
     latest_row = data_points[-1].to_dict()
-    hidden = set(current_app.config.get('HIDDEN_DATA') or [])
+    hidden = set(current_app.config.get('HIDDEN_DATA_CARDS') or [])
     data_thesaurus = current_app.config.get('DATA_THESAURUS', {})
 
     # Filter + apply thesaurus in one loop

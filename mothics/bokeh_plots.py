@@ -9,7 +9,7 @@ import math
 
 
 # Data fetching (shared)
-def extract_time_series(database):
+def extract_time_series(database, hidden_data=None):
     time_series = {}
     for dp in database.data_points:
         for key, value in dp.to_dict().items():
@@ -23,8 +23,8 @@ def extract_time_series(database):
 
 
 # Static plotting
-def create_static_bokeh_plots(database):
-    time_series = extract_time_series(database)
+def create_static_bokeh_plots(database, hidden_data=None):
+    time_series = extract_time_series(database, hidden_data=hidden_data)
     plots = []
 
     for key, data in time_series.items():
@@ -63,7 +63,7 @@ def create_static_bokeh_plots(database):
     return components(layout)
 
 
-# Real-time plotting ---
+# Real-time plotting
 def create_gps_tab(database, transformer, tile_server_url, zoom_level=13, initial_margin=1024, bounds_margin=8192):
     if not database.data_points:
         return None
@@ -121,14 +121,15 @@ class PlotDispatcher:
 
     def _render_static(self):
         database = self.config['GETTERS']['database']()
-        return create_static_bokeh_plots(database)
+        hidden = set(current_app.config.get('HIDDEN_DATA_CARDS') or [])
+        return create_static_bokeh_plots(database, hidden_data=hidden)
 
     def _render_realtime(self):
         return server_document(self.config['PLOT_REALTIME_URL']), ""
 
 
 # Bokeh server app
-def create_realtime_bokeh_app(doc, database):
+def create_realtime_bokeh_app(doc, database, hidden_data=None):
     transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
     sources = {}
     panels = []
@@ -139,7 +140,7 @@ def create_realtime_bokeh_app(doc, database):
     def update_sources():
         now = datetime.now()
         time_window = time_window_slider.value
-        series = extract_time_series(database)
+        series = extract_time_series(database, hidden_data=hidden_data)
 
         for key, src in sources.items():
             if key in series:
