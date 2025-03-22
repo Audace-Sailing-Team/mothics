@@ -307,12 +307,6 @@ class SystemManager:
         if self.communicator:
             self.communicator.disconnect()
             self.communicator = None
-        if self.webapp:
-            try:
-                self.webapp.stop()
-                self.webapp = None
-            except:
-                self.logger.warning('cannot stop webapp')
         self.logger.info("system stopped")
 
     def restart(self, mode=None, reload_config=False):
@@ -331,6 +325,10 @@ class SystemManager:
             self.start_replay()
         else:
             self.logger.error(f"no valid mode found for restart, got: {mode}")
+            
+        # Restart bokeh server if webapp is available
+        if self.webapp is not None and self.webapp.bokeh_thread is not None:
+            self.webapp.restart_bokeh_server()
 
     def get_status(self):
         return {
@@ -338,6 +336,7 @@ class SystemManager:
             "communicator": "running" if self.communicator else "stopped",
             "aggregator": "running" if self.aggregator else "stopped",
             "webapp": "running" if self.webapp else "stopped",
+            "bokeh server": "running" if self.webapp.bokeh_thread else "stopped",
             "track": "active" if self.track else "not active",
             "database": "available" if self.database else "not initialized",
         }
