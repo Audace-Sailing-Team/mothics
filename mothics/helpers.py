@@ -1,5 +1,6 @@
 import requests
 import os
+import math
 import sys
 import logging
 from datetime import datetime, timedelta
@@ -167,3 +168,80 @@ def check_internet_connectivity(test_url="https://www.google.com", timeout=5):
         return response.status_code == 200
     except requests.RequestException as e:
         return False
+
+def deg2num(lat_deg, lon_deg, zoom):
+    """Convert latitude and longitude to tile numbers."""
+    lat_rad = math.radians(lat_deg)
+    n = 2.0 ** zoom
+    xtile = int((lon_deg + 180.0) / 360.0 * n)
+    ytile = int((1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n)
+    return xtile, ytile
+
+def download_tiles(lat_range, lon_range, zoom_levels, output_dir="static/tiles", timeout=5):
+    """
+    Downloads and stores OpenStreetMap tiles for a specified geographic
+    bounding box and zoom levels.
+
+    Parameters:
+        lat_range (tuple): A tuple of two floats (lat_min, lat_max)
+    defining the latitude bounds.
+        lon_range (tuple): A tuple of two floats (lon_min, lon_max)
+    defining the longitude bounds.
+        zoom_levels (iterable): A list or range of integer zoom levels to
+    download tiles for (e.g., range(12, 16)).
+        output_dir (str): Path to the local directory where tiles should
+    be stored, following the convention {z}/{x}/{y}.png.
+
+    Overly large bounding boxes or zoom levels may result in high
+    numbers of downloads and can be rate-limited by OSM.
+
+    """
+
+    headers = {
+        "User-Agent": "MothicsTileFetcher/1.0"
+    }
+    
+    for zoom in zoom_levels:
+        x_start, y_start = deg2num(lat_range[1], lon_range[0], zoom)
+        x_end, y_end = deg2num(lat_range[0], lon_range[1], zoom)
+
+        for x in range(x_start, x_end + 1):
+            for y in range(y_start, y_end + 1):
+                url = f"https://tile.openstreetmap.org/{zoom}/{x}/{y}.png"
+                tile_path = os.path.join(output_dir, f"{zoom}/{x}/{y}.png")
+
+                if not os.path.exists(tile_path):
+                    os.makedirs(os.path.dirname(tile_path), exist_ok=True)
+                    try:
+                        response = requests.get(url, timeout=timeout, headers=headers)
+                        if response.status_code == 200:
+                            with open(tile_path, 'wb') as f:
+                                f.write(response.content)
+                    except Exception as e:
+                        print(f"Error downloading {url}: {e}")
+
+def list_required_tiles(lat_range, lon_range, zoom_levels):
+    """
+    Computes a list of all tile coordinates (z, x, y) required to cover the specified bounding box.
+
+    Parameters:
+        lat_range (tuple): Latitude bounds as (min_lat, max_lat)
+        lon_range (tuple): Longitude bounds as (min_lon, max_lon)
+        zoom_levels (iterable): Zoom levels to include, e.g., [12, 13, 14]
+
+    Returns:
+        List[Tuple[int, int, int]]: A flat list of (z, x, y) tile coordinates
+    """
+    tiles = []
+    lat_min, lat_max = min(lat_range), max(lat_range)
+    lon_min, lon_max = min(lon_range), max(lon_range)
+
+    for z in zoom_levels:
+        x_start, y_start = deg2num(lat_max, lon_min, z)
+        x_end, y_end = deg2num(lat_min, lon_max, z)
+
+        for x in range(x_start, x_end + 1):
+            for y in range(y_start, y_end + 1):
+                tiles.append((z, x, y))
+
+    return tiles                        
