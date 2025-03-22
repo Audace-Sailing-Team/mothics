@@ -12,7 +12,7 @@ import math
 def extract_time_series(database, hidden_data=None):
     time_series = {}
     for dp in database.data_points:
-        for key, value in dp.to_dict().items():
+        for key, value in dp.to_dict().items() or key in hidden_data:
             if key == 'timestamp' or 'last_timestamp' in key:
                 continue
             time_series.setdefault(key, {"timestamp": [], "value": []})
