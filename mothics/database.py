@@ -210,9 +210,12 @@ class Database:
                 self.logger.warning(f"skipping invalid file: {file.name}")
 
         # Process main directory JSON files
-        for file in self.directory.glob("*.json"):
-            is_checkpoint = file.name.endswith(".chk.json")
-            process_file(file, is_checkpoint)
+        for fname in self.directory.glob("*.json"):
+            # Skip database file
+            if str(fname).split('/')[1] == self.db_fname:
+                continue
+            is_checkpoint = fname.name.endswith(".chk.json")
+            process_file(fname, is_checkpoint)
 
         # Process 'chk' subdirectory JSON files
         chk_dir = self.directory / "chk"
