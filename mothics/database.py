@@ -25,10 +25,10 @@ TRACK_SCHEMA = {
             "timestamp": {"type": "string"},
             "input_data": {
                 "type": "object",
-                "patternProperties": {
-                    ".*": {"type": ["number", "boolean", "string", "null"]}
-                },
-                "additionalProperties": False
+                # Allow all string keys and allow typical sensor data types
+                "additionalProperties": {
+                    "type": ["number", "string", "boolean", "null"]
+                }
             }
         },
         "required": ["timestamp", "input_data"]
@@ -153,12 +153,18 @@ class MetadataExtractor:
 class Database:
     def __init__(self, directory, db_fname="tracks_metadata.json", rm_thesaurus=None, validation=True):
         self.directory = Path(directory)
+        """Database path."""
+        self.db_fname = db_fname
+        """Database file name."""
+        self.validation = validation
+        """Require track validation on insertion in database"""
+        self.rm_thesaurus = rm_thesaurus
+        """Aliases for remote unit names"""
+        
         # Initialize TinyDB with caching middleware for better performance.
         self.db = TinyDB(os.path.join(self.directory, db_fname),
                          storage=CachingMiddleware(JSONStorage))
-        self.validation = validation
         self.tracks = []
-        self.rm_thesaurus = rm_thesaurus
 
         # Metadata extractor
         self.extractor = MetadataExtractor()
@@ -227,6 +233,9 @@ class Database:
         # Prepare tabular data.
         table_data = []
         for i, track in enumerate(self.tracks):
+            # Skip database file
+            if track['filename'] == self.db_fname:
+                continue
             # Get the list of remote unit keys.
             thesaurized_units = track.get("remote_units", [])
             if self.rm_thesaurus is not None:
