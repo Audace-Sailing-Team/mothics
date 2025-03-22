@@ -30,11 +30,12 @@ def extract_time_series(database, hidden_data=None):
 
 
 # Static plotting
-def create_static_bokeh_plots(database, hidden_data=None):
+def create_static_bokeh_plots(database, hidden_data=None, data_thesaurus=None):
     time_series = extract_time_series(database, hidden_data=hidden_data)
     plots = []
-
+    
     for key, data in time_series.items():
+        label = data_thesaurus.get(key, key) if data_thesaurus else key
         # Filter out invalid timestamp/value pairs
         x_vals = []
         y_vals = []
@@ -55,16 +56,16 @@ def create_static_bokeh_plots(database, hidden_data=None):
 
         p = figure(
             x_axis_type="datetime",
-            title=f"Time Evolution of {key}",
+            title=f"Time Evolution of {label}",
             sizing_mode="stretch_width",
             height=300
         )
-        p.line('x', 'y', source=source, line_width=2, legend_label=key)
+        p.line('x', 'y', source=source, line_width=2, legend_label=label)
         p.scatter('x', 'y', source=source, size=5, color='red')
 
         p.legend.location = "top_left"
         p.xaxis.axis_label = 'Timestamp'
-        p.yaxis.axis_label = key
+        p.yaxis.axis_label = label
 
         if len(x_vals) > 1:
             p.x_range = Range1d(start=min(x_vals), end=max(x_vals))
@@ -143,14 +144,15 @@ class PlotDispatcher:
     def _render_static(self):
         database = self.config['GETTERS']['database']()
         hidden = set(self.config.get('HIDDEN_DATA_PLOTS') or [])
-        return create_static_bokeh_plots(database, hidden_data=hidden)
+        thesaurus = self.config.get('DATA_THESAURUS', {})
+        return create_static_bokeh_plots(database, hidden_data=hidden, data_thesaurus=thesaurus)
 
     def _render_realtime(self):
         return server_document(self.config['PLOT_REALTIME_URL']), ""
 
 
 # Bokeh server app
-def create_realtime_bokeh_app(doc, database, hidden_data=None):
+def create_realtime_bokeh_app(doc, database, hidden_data=None, data_thesaurus=None):
     transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
     sources = {}
     panels = []
@@ -186,7 +188,8 @@ def create_realtime_bokeh_app(doc, database, hidden_data=None):
     for key, data in series.items():
         if not data["timestamp"] or not data["value"]:
             continue
-
+        label = data_thesaurus.get(key, key) if data_thesaurus else key
+        
         source = ColumnDataSource(data={"x": data["timestamp"], "y": data["value"]})
         sources[key] = source
 
@@ -194,14 +197,15 @@ def create_realtime_bokeh_app(doc, database, hidden_data=None):
         min_time = max_time - timedelta(seconds=time_window_slider.value)
 
         fig = figure(
-            title=f"Time Series: {key}",
+            title=f"Time Series: {label}",
             x_axis_type="datetime",
             height=400,
             sizing_mode="stretch_width",
             x_range=(min_time, max_time)
         )
         fig.line("x", "y", source=source, line_width=2)
-        panels.append(TabPanel(child=fig, title=key))
+        fig.yaxis.axis_label = label
+        panels.append(TabPanel(child=fig, title=label))
 
     # Optional GPS tab
     # gps_tab = create_gps_tab(database, transformer, tile_server_url="http://host.local:5000/tiles/{Z}/{X}/{Y}.png")

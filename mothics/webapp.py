@@ -90,7 +90,7 @@ class WebApp:
         if self.plot_mode == "real-time":
             def bokeh_server_thread():
                 database_instance = self.getters["database"]()
-                app = Application(FunctionHandler(lambda doc: create_realtime_bokeh_app(doc, database_instance, hidden_data=self.hidden_data_plots)))
+                app = Application(FunctionHandler(lambda doc: create_realtime_bokeh_app(doc, database_instance, hidden_data=self.hidden_data_plots, data_thesaurus=self.data_thesaurus)))
                 server = Server(
                     {"/bokeh_app": app},
                     port=5006,
