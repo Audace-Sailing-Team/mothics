@@ -80,7 +80,8 @@ DEFAULT_CONFIG = {
         "hidden_data_plots": None
     },
     "cli": {
-        "button_pin": 21
+        "button_pin": 21,
+        "startup_commands": None
     }
 }
 

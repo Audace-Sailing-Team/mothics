@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import re
+import socket
 import threading
 import glob
 import serial
@@ -25,21 +27,34 @@ except:
 from mothics.helpers import setup_logger, tipify, check_internet_connectivity, list_required_tiles, download_tiles
 from mothics.system_manager import SystemManager
 
-                               
+
+# Intro message
+margin = "  "  # 2-space left margin
+
+lines = [
+    "\033[1;36mMothics - Moth Analytics\033[0m",
+    "Iacopo Ricci - Audace Sailing Team - 2025",
+    "",
+    "\033[2mDefault SSH address:        192.168.42.1",
+    "Default dashboard address:  http://192.168.42.1:5000",
+    f"                            http://{socket.gethostname()}.local:5000",
+    'Type "help" for available commands.',
+    'Type "exit" or <CTRL-D> to quit.\033[0m'
+]
+
+# Compute line width excluding ANSI codes
+strip_ansi = lambda s: re.sub(r'\x1B\[[0-?]*[ -/]*[@-~]', '', s)
+max_width = max(len(strip_ansi(l)) for l in lines)
+
+# Add margin and format
+lines = [f"{margin}{l.ljust(max_width)}" for l in lines]
+border = f"{margin}{'=' * max_width}"
+
+
 # CLI
 class MothicsCLI(Cmd):
     prompt = '\033[1;32m(mothics) \033[0m'
-    intro = """
-    ==============================================
-    \033[1;36mMothics - Moth Analytics\033[0m
-    Iacopo Ricci - Audace Sailing Team - 2025
-    
-    \033[2mDefault SSH address: \t 192.168.42.1
-    Default dashboard address: \t 192.168.42.1:5000
-    Type "help" for available commands.
-    Type "exit" or <CTRL-D> to quit.\033[0m
-    ==============================================
-    """
+    intro = f"\n{border}\n" + "\n".join(lines) + f"\n{border}\n"
     
     def __init__(self):
         super().__init__()
@@ -49,11 +64,6 @@ class MothicsCLI(Cmd):
         self.keep_streaming = False
         self.available_ports = []
         self.button_pin = self.system_manager.config['cli']['button_pin']
-
-        if IS_RASPI:
-            self._start_gpio_monitor()
-        else:
-            self.print("Shutdown button is not available.", level='warning')
 
     def _start_gpio_monitor(self):
         """Starts a background thread to monitor the GPIO button for shutdown/reboot."""
@@ -117,55 +127,21 @@ class MothicsCLI(Cmd):
         }
         print(f"{colors.get(level, '[INFO]')} {message}")
 
-    def _check_updates(self):
-        """Check for updates"""
-        # Skip if no internet
-        if not check_internet_connectivity():
-            self.print("No internet connection. Skipping update check.", level='warning')
-            return
-
-        try:
-            # Ensure we are inside a Git repository
-            subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-            # Get the list of remotes
-            remotes = subprocess.check_output(["git", "remote"]).decode("utf-8").strip().split("\n")
-            if not remotes:
-                self.print("No remote repository found. Skipping update check.", level='error')
-                return
-
-            # Use the first available remote
-            remote_name = remotes[0]
-
-            # Fetch latest changes from the detected remote
-            subprocess.run(["git", "fetch", remote_name], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            
-            # Detect the default branch dynamically
-            try:
-                branch = subprocess.check_output(
-                    ["git", "symbolic-ref", f"refs/remotes/{remote_name}/HEAD"],
-                    stderr=subprocess.DEVNULL
-                ).decode("utf-8").strip().split("/")[-1]
-            except subprocess.CalledProcessError:
-                # Fallback: Check if main exists, otherwise use master
-                branch = "main" if f"{remote_name}/main" in subprocess.getoutput("git branch -r") else "master"
-                
-            # Get the latest commit on the remote branch
-            remote_commit = subprocess.check_output(["git", "rev-parse", f"{remote_name}/{branch}"]).decode("utf-8").strip()
-
-            # Get the current local commit
-            local_commit = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
-            
-            # Compare commits
-            if local_commit != remote_commit:
-                self.print("A new version is available! Run \033[2mupdate\033[0m now or \033[2mgit pull\033[0m after exiting Mothics", level='update')
-                        
-        except subprocess.CalledProcessError as e:
-            self.print(f"Unable to check for updates: {e}", level='error')
-            return
-        
     def preloop(self):
-        self._check_updates()
+        self.print('Initializing Mothics...', level='info')
+        commands = self.system_manager.config['cli']['startup_commands']
+        # Start gpio monitor if we're on a RasPi
+        if IS_RASPI:
+            self._start_gpio_monitor()
+        else:
+            self.print("Shutdown button is not available.", level='warning')
+        # Run commands 
+        if commands:
+            for command in commands:
+                try:
+                    self.onecmd(command)
+                except Exception as e:
+                    self.print(f"Error running '{command}': {e}", level='error')
 
     def do_start(self, args):
         """
@@ -707,16 +683,98 @@ class MothicsCLI(Cmd):
         except subprocess.CalledProcessError as e:
             self.print(f"Error detaching from tmux: {e}", level='error')        
 
-    def do_update(self, args):
-        """Update the CLI by pulling the latest changes from Git."""
-        # Check for updates
-        self._check_updates()
-        
+    def _install_updates(self):
+        """Runs 'git pull' to install updates, and optionally restarts the CLI."""
         try:
             subprocess.run(["git", "pull"], check=True)
-            self.print("Update complete: restart the CLI to apply changes.", level='info')
+            self.print("Update complete.", level='success')
+
+            if self._confirm_action("restart the CLI now to apply changes"):
+                self.print("Restarting CLI...", level='info')
+                self.do_stop()
+                python = sys.executable
+                os.execl(python, python, *sys.argv)
+
+            else:
+                self.print("You can restart the CLI later to apply the changes.", level='info')
+
         except subprocess.CalledProcessError:
             self.print("Update failed. Check your Git settings or internet connection.", level='error')
+
+            
+    def _check_updates(self):
+        """Check for updates"""
+        # Skip if no internet
+        if not check_internet_connectivity():
+            self.print("No internet connection. Skipping update check.", level='warning')
+            return
+
+        try:
+            # Ensure we are inside a Git repository
+            subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+            # Get the list of remotes
+            remotes = subprocess.check_output(["git", "remote"]).decode("utf-8").strip().split("\n")
+            if not remotes:
+                self.print("No remote repository found. Skipping update check.", level='error')
+                return
+
+            # Use the first available remote
+            remote_name = remotes[0]
+
+            # Fetch latest changes from the detected remote
+            subprocess.run(["git", "fetch", remote_name], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            # Detect the default branch dynamically
+            try:
+                branch = subprocess.check_output(
+                    ["git", "symbolic-ref", f"refs/remotes/{remote_name}/HEAD"],
+                    stderr=subprocess.DEVNULL
+                ).decode("utf-8").strip().split("/")[-1]
+            except subprocess.CalledProcessError:
+                # Fallback: Check if main exists, otherwise use master
+                branch = "main" if f"{remote_name}/main" in subprocess.getoutput("git branch -r") else "master"
+                
+            # Get the latest commit on the remote branch
+            remote_commit = subprocess.check_output(["git", "rev-parse", f"{remote_name}/{branch}"]).decode("utf-8").strip()
+
+            # Get the current local commit
+            local_commit = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
+            
+            # Compare commits
+            if local_commit != remote_commit:
+                self.print("A new version is available! Run \033[2mupdate\033[0m now or \033[2mgit pull\033[0m after exiting Mothics", level='update')
+            else:
+                self.print("No updates available.", level='info')
+                        
+        except subprocess.CalledProcessError as e:
+            self.print(f"Unable to check for updates: {e}", level='error')
+            return
+            
+    def do_update(self, args):
+        """
+        Update the CLI from Git.
+
+        Usage:
+            update             - Check for updates and install if needed
+            update check       - Only check for updates
+            update install     - Only install updates via 'git pull'
+        """
+        parts = args.strip().split()
+        mode = parts[0] if parts else "full"
+
+        if mode == "check":
+            self._check_updates()
+        elif mode == "install":
+            self._install_updates()
+        elif mode == "full" or mode == "":
+            if self._check_updates(return_status=True):
+                self._install_updates()
+            else:
+                self.print("No update needed.", level='info')
+        else:
+            self.print(f"Unknown subcommand: {mode}", level='error')
+            self.print("Available subcommands: check, install", level='info')
 
     def _shutdown(self, confirm=True):
         """Safely shuts down the system with user confirmation."""
