@@ -150,8 +150,6 @@ def check_cdn_availability(urls=None, outdir='static'):
     
     return missing_files
 
-import requests
-
 def check_internet_connectivity(test_url="https://www.google.com", timeout=5):
     """
     Checks for an active internet connection by sending a HEAD request to a well-known website.
