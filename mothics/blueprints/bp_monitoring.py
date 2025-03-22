@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template, jsonify, request, Response, current_app
+import os
+from flask import Blueprint, render_template, jsonify, request, Response, current_app, abort, send_file
 from bokeh.embed import server_document
 from ..bokeh_apps.static import create_bokeh_plots
 from ..helpers import compute_status
@@ -42,20 +43,13 @@ def get_table():
 
     return render_template("table.html", table_data=[filtered_row])
 
-# @monitor_bp.route("/get_table")
-# def get_table():
-#     database = current_app.config['GETTERS']['database']()
-#     latest_data = [{key: value for key, value in database.data_points[-1].to_dict().items() if '/last_timestamp' not in key}] if database.data_points else []
-
-#     # Apply the data thesaurus
-#     data_thesaurus = current_app.config['DATA_THESAURUS']
-#     if data_thesaurus is not None:
-#         for row in latest_data:
-#             for key in list(row.keys()):
-#                 if key in data_thesaurus:
-#                     row[data_thesaurus[key]] = row.pop(key)
-                
-#     return render_template("table.html", table_data=latest_data)
+@monitor_bp.route('/tiles/<int:z>/<int:x>/<int:y>.png')
+def serve_tile(z, x, y):
+    path = os.path.join(current_app.root_path, 'static', 'tiles', str(z), str(x), f"{y}.png")
+    if os.path.exists(path):
+        return send_file(path)
+    else:
+        abort(404)
 
 @monitor_bp.route("/get_status")
 def get_status():
