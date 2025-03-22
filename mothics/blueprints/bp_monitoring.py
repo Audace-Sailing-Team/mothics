@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta
 from flask import Blueprint, render_template, jsonify, request, Response, current_app, abort, send_file
 from bokeh.embed import server_document
 from ..bokeh_apps.static import create_bokeh_plots
@@ -70,15 +71,25 @@ def gps_map():
 
 @monitor_bp.route("/api/latest_gps")
 def api_latest_gps():
-    if not current_app.config['GETTERS']['database']:
-        return jsonify({'error': 'no GPS'}), 404
+    db = current_app.config['GETTERS']['database']()
+    if not db.data_points:
+        return jsonify({'error': 'no data'}), 204  # no content
 
-    dp = current_app.config['GETTERS']['database']().data_points[-1].to_dict()
+    latest = db.data_points[-1].to_dict()
 
-    lat = next((v for k, v in dp.items() if k.endswith('/gps/lat')), None)
-    lon = next((v for k, v in dp.items() if k.endswith('/gps/long')), None)
+    lat_key = next((k for k in latest if k.endswith("/gps/lat")), None)
+    lon_key = next((k for k in latest if k.endswith("/gps/long")), None)
+    spd_key = next((k for k in latest if "/gps/speed" in k), None)
+
+    lat = latest.get(lat_key)
+    lon = latest.get(lon_key)
+    speed = latest.get(spd_key) if spd_key else None
 
     if lat is None or lon is None:
-        return jsonify({'error': 'invalid GPS'}), 400
+        return jsonify({'error': 'no gps'}), 204
 
-    return jsonify({'lat': lat, 'lon': lon})
+    return jsonify({
+        'lat': lat,
+        'lon': lon,
+        'speed': speed
+    })

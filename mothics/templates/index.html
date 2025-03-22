@@ -92,12 +92,34 @@
     </div>
 
     <!-- Leaflet GPS Map -->
-    <div class="plot-container my-4" id="leaflet-map-container">
-      <h2>Live GPS Map</h2>
-      <div id="leaflet-map"></div>
-      <div id="gps-flag">GPS unavailable</div>
+    <div class="status-section">
+      <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#leaflet-map-container">
+	GPS Map <span class="arrow">&#9660;</span>
+      </div>
+
+      <div id="leaflet-map-container" class="collapse show">
+	<!-- Sliders ABOVE the map -->
+	<div class="gps-sliders row align-items-center my-3 w-100">
+	  <div class="col-auto">
+            <label for="gpsRefreshSlider" class="form-label small">Refresh Rate (seconds)</label>
+            <input type="range" class="form-range" min="0.1" max="10" step="0.1" value="1" id="gpsRefreshSlider">
+            <span class="form-text" id="gpsRefreshValue">1s</span>
+	  </div>
+	  <div class="col-auto">
+            <label for="gpsTrackSlider" class="form-label small">Track Duration (minutes)</label>
+            <input type="range" class="form-range" min="1" max="30" step="1" value="10" id="gpsTrackSlider">
+            <span class="form-text" id="gpsTrackValue">10 min</span>
+	  </div>
+	</div>
+	
+	<!-- Isolated map container -->
+	<div class="plot-container w-100" style="position: relative;">
+	  <div id="leaflet-map" class="w-100"></div>
+	  <div id="gps-flag">GPS unavailable</div>
+	</div>
+      </div>
     </div>
-    
+        
     <!-- Time Evolution -->
     <div class="plot-container my-4" id="plot-container">
       <h2> Time Evolution </h2>
@@ -281,36 +303,82 @@
     fillOpacity: 0.8
   }).addTo(leafletMap);
 
+  const gpsFlag = document.getElementById("gps-flag");
+
   let gpsAutoFollow = true;
+  let gpsHistory = [];
+
+  let refreshMs = 2000;
+  let durationMs = 600000; // 10 minutes
 
   function updateGPS() {
-      fetch("/api/latest_gps")
-	  .then(response => response.ok ? response.json() : null)
-	  .then(data => {
-	      const flag = document.getElementById("gps-flag");
-	      
-	      if (!data || !data.lat || !data.lon) {
-		  flag.style.display = "block";
-		  return;
-	      }
-	      
-	      const lat = data.lat;
-	      const lon = data.lon;
-	      gpsMarker.setLatLng([lat, lon]);
-	      
-	      if (gpsAutoFollow) {
-		  leafletMap.panTo([lat, lon]);
-	      }
-	      
-	      flag.style.display = "none";
-	  })
-	  .catch(() => {
-	      // network/server error, treat as unavailable
-	      document.getElementById("gps-flag").style.display = "block";
-	  });
+    fetch("/api/latest_gps")
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data || !data.lat || !data.lon) {
+          gpsFlag.style.display = "block";
+          return;
+        }
+
+        const lat = data.lat;
+        const lon = data.lon;
+        const speed = data.speed ?? null;
+        const now = Date.now();
+
+        gpsFlag.style.display = "none";
+        gpsMarker.setLatLng([lat, lon]);
+
+        gpsHistory.push({ time: now, lat, lon, speed });
+        gpsHistory = gpsHistory.filter(p => now - p.time <= durationMs);
+
+        drawTrack();
+
+        if (gpsAutoFollow) {
+          leafletMap.panTo([lat, lon]);
+        }
+      })
+      .catch(() => {
+        gpsFlag.style.display = "block";
+      });
   }
 
-  setInterval(updateGPS, 2000);
+  function drawTrack() {
+    // Remove old segments if any
+    gpsSegments.forEach(segment => leafletMap.removeLayer(segment));
+    gpsSegments = [];
+
+    if (gpsHistory.length < 2) return;
+
+    for (let i = 1; i < gpsHistory.length; i++) {
+      const prev = gpsHistory[i - 1];
+      const curr = gpsHistory[i];
+
+      const latlngs = [[prev.lat, prev.lon], [curr.lat, curr.lon]];
+
+      const speed = curr.speed ?? prev.speed;
+      const color = speed != null ? getSpeedColor(speed) : "#3388ff";
+
+      const seg = L.polyline(latlngs, {
+        color,
+        weight: 3,
+        opacity: 0.8
+      }).addTo(leafletMap);
+
+      gpsSegments.push(seg);
+    }
+  }
+
+  function getSpeedColor(speed) {
+    // Simple gradient: blue (slow) → green → red (fast)
+    if (speed < 1) return "#3366cc";     // walking
+    if (speed < 5) return "#66cc66";     // slow bike
+    if (speed < 15) return "#ffcc00";    // scooter
+    return "#cc3333";                    // fast
+  }
+
+  let gpsSegments = [];
+
+  let gpsTimer = setInterval(updateGPS, refreshMs);
   updateGPS();
 
   leafletMap.on("movestart", () => gpsAutoFollow = false);
@@ -322,12 +390,28 @@
     btn.style.padding = '4px 8px';
     btn.style.cursor = 'pointer';
     btn.title = 'Recenter GPS';
-    btn.onclick = () => {
-      gpsAutoFollow = true;
-    };
+    btn.onclick = () => gpsAutoFollow = true;
     return btn;
   };
   recenterBtn.addTo(leafletMap);
+
+  // Sliders
+  const refreshSlider = document.getElementById("gpsRefreshSlider");
+  const trackSlider = document.getElementById("gpsTrackSlider");
+
+  refreshSlider.addEventListener("input", () => {
+    const val = parseFloat(refreshSlider.value);
+    document.getElementById("gpsRefreshValue").textContent = `${val}s`;
+    refreshMs = val * 1000;
+    clearInterval(gpsTimer);
+    gpsTimer = setInterval(updateGPS, refreshMs);
+  });
+
+  trackSlider.addEventListener("input", () => {
+    const val = parseInt(trackSlider.value);
+    document.getElementById("gpsTrackValue").textContent = `${val} min`;
+    durationMs = val * 60 * 1000;
+  });
 </script>
 
 </body>

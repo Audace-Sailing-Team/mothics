@@ -193,20 +193,76 @@ body {
 }
 
 #leaflet-map-container {
-    position: relative; /* anchor for absolutely positioned child */
+  position: relative;
+}
+
+#leaflet-map-container .row {
+    flex-wrap: nowrap;
+    gap: 1rem;
+}
+
+#leaflet-map-container .col {
+    min-width: 180px;
+    flex-grow: 1;
+}
+
+#leaflet-map {
+  height: 500px;
+  width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 6px;
 }
 
 #gps-flag {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    background-color: rgba(255, 230, 180, 0.95);
-    color: #555;
-    font-size: 0.85rem;
-    padding: 4px 8px;
-    border-radius: 4px;
-    box-shadow: 0 0 4px rgba(0, 0, 0, 0.15);
-    z-index: 800;
-    display: none;
-    pointer-events: none;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background-color: rgba(255, 230, 180, 0.95);
+  color: #555;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.15);
+  z-index: 800;
+  display: none;
+  pointer-events: none;
+}
+
+input[type="range"].form-range {
+    accent-color: #0d6efd; /* Bootstrap primary */
+    background: rgba(200, 200, 200, 0.3);
+    height: 2px;
+}
+
+input[type="range"].form-range::-webkit-slider-thumb {
+    background-color: #0d6efd;
+    border: none;
+}
+
+input[type="range"].form-range::-moz-range-thumb {
+    background-color: #0d6efd;
+    border: none;
+}
+
+.gps-sliders {
+  flex-wrap: nowrap;
+  justify-content: start;
+  gap: 2rem;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.gps-sliders .col-auto {
+  min-width: 200px;
+}
+
+.gps-sliders label,
+.gps-sliders .form-text {
+  white-space: nowrap;
+}
+
+.gps-sliders .form-text {
+    display: inline-block;
+    min-width: 10ch;      /* Room for e.g. "10s" or "30 min" */
+    text-align: left;
 }
