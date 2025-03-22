@@ -88,9 +88,9 @@ class MothicsCLI(Cmd):
         press_duration = time.time() - start_time
 
         if press_duration > 2 and press_duration < 5:
-            self._shutdown(confirm=False)
-        elif press_duration > 5:
             self._reboot(confirm=False)
+        elif press_duration > 5:
+            self._shutdown(confirm=False)
 
     def _cleanup_gpio(self):
         """Cleans up GPIO resources on exit."""
