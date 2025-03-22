@@ -26,7 +26,7 @@ TRACK_SCHEMA = {
             "input_data": {
                 "type": "object",
                 "patternProperties": {
-                    ".*": {"type": ["number", "string", "null"]}
+                    ".*": {"type": ["number", "boolean", "string", "null"]}
                 },
                 "additionalProperties": False
             }
@@ -195,15 +195,21 @@ def extract_metadata_from_file(filepath: Path) -> Dict[str, Any]:
 
 
 class Database:
-    def __init__(self, directory, db_path="tracks_metadata.json", rm_thesaurus=None):
+    def __init__(self, directory, db_fname="tracks_metadata.json", rm_thesaurus=None, validation=True):
         self.directory = Path(directory)
         # Initialize TinyDB with caching middleware for better performance.
-        self.db = TinyDB(db_path, storage=CachingMiddleware(JSONStorage))
+        self.db = TinyDB(os.path.join(self.directory, db_fname),
+                         storage=CachingMiddleware(JSONStorage))
+        self.validation = validation
         self.tracks = []
-        self.load_tracks()
         self.rm_thesaurus = rm_thesaurus
+
+        # Setup logger
         self.logger = logging.getLogger("Database")
         self.logger.info("-------------Database-------------")
+
+        # Load tracks
+        self.load_tracks()
 
     def validate_json(self, filepath: Path):
         """
@@ -230,13 +236,13 @@ class Database:
 
         def process_file(file: Path, is_checkpoint: bool):
             """Helper to validate and process a JSON file."""
-            if self.validate_json(file):
+            if self.validate_json(file) or not self.validation:
                 meta = extract_metadata_from_file(file)
                 meta["checkpoint"] = is_checkpoint
                 self.db.insert(meta)
                 self.tracks.append(meta)
             else:
-                print(f"Skipping invalid file: {file.name}")
+                self.logger.warning(f"skipping invalid file: {file.name}")
 
         # Process main directory JSON files
         for file in self.directory.glob("*.json"):
@@ -256,7 +262,7 @@ class Database:
         """
         self.tracks = self.db.all()  # Reload tracks from DB.
         if not self.tracks:
-            print("No tracks available.")
+            self.logger.warning("no tracks available.")
             return []
 
         # Prepare tabular data.
@@ -291,7 +297,7 @@ class Database:
         self.tracks = self.db.all()
         if 0 <= index < len(self.tracks):
             return self.tracks[index]
-        print("Invalid track index")
+        self.logger.warning("invalid track index")
         return {}
 
     def get_track_path(self, identifier: Union[int, str]) -> Optional[Path]:
@@ -305,15 +311,15 @@ class Database:
             if 0 <= identifier < len(self.tracks):
                 track = self.tracks[identifier]
             else:
-                self.logger.warning("Invalid track index")
+                self.logger.warning("invalid track index")
                 return None
         elif isinstance(identifier, str):  # Lookup by filename
             track = next((t for t in self.tracks if t["filename"] == identifier), None)
             if not track:
-                self.logger.warning(f"Track with filename '{identifier}' not found in DB")
+                self.logger.warning(f"track with filename '{identifier}' not found in DB")
                 return None
         else:
-            self.logger.warning("Invalid identifier type")
+            self.logger.warning("invalid identifier type")
             return None
 
         filename = track["filename"]

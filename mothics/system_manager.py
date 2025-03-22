@@ -58,6 +58,9 @@ DEFAULT_CONFIG = {
         "trim_fraction": 0.5,
         "max_datapoints": 1e5
     },
+    "database":{
+        "validation": True
+    },
     "files": {
         "logger_fname": "default.log",
         "cdn_dir": "mothics/static",
@@ -130,6 +133,7 @@ class SystemManager:
         """ Initializes CDNs for webapp display """
         # Get CDN URLs from configuration
         cdn_urls = self.config["webapp"]["cdns"]
+        
         if not cdn_urls:
             self.logger.warning("no CDN URLs specified in configuration. Skipping CDN initialization")
             return
@@ -153,11 +157,10 @@ class SystemManager:
 
     def initialize_database(self):
         """ Initializes the database. """                                      
-        output_dir = self.config["files"]["output_dir"]
-        rm_thesaurus = self.config["webapp"]["rm_thesaurus"]
-                               
         # Start database
-        self.database = Database(output_dir, rm_thesaurus=rm_thesaurus)
+        self.database = Database(self.config["files"]["output_dir"],
+                                 rm_thesaurus=self.config["webapp"]["rm_thesaurus"],
+                                 validation=self.config["database"]["validation"])
         
     def initialize_common_components(self, mode, track_file=None):
         """ Initializes shared components for live and replay modes. """
