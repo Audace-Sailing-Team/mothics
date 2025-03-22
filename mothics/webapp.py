@@ -79,6 +79,9 @@ class WebApp:
         })
         
         # Start bokeh server
+        self.bokeh_server = None
+        self.bokeh_thread = None
+
         self.allowed_origins = [
             "localhost:5000", "127.0.0.1:5000",
             f"{hostname}:5000", f"{local_ip}:5000",
