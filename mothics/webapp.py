@@ -19,7 +19,7 @@ from .blueprints.bp_database import database_bp
 
 
 class WebApp:
-    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None, plot_mode='real-time'):
+    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data_cards=None, hidden_data_plots=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None, plot_mode='real-time'):
         self.getters = getters or {}
         """Getter methods from other Mothics components"""
         self.setters = setters or {}
@@ -32,8 +32,10 @@ class WebApp:
         """Aliases for remote unit names"""
         self.data_thesaurus = data_thesaurus
         """Aliases for sensor data names"""
-        self.hidden_data = hidden_data
+        self.hidden_data_cards = hidden_data_cards
         """Sensor data addresses hidden from card view"""
+        self.hidden_data_plots = hidden_data_plots
+        """Sensor data addresses hidden from plot view"""
         self.timeout_offline = timeout_offline
         """Threshold to set remote unit as offline"""
         self.timeout_noncomm = timeout_noncomm
@@ -47,13 +49,36 @@ class WebApp:
         # Setup logger
         self.setup_logging()
 
-        # Start bokeh server	
+        # Get bokeh url
         hostname = socket.gethostname()
         local_ip = socket.gethostbyname(hostname)
         
         self.plot_realtime_url = f"http://{hostname}.local:5006/bokeh_app"
         """Real-time bokeh server URL"""        
-
+        
+        # Create the Flask app
+        self.app = Flask(__name__, template_folder="templates", static_folder='static')
+        
+        # Pass configuration to the app so blueprints can access it
+        self.app.config.update({
+            'GETTERS': self.getters,
+            'SETTERS': self.setters,
+            'AUTO_REFRESH_TABLE': self.auto_refresh_table,
+            'RM_THESAURUS': self.rm_thesaurus,
+            'DATA_THESAURUS': self.data_thesaurus,
+            'HIDDEN_DATA_CARDS': self.hidden_data_cards,
+            'HIDDEN_DATA_PLOTS': self.hidden_data_plots,
+            'TIMEOUT_OFFLINE': self.timeout_offline,
+            'TIMEOUT_NONCOMM': self.timeout_noncomm,
+            'LOGGER_FNAME': self.logger_fname,
+            'TRACK_MANAGER_DIRECTORY': self.track_manager_directory,
+            'TRACK_MANAGER': self.track_manager,
+            'LOGGER': self.logger,
+            'PLOT_MODE': self.plot_mode,
+            'PLOT_REALTIME_URL': self.plot_realtime_url
+        })
+        
+        # Start bokeh server
         allowed_origins = [
             "localhost:5000", "127.0.0.1:5000",
             f"{hostname}:5000", f"{local_ip}:5000",
@@ -65,7 +90,7 @@ class WebApp:
         if self.plot_mode == "real-time":
             def bokeh_server_thread():
                 database_instance = self.getters["database"]()
-                app = Application(FunctionHandler(lambda doc: create_realtime_bokeh_app(doc, database_instance)))
+                app = Application(FunctionHandler(lambda doc: create_realtime_bokeh_app(doc, database_instance, hidden_data=self.hidden_data_plots)))
                 server = Server(
                     {"/bokeh_app": app},
                     port=5006,
@@ -79,27 +104,7 @@ class WebApp:
             self.bokeh_thread.daemon = True
             self.bokeh_thread.start()
     
-        # Create the Flask app
-        self.app = Flask(__name__, template_folder="templates", static_folder='static')
-        
-        # Pass configuration to the app so blueprints can access it
-        self.app.config.update({
-            'GETTERS': self.getters,
-            'SETTERS': self.setters,
-            'AUTO_REFRESH_TABLE': self.auto_refresh_table,
-            'RM_THESAURUS': self.rm_thesaurus,
-            'DATA_THESAURUS': self.data_thesaurus,
-            'HIDDEN_DATA': self.hidden_data,
-            'TIMEOUT_OFFLINE': self.timeout_offline,
-            'TIMEOUT_NONCOMM': self.timeout_noncomm,
-            'LOGGER_FNAME': self.logger_fname,
-            'TRACK_MANAGER_DIRECTORY': self.track_manager_directory,
-            'TRACK_MANAGER': self.track_manager,
-            'LOGGER': self.logger,
-            'PLOT_MODE': self.plot_mode,
-            'PLOT_REALTIME_URL': self.plot_realtime_url
-        })
-        
+        # Setup routes
         self.setup_routes()
 
     def setup_logging(self):

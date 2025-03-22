@@ -76,7 +76,8 @@ DEFAULT_CONFIG = {
             "rm2": "Anemometer"
         },
         "data_thesaurus": None,
-        "hidden_data": None
+        "hidden_data_cards": None,
+        "hidden_data_plots": None
     },
     "cli": {
         "button_pin": 21
@@ -246,7 +247,8 @@ class SystemManager:
                 logger_fname=self.config["files"]["logger_fname"],
                 rm_thesaurus=self.config["webapp"]["rm_thesaurus"],
                 data_thesaurus=self.config["webapp"]["data_thesaurus"],
-                hidden_data=self.config["webapp"]["hidden_data"],
+                hidden_data_cards=self.config["webapp"]["hidden_data_cards"],
+                hidden_data_plots=self.config["webapp"]["hidden_data_plots"],
                 timeout_offline=self.config["webapp"]["timeout_offline"],
                 timeout_noncomm=self.config["webapp"]["timeout_noncomm"],
                 track_manager_directory=self.config["files"]["output_dir"]
