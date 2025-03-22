@@ -10,7 +10,7 @@ from bokeh.application import Application
 from bokeh.application.handlers.function import FunctionHandler
 from tornado.log import access_log, app_log, gen_log
 
-from .bokeh_apps.server import create_realtime_bokeh_app
+from .bokeh_plots import create_realtime_bokeh_app
 from .blueprints.bp_monitoring import monitor_bp
 from .blueprints.bp_logging import log_bp
 from .blueprints.bp_saving import save_bp
