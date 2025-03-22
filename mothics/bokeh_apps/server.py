@@ -39,7 +39,7 @@ def create_realtime_bokeh_app(doc: Document, database):
 
     # Dynamically discover GPS keys
     lat_key = next((k for k in initial_data if k.endswith('/gps/lat')), None)
-    lon_key = next((k for k in initial_data if k.endswith('/gps/lon')), None)
+    lon_key = next((k for k in initial_data if k.endswith('/gps/long')), None)
 
     for key, data in initial_data.items():
         if not data["timestamp"] or not data["value"]:
