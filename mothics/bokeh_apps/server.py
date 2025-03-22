@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from bokeh.layouts import row, column
+from bokeh.layouts import row, column, layout
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, Tabs, TabPanel, Slider
 from bokeh.models import WMTSTileSource
@@ -137,16 +137,15 @@ def create_realtime_bokeh_app(doc: Document, database):
     time_window_slider.on_change("value", update_x_range)
 
     # Create a row for the sliders
-    slider_row = row(
-        time_window_slider, 
+    slider_column = column(
         refresh_slider, 
-        sizing_mode="stretch_width",
-        css_classes=["bokeh-slider-row"]
+        time_window_slider, 
+        sizing_mode="stretch_width"
     )
     
     # Sliders in a row, then tabs
     layout = column(
-        slider_row, 
+        slider_column,
         tabs,
         sizing_mode="stretch_width"
     )

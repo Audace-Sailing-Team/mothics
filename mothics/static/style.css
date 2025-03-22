@@ -165,10 +165,6 @@ body {
     width: 100% !important;
     max-width: none !important;
 }
-.bokeh-container {
-    width: 100% !important;
-    display: block !important;
-}
 
 /* Custom class for Bokeh slider row layout */
 .bokeh-slider-row {
