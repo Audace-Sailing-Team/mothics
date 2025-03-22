@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Leaflet GPS Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet styles -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='leaflet.css') }}">
+  <style>
+    #map { height: 90vh; width: 100%; }
+  </style>
+</head>
+<body>
+
+<h2 align="center">Live GPS Map</h2>
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="{{ url_for('static', filename='leaflet.js') }}"></script>
+
+<script>
+  const tileUrl = "/tiles/{z}/{x}/{y}.png";
+
+  const map = L.map('map').setView([45.65, 13.78], 13);  // Fallback center
+
+  const tileLayer = L.tileLayer(tileUrl, {
+    minZoom: 10,
+    maxZoom: 17,
+    tileSize: 256,
+    attribution: "&copy; local OSM cache"
+  }).addTo(map);
+
+  let marker = L.circleMarker([0, 0], {
+    radius: 8,
+    color: "blue",
+    weight: 2,
+    fillColor: "#30f",
+    fillOpacity: 0.7
+  }).addTo(map);
+
+  let autoFollow = true;
+
+  // Reset to center on GPS
+  function updateGPS() {
+    fetch('/api/latest_gps')
+      .then(res => res.json())
+      .then(data => {
+        if (!data.lat || !data.lon) return;
+        const lat = data.lat;
+        const lon = data.lon;
+        marker.setLatLng([lat, lon]);
+
+        if (autoFollow) {
+          map.panTo([lat, lon]);
+        }
+      })
+      .catch(console.warn);
+  }
+
+  setInterval(updateGPS, 2000);  // Update every 2s
+  updateGPS();
+
+  // Allow user to disable auto-follow by dragging
+  map.on('movestart', () => {
+    autoFollow = false;
+  });
+
+  // Optional: Add a button to re-enable auto-follow
+  const followButton = L.control({ position: 'topright' });
+  followButton.onAdd = function () {
+    const btn = L.DomUtil.create('button', '');
+    btn.innerHTML = 'Recenter';
+    btn.style.padding = '5px';
+    btn.onclick = () => {
+      autoFollow = true;
+    };
+    return btn;
+  };
+  followButton.addTo(map);
+</script>
+
+</body>
+</html>

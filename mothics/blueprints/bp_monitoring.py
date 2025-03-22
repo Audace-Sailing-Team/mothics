@@ -43,14 +43,6 @@ def get_table():
 
     return render_template("table.html", table_data=[filtered_row])
 
-@monitor_bp.route('/tiles/<int:z>/<int:x>/<int:y>.png')
-def serve_tile(z, x, y):
-    path = os.path.join(current_app.root_path, 'static', 'tiles', str(z), str(x), f"{y}.png")
-    if os.path.exists(path):
-        return send_file(path)
-    else:
-        abort(404)
-
 @monitor_bp.route("/get_status")
 def get_status():
     database = current_app.config['GETTERS']['database']()
@@ -64,3 +56,29 @@ def get_status():
         status_data = {rm_thesaurus.get(rm, rm): status for rm, status in status_data.items()}
     return render_template("status.html", status_data=status_data)
 
+@monitor_bp.route('/tiles/<int:z>/<int:x>/<int:y>.png')
+def serve_tile(z, x, y):
+    path = os.path.join(current_app.root_path, 'static', 'tiles', str(z), str(x), f"{y}.png")
+    if os.path.exists(path):
+        return send_file(path)
+    else:
+        abort(404)
+
+@monitor_bp.route("/gps_map")
+def gps_map():
+    return render_template("gps_map.html")
+
+@monitor_bp.route("/api/latest_gps")
+def api_latest_gps():
+    if not current_app.config['GETTERS']['database']:
+        return jsonify({'error': 'no GPS'}), 404
+
+    dp = current_app.config['GETTERS']['database']().data_points[-1].to_dict()
+
+    lat = next((v for k, v in dp.items() if k.endswith('/gps/lat')), None)
+    lon = next((v for k, v in dp.items() if k.endswith('/gps/long')), None)
+
+    if lat is None or lon is None:
+        return jsonify({'error': 'invalid GPS'}), 400
+
+    return jsonify({'lat': lat, 'lon': lon})

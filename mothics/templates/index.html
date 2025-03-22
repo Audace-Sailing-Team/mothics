@@ -15,6 +15,9 @@
     <script src="{{ url_for('static', filename='bokeh-widgets-3.6.2.min.js') }}"></script>
     <script src="{{ url_for('static', filename='bokeh-tables-3.6.2.min.js') }}"></script>
 
+    <!-- Leaflet Scripts -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='leaflet.css') }}">
+    <script src="{{ url_for('static', filename='leaflet.js') }}"></script>
 </head>
 <body>
   <!-- Header and Navigation -->
@@ -87,7 +90,14 @@
 	
       </div>
     </div>
-	
+
+    <!-- Leaflet GPS Map -->
+    <div class="plot-container my-4" id="leaflet-map-container">
+      <h2>Live GPS Map</h2>
+      <div id="leaflet-map"></div>
+      <div id="gps-flag">GPS unavailable</div>
+    </div>
+    
     <!-- Time Evolution -->
     <div class="plot-container my-4" id="plot-container">
       <h2> Time Evolution </h2>
@@ -116,6 +126,7 @@
     
     </div>
 
+<!-- Dashboard update -->
 <script>
     const auto_refresh = {{ auto_refresh }};
     let selectedMetrics = new Set(JSON.parse(localStorage.getItem("selectedMetrics")) || []);
@@ -251,6 +262,73 @@
     updateDashboard();
     populateDropdown();
 </script>
-    
+
+<!-- Leaflet Map JS -->
+<script>
+  const leafletMap = L.map('leaflet-map').setView([45.65, 13.78], 13);
+
+  L.tileLayer("/tiles/{z}/{x}/{y}.png", {
+    minZoom: 10,
+    maxZoom: 17,
+    tileSize: 256,
+    attribution: "Local tiles"
+  }).addTo(leafletMap);
+
+  const gpsMarker = L.circleMarker([0, 0], {
+    radius: 8,
+    color: "blue",
+    fillColor: "#3399ff",
+    fillOpacity: 0.8
+  }).addTo(leafletMap);
+
+  let gpsAutoFollow = true;
+
+  function updateGPS() {
+      fetch("/api/latest_gps")
+	  .then(response => response.ok ? response.json() : null)
+	  .then(data => {
+	      const flag = document.getElementById("gps-flag");
+	      
+	      if (!data || !data.lat || !data.lon) {
+		  flag.style.display = "block";
+		  return;
+	      }
+	      
+	      const lat = data.lat;
+	      const lon = data.lon;
+	      gpsMarker.setLatLng([lat, lon]);
+	      
+	      if (gpsAutoFollow) {
+		  leafletMap.panTo([lat, lon]);
+	      }
+	      
+	      flag.style.display = "none";
+	  })
+	  .catch(() => {
+	      // network/server error, treat as unavailable
+	      document.getElementById("gps-flag").style.display = "block";
+	  });
+  }
+
+  setInterval(updateGPS, 2000);
+  updateGPS();
+
+  leafletMap.on("movestart", () => gpsAutoFollow = false);
+
+  const recenterBtn = L.control({ position: 'topright' });
+  recenterBtn.onAdd = function () {
+    const btn = L.DomUtil.create('button', 'leaflet-bar');
+    btn.innerHTML = '⟳';
+    btn.style.padding = '4px 8px';
+    btn.style.cursor = 'pointer';
+    btn.title = 'Recenter GPS';
+    btn.onclick = () => {
+      gpsAutoFollow = true;
+    };
+    return btn;
+  };
+  recenterBtn.addTo(leafletMap);
+</script>
+
 </body>
 </html>
