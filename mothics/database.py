@@ -36,162 +36,118 @@ TRACK_SCHEMA = {
 }
 
 
-# Metadata extractors
-def extract_track_datetime(filepath: Path, data: Any) -> Dict[str, Any]:
-    """
-    Extracts the track date and time from the filename.
-    Expected filename format: something like "20250202-210230.json" or "track_2025-02-02T21-02-30.json".
-    Adjust the regex and parsing as needed.
-    """
-    pattern = r'(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}|\d{8}-\d{6})'
-    match = re.search(pattern, filepath.name)
-    if match:
-        dt_str = match.group(1)
-        try:
-            # If format is 20250202-210230, convert to a standard datetime string:
-            if "-" in dt_str and ":" not in dt_str:
-                dt = datetime.strptime(dt_str, '%Y%m%d-%H%M%S')
-            else:
-                # For format like 2025-02-02T21-02-30, replace '-' in time with ':'
-                dt_formatted = dt_str[:10] + " " + dt_str[11:].replace('-', ':')
-                dt = datetime.strptime(dt_formatted, '%Y-%m-%d %H:%M:%S')
-            return {"track_datetime": dt.isoformat()}
-        except ValueError as ve:
-            print(f"Date parsing error in file {filepath.name}: {ve}")
-    return {"track_datetime": None}
+class MetadataExtractor:
+    def __init__(self):
+        # Setup logger
+        self.logger = logging.getLogger("MetadataExtractor")
+        self.logger.info("-------------MetadataExtractor-------------")
 
-
-def extract_datapoint_count(filepath: Path, data: Any) -> Dict[str, Any]:
-    """
-    Count datapoints.
-    If the JSON is a list, then its length is the count.
-    Otherwise, try to get the count from a key.
-    """
-    if isinstance(data, list):
-        count = len(data)
-    elif isinstance(data, dict):
-        # Change "data" to the appropriate key if needed.
-        count = len(data.get("data", []))
-    else:
-        count = 0
-    return {"datapoint_count": count}
-
-
-def extract_remote_units(filepath: Path, data: Any) -> Dict[str, Any]:
-    """
-    Determines remote units available.
-    In your sample file, each datapoint has an "input_data" dict with keys like "rm2/wind/speed".
-    We split these keys on '/' and take the first element.
-    """
-    remote_units = set()
-    if isinstance(data, list) and data:
-        # Check if first element has "input_data"
-        first_dp = data[0]
-        if isinstance(first_dp, dict) and "input_data" in first_dp:
-            for key in first_dp["input_data"].keys():
-                unit = key.split("/")[0]
-                remote_units.add(unit)
-    elif isinstance(data, dict):
-        datapoints = data.get("data", [])
-        if datapoints and isinstance(datapoints[0], dict):
-            for key in datapoints[0].keys():
-                # Assume keys are separated by '_' if not using "input_data"
-                unit = key.split("_")[0]
-                remote_units.add(unit)
-    return {"remote_units": list(remote_units)}
-
-
-def extract_additional_metadata(filepath: Path, data: Any) -> Dict[str, Any]:
-    """
-    Extract additional metadata.
-    For a list, extract the keys common to all "input_data" dictionaries.
-    For a dict, extract the keys common to all datapoints in data['data'].
-    """
-    metadata = {}
-    if isinstance(data, list) and data:
-        # Ensure the datapoints have "input_data"
-        if "input_data" in data[0]:
-            common_keys = set(data[0]["input_data"].keys())
-            for dp in data[1:]:
-                if "input_data" in dp:
-                    common_keys.intersection_update(dp["input_data"].keys())
-            metadata["common_datapoint_keys"] = list(common_keys)
-    elif isinstance(data, dict):
-        datapoints = data.get("data", [])
-        if datapoints and isinstance(datapoints[0], dict):
-            common_keys = set(datapoints[0].keys())
-            for dp in datapoints[1:]:
-                common_keys.intersection_update(dp.keys())
-            metadata["common_datapoint_keys"] = list(common_keys)
-    return metadata
-
-def extract_track_duration(filepath, data) -> Dict[str, Any]:
-    """
-    Extracts the track duration from the first and last data point timestamps.
-    Assumes that each data point has a "timestamp" key in the format "%Y-%m-%d %H:%M:%S.%f".
-    Works whether the JSON is a list of datapoints or a dict with a "data" key.
-    """
-    # Define a helper function to parse a timestamp string
-    def parse_timestamp(ts_str):
-        try:
-            return datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S.%f")
-        except ValueError:
-            # If microseconds are missing, try without %f
-            return datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
-    
-    start_ts = None
-    end_ts = None
-    
-    # Case 1: JSON is a list of datapoints.
-    if isinstance(data, list) and data:
-        try:
-            start_ts = parse_timestamp(data[0].get("timestamp"))
-            end_ts = parse_timestamp(data[-1].get("timestamp"))
-        except Exception as e:
-            print(f"Error computing track duration for {filepath.name}: {e}")
-    
-    # Case 2: JSON is a dict with a "data" key.
-    elif isinstance(data, dict):
-        datapoints = data.get("data", [])
-        if datapoints:
+    def extract_track_datetime(self, filepath: Path, data: Any) -> Dict[str, Any]:
+        pattern = r'(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}|\d{8}-\d{6})'
+        match = re.search(pattern, filepath.name)
+        if match:
+            dt_str = match.group(1)
             try:
-                start_ts = parse_timestamp(datapoints[0].get("timestamp"))
-                end_ts = parse_timestamp(datapoints[-1].get("timestamp"))
-            except Exception as e:
-                print(f"Error computing track duration for {filepath.name}: {e}")
-    
-    # Compute duration if both timestamps were successfully parsed.
-    if start_ts and end_ts:
-        duration = (end_ts - start_ts).total_seconds()
-        return {"track_duration": duration}
-    
-    return {"track_duration": None}
+                if "-" in dt_str and ":" not in dt_str:
+                    dt = datetime.strptime(dt_str, '%Y%m%d-%H%M%S')
+                else:
+                    dt_formatted = dt_str[:10] + " " + dt_str[11:].replace('-', ':')
+                    dt = datetime.strptime(dt_formatted, '%Y-%m-%d %H:%M:%S')
+                return {"track_datetime": dt.isoformat()}
+            except ValueError as ve:
+                self.logger.warning(f"Date parsing error in file {filepath.name}: {ve}")
+        return {"track_datetime": None}
 
+    def extract_datapoint_count(self, filepath: Path, data: Any) -> Dict[str, Any]:
+        if isinstance(data, list):
+            count = len(data)
+        elif isinstance(data, dict):
+            count = len(data.get("data", []))
+        else:
+            count = 0
+        return {"datapoint_count": count}
 
-# Registry of extractor functions
-_metadata_extractors = {
-    'datetime': extract_track_datetime,
-    'duration': extract_track_duration,
-    'count': extract_datapoint_count,
-    'rm': extract_remote_units,
-    'other': extract_additional_metadata,
-}
+    def extract_remote_units(self, filepath: Path, data: Any) -> Dict[str, Any]:
+        remote_units = set()
+        if isinstance(data, list) and data:
+            first_dp = data[0]
+            if isinstance(first_dp, dict) and "input_data" in first_dp:
+                for key in first_dp["input_data"].keys():
+                    unit = key.split("/")[0]
+                    remote_units.add(unit)
+        elif isinstance(data, dict):
+            datapoints = data.get("data", [])
+            if datapoints and isinstance(datapoints[0], dict):
+                for key in datapoints[0].keys():
+                    unit = key.split("_")[0]
+                    remote_units.add(unit)
+        return {"remote_units": list(remote_units)}
 
-def extract_metadata_from_file(filepath: Path) -> Dict[str, Any]:
-    metadata = {"filename": filepath.name}
-    try:
-        with open(filepath, "r") as f:
-            data = json.load(f)
-    except Exception as e:
-        print(f"Error reading {filepath.name}: {e}")
+    def extract_additional_metadata(self, filepath: Path, data: Any) -> Dict[str, Any]:
+        metadata = {}
+        if isinstance(data, list) and data:
+            if "input_data" in data[0]:
+                common_keys = set(data[0]["input_data"].keys())
+                for dp in data[1:]:
+                    if "input_data" in dp:
+                        common_keys.intersection_update(dp["input_data"].keys())
+                metadata["common_datapoint_keys"] = list(common_keys)
+        elif isinstance(data, dict):
+            datapoints = data.get("data", [])
+            if datapoints and isinstance(datapoints[0], dict):
+                common_keys = set(datapoints[0].keys())
+                for dp in datapoints[1:]:
+                    common_keys.intersection_update(dp.keys())
+                metadata["common_datapoint_keys"] = list(common_keys)
         return metadata
 
-    for extractor in _metadata_extractors.values():
+    def extract_track_duration(self, filepath: Path, data: Any) -> Dict[str, Any]:
+        def parse_timestamp(ts_str):
+            try:
+                return datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S.%f")
+            except ValueError:
+                return datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+
+        start_ts = end_ts = None
         try:
-            metadata.update(extractor(filepath, data))
+            if isinstance(data, list) and data:
+                start_ts = parse_timestamp(data[0].get("timestamp"))
+                end_ts = parse_timestamp(data[-1].get("timestamp"))
+            elif isinstance(data, dict):
+                datapoints = data.get("data", [])
+                if datapoints:
+                    start_ts = parse_timestamp(datapoints[0].get("timestamp"))
+                    end_ts = parse_timestamp(datapoints[-1].get("timestamp"))
         except Exception as e:
-            print(f"Error in extractor {extractor.__name__} for {filepath.name}: {e}")
-    return metadata
+            self.logger.warning(f"Error computing track duration for {filepath.name}: {e}")
+
+        if start_ts and end_ts:
+            return {"track_duration": (end_ts - start_ts).total_seconds()}
+        return {"track_duration": None}
+
+    def extract_all(self, filepath: Path) -> Dict[str, Any]:
+        metadata = {"filename": filepath.name}
+        try:
+            with open(filepath, "r") as f:
+                data = json.load(f)
+        except Exception as e:
+            self.logger.warning(f"Error reading {filepath.name}: {e}")
+            return metadata
+
+        extractors = [
+            self.extract_track_datetime,
+            self.extract_track_duration,
+            self.extract_datapoint_count,
+            self.extract_remote_units,
+            self.extract_additional_metadata,
+        ]
+
+        for extractor in extractors:
+            try:
+                metadata.update(extractor(filepath, data))
+            except Exception as e:
+                self.logger.warning(f"Error in extractor {extractor.__name__} for {filepath.name}: {e}")
+        return metadata
 
 
 class Database:
@@ -204,6 +160,9 @@ class Database:
         self.tracks = []
         self.rm_thesaurus = rm_thesaurus
 
+        # Metadata extractor
+        self.extractor = MetadataExtractor()
+        
         # Setup logger
         self.logger = logging.getLogger("Database")
         self.logger.info("-------------Database-------------")
@@ -237,7 +196,7 @@ class Database:
         def process_file(file: Path, is_checkpoint: bool):
             """Helper to validate and process a JSON file."""
             if self.validate_json(file) or not self.validation:
-                meta = extract_metadata_from_file(file)
+                meta = self.extractor.extract_all(file)
                 meta["checkpoint"] = is_checkpoint
                 self.db.insert(meta)
                 self.tracks.append(meta)
