@@ -332,12 +332,16 @@ class SystemManager:
             self.webapp.restart_bokeh_server()
 
     def get_status(self):
+        if self.webapp:
+            bokeh_status = self.webapp.bokeh_thread
+        else:
+            bokeh_status = False
         return {
             "mode": self.mode,
             "communicator": "running" if self.communicator else "stopped",
             "aggregator": "running" if self.aggregator else "stopped",
             "webapp": "running" if self.webapp else "stopped",
-            "bokeh server": "running" if self.webapp.bokeh_thread else "stopped",
+            "bokeh server": "running" if bokeh_status else "stopped",
             "track": "active" if self.track else "not active",
             "database": "available" if self.database else "not initialized",
         }
