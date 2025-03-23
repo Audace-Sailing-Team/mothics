@@ -227,10 +227,15 @@
         let dropdownMenu = document.getElementById("cardSelectionMenu");
         dropdownMenu.innerHTML = ""; 
 
-        // Add "Select All / Unselect All" button
-        let selectAllItem = document.createElement("li");
-        selectAllItem.innerHTML = `<button id="selectAllBtn" class="dropdown-item">Select All</button>`;
-        dropdownMenu.appendChild(selectAllItem);
+	// Add "Select All" button
+	let selectAllItem = document.createElement("li");
+	selectAllItem.innerHTML = `<button id="selectAllBtn" class="dropdown-item">Select All</button>`;
+	dropdownMenu.appendChild(selectAllItem);
+	
+	// Add "Unselect All" button
+	let unselectAllItem = document.createElement("li");
+	unselectAllItem.innerHTML = `<button id="unselectAllBtn" class="dropdown-item">Unselect All</button>`;
+	dropdownMenu.appendChild(unselectAllItem);
 
         metrics.forEach(metric => {
             let isChecked = selectedMetrics.has(metric);
@@ -263,6 +268,16 @@
             });
             updateDashboard();
         });
+
+	// Unselect All Button
+	document.getElementById('unselectAllBtn').addEventListener('click', function () {
+	    selectedMetrics.clear();
+	    localStorage.setItem("selectedMetrics", JSON.stringify([...selectedMetrics]));
+	    dropdownMenu.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+		checkbox.checked = false;
+	    });
+	    updateDashboard();
+	});
     }
 
     // Button handlers for starting and stopping sampling
