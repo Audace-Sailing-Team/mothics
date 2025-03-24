@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, render_template, jsonify, request, Response, current_app, abort, send_file
 from bokeh.embed import server_document
 from ..bokeh_plots import PlotDispatcher
-from ..helpers import compute_status
+from ..helpers import compute_status, get_tile_zoom_levels
 
 monitor_bp = Blueprint('monitor', __name__)
 
@@ -63,13 +63,10 @@ def serve_tile(z, x, y):
 def gps_map():
     return render_template("gps_map.html")
 
-@monitor_bp.route("/api/latest_gps")
-def api_latest_gps():
+@monitor_bp.route("/api/gps_info")
+def gps_info():
     db = current_app.config['GETTERS']['database']()
-    if not db.data_points:
-        return jsonify({'error': 'no data'}), 204  # no content
-
-    latest = db.data_points[-1].to_dict()
+    latest = db.data_points[-1].to_dict() if db.data_points else {}
 
     lat_key = next((k for k in latest if k.endswith("/gps/lat")), None)
     lon_key = next((k for k in latest if k.endswith("/gps/long")), None)
@@ -79,11 +76,25 @@ def api_latest_gps():
     lon = latest.get(lon_key)
     speed = latest.get(spd_key) if spd_key else None
 
-    if lat is None or lon is None:
-        return jsonify({'error': 'no gps'}), 204
+    status_key = next((k for k in latest if k.endswith("/gps/status")), None)
+    gps_available = latest.get(status_key, False)
+
+    tile_dir = current_app.config['GPS_TILES_DIRECTORY']
+    min_zoom, max_zoom = get_tile_zoom_levels(tile_dir=tile_dir)
 
     return jsonify({
-        'lat': lat,
-        'lon': lon,
-        'speed': speed
+        "gps_available": gps_available,
+        "latest_position": {
+            "lat": lat,
+            "lon": lon,
+            "speed": speed
+        } if gps_available else None,
+        "zoom": {
+            "min": min_zoom,
+            "max": max_zoom
+        },
+        "speed_coloring": {
+            "thresholds": [1, 5, 15],
+            "colors": ["#3366cc", "#66cc66", "#ffcc00", "#cc3333"]
+        }
     })

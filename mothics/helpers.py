@@ -244,3 +244,9 @@ def list_required_tiles(lat_range, lon_range, zoom_levels):
                 tiles.append((z, x, y))
 
     return tiles                        
+
+def get_tile_zoom_levels(tile_dir="static/tiles"):
+    if not os.path.exists(tile_dir):
+        return 10, 17
+    zooms = [int(z) for z in os.listdir(tile_dir) if z.isdigit()]
+    return min(zooms), max(zooms) if zooms else (10, 17)
