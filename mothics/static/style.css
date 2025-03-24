@@ -286,3 +286,40 @@ input[type="range"].form-range::-moz-range-thumb {
     min-width: 10ch;      /* Room for e.g. "10s" or "30 min" */
     text-align: left;
 }
+
+.track-legend {
+  background: rgba(255, 255, 255, 0.9);
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  border-radius: 4px;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
+  min-width: 120px;
+  max-width: 160px;
+}
+
+.legend-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.legend-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-color {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #999;
+  border-radius: 2px;
+}
