@@ -93,7 +93,8 @@ def gps_info():
             "min": min_zoom,
             "max": max_zoom
         },
-        "speed_coloring": {
+        "track_coloring": {
+            "key": "speed",
             "thresholds": [1, 5, 15],
             "colors": ["#3366cc", "#66cc66", "#ffcc00", "#cc3333"]
         }
