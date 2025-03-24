@@ -19,7 +19,7 @@ from .blueprints.bp_database import database_bp
 
 
 class WebApp:
-    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data_cards=None, hidden_data_plots=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None, plot_mode='real-time'):
+    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data_cards=None, hidden_data_plots=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None, plot_mode='real-time', gps_tiles_directory=None):
         self.getters = getters or {}
         """Getter methods from other Mothics components"""
         self.setters = setters or {}
@@ -42,6 +42,8 @@ class WebApp:
         """Threshold to set remote unit as non communicative"""
         self.track_manager_directory = track_manager_directory
         """Database directory"""
+        self.gps_tiles_directory = gps_tiles_directory
+        """GPS tiles directory"""
         self.plot_mode = plot_mode
         """Data plot mode - `static` or `real-time`"""
         self.track_manager = None
@@ -75,7 +77,8 @@ class WebApp:
             'TRACK_MANAGER': self.track_manager,
             'LOGGER': self.logger,
             'PLOT_MODE': self.plot_mode,
-            'PLOT_REALTIME_URL': self.plot_realtime_url
+            'PLOT_REALTIME_URL': self.plot_realtime_url,
+            'GPS_TILES_DIRECTORY': self.gps_tiles_directory
         })
         
         # Start bokeh server

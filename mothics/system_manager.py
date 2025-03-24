@@ -252,7 +252,8 @@ class SystemManager:
                 hidden_data_plots=self.config["webapp"]["hidden_data_plots"],
                 timeout_offline=self.config["webapp"]["timeout_offline"],
                 timeout_noncomm=self.config["webapp"]["timeout_noncomm"],
-                track_manager_directory=self.config["files"]["output_dir"]
+                track_manager_directory=self.config["files"]["output_dir"],
+                gps_tiles_directory=self.config["files"]["tile_dir"]
             )
             self.webapp.run()
 
