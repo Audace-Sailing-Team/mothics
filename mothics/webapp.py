@@ -19,7 +19,7 @@ from .blueprints.bp_database import database_bp
 
 
 class WebApp:
-    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data_cards=None, hidden_data_plots=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None, plot_mode='real-time', gps_tiles_directory=None):
+    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data_cards=None, hidden_data_plots=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None, plot_mode='real-time', gps_tiles_directory=None, track_variable='speed', track_thresholds=None, track_colors=None, track_units=None):
         self.getters = getters or {}
         """Getter methods from other Mothics components"""
         self.setters = setters or {}
@@ -44,6 +44,14 @@ class WebApp:
         """Database directory"""
         self.gps_tiles_directory = gps_tiles_directory
         """GPS tiles directory"""
+        self.track_variable = track_variable
+        """Variable which determines GPS track coloring"""
+        self.track_thresholds = track_thresholds
+        """Variable thresholds at which GPS track coloring changes"""
+        self.track_colors = track_colors
+        """Colors for GPS track"""
+        self.track_units = track_units
+        """Units of measurement for variable in GPS track"""
         self.plot_mode = plot_mode
         """Data plot mode - `static` or `real-time`"""
         self.track_manager = None
@@ -78,7 +86,11 @@ class WebApp:
             'LOGGER': self.logger,
             'PLOT_MODE': self.plot_mode,
             'PLOT_REALTIME_URL': self.plot_realtime_url,
-            'GPS_TILES_DIRECTORY': self.gps_tiles_directory
+            'GPS_TILES_DIRECTORY': self.gps_tiles_directory,
+            'TRACK_VARIABLE': self.track_variable,
+            'TRACK_THRESHOLDS': self.track_thresholds,
+            'TRACK_COLORS': track_colors,
+            'TRACK_UNITS': track_units
         })
         
         # Start bokeh server
@@ -90,7 +102,8 @@ class WebApp:
             f"{hostname}:5000", f"{local_ip}:5000",
             "localhost:5006", "127.0.0.1:5006",
             f"{hostname}:5006", f"{local_ip}:5006",
-            "mothics.local:5000", "mothics.local:5006"
+            "mothics.local:5000", "mothics.local:5006",
+            "10.42.0.94:5000", "10.42.0.96:5006"
         ]
 
         if self.plot_mode == "real-time":
