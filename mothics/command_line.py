@@ -600,6 +600,103 @@ class MothicsCLI(Cmd):
 
         self.serial_threads = []  # Clear threads list
 
+    def do_scp(self, args):
+        """
+        Securely copy files to/from a remote machine.
+
+        Interactive usage (if no arguments):
+            1) The CLI will prompt you for mode: upload/download
+            2) Prompts for local path, remote user, remote host, remote path
+            3) Optionally prompt for additional scp flags (e.g. -r for recursive)
+            4) Constructs and executes the scp command
+
+        Direct usage:
+            scp <source> <destination> [options]
+
+        Examples:
+            scp local_file.txt user@192.168.42.1:/home/user/
+            scp user@192.168.42.10:/home/user/remote_file.txt .
+            scp -r folder/ user@192.168.42.1:/home/user/
+        """
+        if not args.strip():
+            mode = input("Are you uploading or downloading? [upload/download]: ").strip().lower()
+
+            if mode not in ["upload", "download"]:
+                self.print("Invalid choice, please enter 'upload' or 'download'.", level='error')
+                return
+
+            # Common inputs
+            remote_user = input("Enter remote username [default: pi]: ").strip()
+            if not remote_user:
+                remote_user = "mothics-user"
+
+            remote_host = input("Enter remote host (IP or hostname) [default: 192.168.42.1]: ").strip()
+            if not remote_host:
+                remote_host = "192.168.42.1"
+
+            extra_flags = input("Any additional scp flags? (e.g. -r): ").strip()
+
+            if mode == "upload":
+                # Upload => local path -> remote destination
+                local_path = input("Enter local file/folder path to upload: ").strip()
+                remote_path = input("Enter remote destination path [default: ~]: ").strip()
+                if not remote_path:
+                    remote_path = "~"
+
+                cmd = ["scp"]
+                if extra_flags:
+                    cmd.append(extra_flags)
+                cmd.append(local_path)
+                cmd.append(f"{remote_user}@{remote_host}:{remote_path}")
+
+            else:
+                # Download => remote source -> local path
+                remote_path = input("Enter remote file/folder path to download: ").strip()
+                local_path = input("Enter local destination path [default: .]: ").strip()
+                if not local_path:
+                    local_path = "."
+
+                cmd = ["scp"]
+                if extra_flags:
+                    cmd.append(extra_flags)
+                cmd.append(f"{remote_user}@{remote_host}:{remote_path}")
+                cmd.append(local_path)
+
+            # Flatten the command list into a string
+            scp_command = " ".join(cmd)
+            confirm = input(f"Ready to run: {scp_command}\nProceed? [Y/n]: ").strip().lower()
+            if confirm not in ["", "y", "yes"]:
+                self.print("SCP command cancelled.", level='warning')
+                return
+
+            try:
+                proc = subprocess.run(scp_command, shell=True, capture_output=True, text=True)
+                if proc.returncode == 0:
+                    print(proc.stdout)
+                    if proc.stderr:
+                        self.print(proc.stderr, level='info')
+                    self.print("SCP transfer completed.", level='success')
+                else:
+                    # Non-zero exit => error
+                    self.print(f"SCP error:\n{proc.stderr}", level='error')
+            except Exception as e:
+                self.print(f"Failed to run scp: {e}", level='error')
+
+        else:
+            # Direct usage with user-supplied args
+            cmd = ["scp"] + args.split()
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True)
+                if proc.returncode == 0:
+                    print(proc.stdout)
+                    if proc.stderr:
+                        self.print(proc.stderr, level='info')
+                    self.print("SCP transfer completed.", level='success')
+                else:
+                    self.print(f"SCP error:\n{proc.stderr}", level='error')
+            except Exception as e:
+                self.print(f"Failed to run scp: {e}", level='error')
+            
     def do_interface_refresh(self, args):
         """
         Refresh the communicator (re-connect new or disconnected interfaces).
@@ -683,6 +780,141 @@ class MothicsCLI(Cmd):
         except subprocess.CalledProcessError as e:
             self.print(f"Error detaching from tmux: {e}", level='error')        
 
+    def do_update(self, args):
+        """
+        Update the CLI from Git, or perform offline updates.
+
+        Usage:
+            update             - Check for updates and install if needed
+            update check       - Only check for updates
+            update install     - Only install updates via 'git pull'
+            update offline     - Perform offline update (export/import git bundles)
+        """
+        parts = args.strip().split()
+        mode = parts[0] if parts else "full"
+
+        if mode == "check":
+            self._check_updates()
+        elif mode == "install":
+            self._install_updates()
+        elif mode == "offline":
+            # Handle offline update (export/import)
+            if len(parts) < 2:
+                self.print("Usage: update offline <subcommand>", level='warning')
+                self.print("Available subcommands: export, import", level='info')
+                return
+
+            subcommand = parts[1].lower()
+            if subcommand == "export":
+                self._handle_offline_export(parts[2:])
+            elif subcommand == "import":
+                self._handle_offline_import(parts[2:])
+            else:
+                self.print(f"Unknown offline subcommand: {subcommand}", level='error')
+                self.print("Available subcommands: export, import", level='info')
+        elif mode == "full" or mode == "":
+            if self._check_updates():
+                self._install_updates()
+            else:
+                self.print("No update needed.", level='info')
+        else:
+            self.print(f"Unknown subcommand: {mode}", level='error')
+            self.print("Available subcommands: check, install, offline", level='info')
+
+    def _handle_offline_export(self, args):
+        """
+        Handles exporting a Git bundle for offline updates.
+
+        Usage:
+            export <filename> [--all]  - Export a git bundle
+            --all: Export all refs in the repository.
+        """
+        if len(args) < 1:
+            self.print("Please specify a filename for the Git bundle.", level='warning')
+            return
+
+        filename = args[0]
+        include_all = False
+        if len(args) > 1 and args[1] == "--all":
+            include_all = True
+        self._offline_export_bundle(filename, include_all)
+
+    def _handle_offline_import(self, args):
+        """
+        Handles importing a Git bundle and applying it to the specified branch.
+
+        Usage:
+            import <filename> <branch>  - Import a Git bundle into a specific branch.
+        """
+        if len(args) < 2:
+            self.print("Usage: import <filename> <branch>", level='warning')
+            return
+
+        bundle_file = args[0]
+        branch = args[1]
+        self._offline_import_bundle(bundle_file, branch)
+
+    def _offline_export_bundle(self, filename, include_all=False):
+        """
+        Creates a Git bundle containing commits from the local repository.
+        If include_all=True, it includes all refs (like a full mirror).
+        Otherwise, only the current branch HEAD is included.
+        """
+        try:
+            subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], check=True,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError:
+            self.print("Not in a valid Git repository.", level='error')
+            return
+
+        refs = []
+        if include_all:
+            refs = ["--all"]
+            self.print("Exporting all refs in the repository...", level='info')
+        else:
+            try:
+                current_branch = subprocess.check_output(["git", "branch", "--show-current"]).decode().strip()
+                refs = [current_branch]
+                self.print(f"Exporting only the current branch: {current_branch}", level='info')
+            except subprocess.CalledProcessError as e:
+                self.print(f"Could not detect current branch: {e}", level='error')
+                return
+
+        try:
+            cmd = ["git", "bundle", "create", filename] + refs
+            subprocess.run(cmd, check=True)
+            self.print(f"Git bundle created: {filename}", level='success')
+        except subprocess.CalledProcessError as e:
+            self.print(f"Failed to create bundle: {e}", level='error')
+
+    def _offline_import_bundle(self, bundle_file, branch):
+        """
+        Imports and applies commits from a Git bundle into the specified branch.
+        """
+        try:
+            subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], check=True,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError:
+            self.print("Not in a valid Git repository.", level='error')
+            return
+
+        self.print(f"Verifying bundle: {bundle_file}", level='info')
+        verify_proc = subprocess.run(["git", "bundle", "verify", bundle_file], capture_output=True, text=True)
+        if verify_proc.returncode != 0:
+            self.print(f"Bundle verification failed:\n{verify_proc.stderr}", level='error')
+            return
+
+        try:
+            cmd = ["git", "pull", bundle_file, branch]
+            self.print(f"Pulling from bundle into branch: {branch}", level='info')
+            pull_proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            print(pull_proc.stdout)
+            if pull_proc.stderr:
+                self.print(pull_proc.stderr, level='error')
+            self.print("Successfully imported offline updates.", level='success')
+        except subprocess.CalledProcessError as e:
+            self.print(f"Failed to pull from bundle: {e}", level='error')            
+
     def _install_updates(self):
         """Runs 'git pull' to install updates, and optionally restarts the CLI."""
         try:
@@ -700,7 +932,6 @@ class MothicsCLI(Cmd):
 
         except subprocess.CalledProcessError:
             self.print("Update failed. Check your Git settings or internet connection.", level='error')
-
             
     def _check_updates(self):
         """Check for updates"""
@@ -749,32 +980,7 @@ class MothicsCLI(Cmd):
                         
         except subprocess.CalledProcessError as e:
             self.print(f"Unable to check for updates: {e}", level='error')
-            return
-            
-    def do_update(self, args):
-        """
-        Update the CLI from Git.
-
-        Usage:
-            update             - Check for updates and install if needed
-            update check       - Only check for updates
-            update install     - Only install updates via 'git pull'
-        """
-        parts = args.strip().split()
-        mode = parts[0] if parts else "full"
-
-        if mode == "check":
-            self._check_updates()
-        elif mode == "install":
-            self._install_updates()
-        elif mode == "full" or mode == "":
-            if self._check_updates(return_status=True):
-                self._install_updates()
-            else:
-                self.print("No update needed.", level='info')
-        else:
-            self.print(f"Unknown subcommand: {mode}", level='error')
-            self.print("Available subcommands: check, install", level='info')
+            return            
 
     def _shutdown(self, confirm=True):
         """Safely shuts down the system with user confirmation."""
