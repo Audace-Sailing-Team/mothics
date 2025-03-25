@@ -80,6 +80,10 @@ def gps_info():
     gps_available = latest.get(status_key, False)
 
     tile_dir = current_app.config['GPS_TILES_DIRECTORY']
+    track_variable = current_app.config.get('TRACK_VARIABLE', 'speed')
+    track_thresholds = current_app.config.get('TRACK_THRESHOLDS', [1, 5, 15])
+    track_colors = current_app.config.get('TRACK_COLORS', ["#3366cc", "#66cc66", "#ffcc00", "#cc3333"])
+    track_units = current_app.config.get('TRACK_UNITS', None)
     min_zoom, max_zoom = get_tile_zoom_levels(tile_dir=tile_dir)
 
     return jsonify({
@@ -94,8 +98,9 @@ def gps_info():
             "max": max_zoom
         },
         "track_coloring": {
-            "key": "speed",
-            "thresholds": [1, 5, 15],
-            "colors": ["#3366cc", "#66cc66", "#ffcc00", "#cc3333"]
+            "key": track_variable,
+            "thresholds": track_thresholds,
+            "colors": track_colors,
+            "units": track_units
         }
     })

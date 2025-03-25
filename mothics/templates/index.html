@@ -431,9 +431,10 @@ fetch("/api/gps_info")
 
     // Accept dynamic coloring config
     if (config.track_coloring) {
-      trackColorKey = config.track_coloring.key ?? "speed";
-      colorThresholds = config.track_coloring.thresholds ?? colorThresholds;
-      colorPalette = config.track_coloring.colors ?? colorPalette;
+	trackColorKey = config.track_coloring.key ?? "speed";
+	colorThresholds = config.track_coloring.thresholds ?? colorThresholds;
+	colorPalette = config.track_coloring.colors ?? colorPalette;
+	trackColorUnits = config.track_coloring.units ?? "";
     }
 
     // Map init
@@ -490,7 +491,7 @@ function updateLegendHTML(container) {
     swatch.style.backgroundColor = colorPalette[i];
 
     const label = document.createElement("span");
-    label.textContent = `< ${colorThresholds[i]}`;
+    label.textContent = `< ${colorThresholds[i]} ${trackColorUnits}`;
 
     row.appendChild(swatch);
     row.appendChild(label);
@@ -504,7 +505,7 @@ function updateLegendHTML(container) {
   swatch.className = "legend-color";
   swatch.style.backgroundColor = colorPalette[colorPalette.length - 1];
   const label = document.createElement("span");
-  label.textContent = `≥ ${colorThresholds[colorThresholds.length - 1]}`;
+  label.textContent = `≥ ${colorThresholds[colorThresholds.length - 1]} ${trackColorUnits}`;
   row.appendChild(swatch);
   row.appendChild(label);
   entries.appendChild(row);

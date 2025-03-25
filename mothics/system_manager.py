@@ -77,7 +77,16 @@ DEFAULT_CONFIG = {
         },
         "data_thesaurus": None,
         "hidden_data_cards": None,
-        "hidden_data_plots": None
+        "hidden_data_plots": None,
+        "gps": {
+            "lat_range": [45.5, 45.8],
+            "lon_range": [13.5, 14.0],
+            "zoom_levels": [13, 14, 15],
+            "track_variable":'speed',
+            "track_thresholds": None,
+            "track_colors": None,
+            "track_units": 'm/s'
+        },
     },
     "cli": {
         "button_pin": 21,
@@ -166,9 +175,9 @@ class SystemManager:
             return
         
         # Get lat/long range from config 
-        lat_range = self.config["webapp"]["lat_range"]
-        lon_range = self.config["webapp"]["lon_range"]
-        zoom_levels = self.config["webapp"]["zoom_levels"]
+        lat_range = self.config["webapp"]["gps"]["lat_range"]
+        lon_range = self.config["webapp"]["gps"]["lon_range"]
+        zoom_levels = self.config["webapp"]["gps"]["zoom_levels"]
         output_dir = self.config["files"]["tile_dir"]
         os.makedirs(output_dir, exist_ok=True)
 
@@ -253,7 +262,11 @@ class SystemManager:
                 timeout_offline=self.config["webapp"]["timeout_offline"],
                 timeout_noncomm=self.config["webapp"]["timeout_noncomm"],
                 track_manager_directory=self.config["files"]["output_dir"],
-                gps_tiles_directory=self.config["files"]["tile_dir"]
+                gps_tiles_directory=self.config["files"]["tile_dir"],
+                track_variable=self.config["webapp"]["gps"]["track_variable"],
+                track_thresholds=self.config["webapp"]["gps"]["track_thresholds"],
+                track_colors=self.config["webapp"]["gps"]["track_colors"],
+                track_units=self.config["webapp"]["gps"]["track_units"]
             )
             self.webapp.run()
 
