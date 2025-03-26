@@ -39,6 +39,9 @@ def _export_base(data_points, filename, interval=None, field_names=None):
 
 def export_to_json(data_points, filename, interval=None, field_names=None):
     """Exports the database to a JSON file."""
+    if data_points is None:
+        raise RuntimeError("no data points to save.")
+    
     # Slice data_point list
     data_points_to_export = data_points
     if interval is not None:
@@ -49,6 +52,9 @@ def export_to_json(data_points, filename, interval=None, field_names=None):
 
 def export_to_csv(data_points, filename, interval=None, field_names=None):
     """Exports the database to a CSV file."""
+    if data_points is None:
+        raise RuntimeError("no data points to save.")
+    
     # Slice data_point list
     data_points_to_export = data_points
     if interval is not None:
@@ -63,6 +69,9 @@ def export_to_csv(data_points, filename, interval=None, field_names=None):
 
 def export_to_gpx(data_points, filename, interval=None):
     """Exports the track to a GPX file."""
+    if data_points is None:
+        raise RuntimeError("no data points to save.")
+    
     # Slice data_point list
     data_points_to_export = data_points
     if interval is not None:
@@ -100,7 +109,6 @@ def export_to_gpx(data_points, filename, interval=None):
 _export_methods = {'json': export_to_json, 'csv': export_to_csv, 'gpx': export_to_gpx}
 
 
-from traceback import format_exc
 # Track
 class Track:
     def __init__(self,
@@ -199,24 +207,7 @@ class Track:
             self.logger.info(f"saving track to {file_format}: {fname}")
         except Exception as e:
             self.logger.critical(f'error in saving track: {e}')
-            self.logger.critical(format_exc())
     
-    # def save(self, format='json', fname=None, interval=None):
-    #     """Save track on JSON or CSV file""" 
-    #     if fname is None:
-    #         fname = os.path.join(self.output_dir, f'{datetime.now().strftime("%Y%m%d-%H%M%S")}')
-    #     try:
-    #         if format == 'csv':
-    #             fname += '.csv'
-    #             self.export_to_csv(fname, interval=interval)
-    #             self.logger.info(f"saving track to CSV: {fname}")
-    #         else:
-    #             fname += '.json'
-    #             self.export_to_json(fname, interval=interval)
-    #             self.logger.info(f"saving track to JSON: {fname}")
-    #     except Exception as e:
-    #         self.logger.critical(f'error in saving track: {e}')
-
     def _remove_datapoints(self, start=0, fraction=0.1):
         """Remove data points from memory according to a specified percentage from a given starting point (i.e., point index).
 
@@ -291,34 +282,6 @@ class Track:
             if len(chk_files) > self.max_checkpoint_files:
                 # Delete the oldest file
                 os.remove(chk_files[0])
-
-    # def export_to_json(self, filename, interval=None):
-    #     """Exports the database to a JSON file."""
-    #     # Slice data_point list
-    #     data_points_to_export = self.data_points
-    #     if interval is not None:
-    #         data_points_to_export = self.data_points[interval]
-
-    #     with open(filename, mode='w') as jsonfile:
-    #         json.dump([asdict(dp) for dp in data_points_to_export], jsonfile, default=str, indent=4)
-
-    # def export_to_csv(self, filename, interval=None):
-    #     """Exports the database to a CSV file."""
-    #     if not self.data_points:
-    #         self.logger.critical("no data points to export.")
-    #         raise ValueError("no data points to export.")
-
-    #     # Slice data_point list
-    #     data_points_to_export = self.data_points
-    #     if interval is not None:
-    #         data_points_to_export = self.data_points[interval]
-
-    #     with open(filename, mode='w', newline='') as csvfile:
-    #         writer = csv.DictWriter(csvfile, fieldnames=['timestamp'] + self.field_names)
-    #         writer.writeheader()
-    #         for point in data_points_to_export:
-    #             row = {'timestamp': point.timestamp.isoformat(), **point.data}
-    #             writer.writerow(row)
 
     def add_point(self, timestamp: datetime, data: Dict[str, Any]):
         """Add a data point ensuring field consistency."""
