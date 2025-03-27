@@ -19,35 +19,33 @@
     <h1 class="mb-4">Tracks</h1>
 
     {% if tracks %}
-      <!-- Refresh All Tracks Button -->
-      <div class="mb-4">
-        <form action="{{ url_for('database.track_action') }}" method="POST" class="d-inline">
-          <button type="submit" name="action" value="refresh_all" class="btn btn-primary btn-sm">
-            <i class="fas fa-sync"></i> Refresh All Tracks
-          </button>
-        </form>
-      </div>
-
       <!-- Track Action Form -->
       <form action="{{ url_for('database.track_action') }}" method="POST" id="trackActionForm">
         <div class="card">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <div class="btn-group">
-              <!-- Delete button with confirmation -->
-              <button type="submit" name="action" value="delete" class="btn btn-danger btn-sm" id="deleteBtn"> 
-                Delete 
-              </button>
-
-              <!-- Export section -->
-              <select name="export_format" class="form-control form-control-sm mx-2" id="exportSelect">
-                <option value="">Select Export Format</option>
-                {% for format in export_methods %}
-                  <option value="{{ format }}">{{ format.upper() }}</option>
-                {% endfor %}
-              </select>
-              <button type="submit" name="action" value="export" class="btn btn-success btn-sm" id="exportBtn">
-                <i class="fas fa-file-export"></i> Export
-              </button>
+            <div class="d-flex">
+              <div class="btn-group me-3">
+                <button type="submit" name="action" value="refresh_all" class="btn btn-primary btn-sm">
+                  <i class="fas fa-sync"></i> Refresh All Tracks
+                </button>
+              </div>
+              <div class="btn-group">
+                <button type="submit" name="action" value="download" class="btn btn-info btn-sm" id="downloadBtn">
+                  <i class="fas fa-download"></i> Download
+                </button>
+                <button type="submit" name="action" value="delete" class="btn btn-danger btn-sm" id="deleteBtn"> 
+                  Delete 
+                </button>
+                <select name="export_format" class="form-control form-control-sm mx-2" id="exportSelect">
+                  <option value="">Select Export Format</option>
+                  {% for format in export_methods %}
+                    <option value="{{ format }}">{{ format.upper() }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" name="action" value="export" class="btn btn-success btn-sm" id="exportBtn">
+                  <i class="fas fa-file-export"></i> Export
+                </button>
+              </div>
             </div>
           </div>
 
@@ -127,44 +125,26 @@
       const form = document.getElementById("trackActionForm");
       const deleteBtn = document.getElementById("deleteBtn");
       const exportBtn = document.getElementById("exportBtn");
+      const downloadBtn = document.getElementById("downloadBtn");
 
       function getSelectedTracks() {
           return Array.from(document.querySelectorAll('input[name="track_id"]:checked'))
                       .map(input => input.value);
       }
 
-      function validateDelete(event) {
+      function validateAction(event, actionType) {
           const selectedTracks = getSelectedTracks();
           if (selectedTracks.length === 0) {
-              alert("Please select at least one track to delete.");
-              event.preventDefault();
-              return false;
-          }
-          if (!confirm(`Are you sure you want to delete ${selectedTracks.length} selected track(s)? This action cannot be undone.`)) {
+              alert(`Please select at least one track to ${actionType}.`);
               event.preventDefault();
               return false;
           }
           return true;
       }
 
-      function validateExport(event) {
-          const selectedTracks = getSelectedTracks();
-          const exportFormat = document.getElementById("exportSelect").value;
-          if (selectedTracks.length === 0) {
-              alert("Please select at least one track to export.");
-              event.preventDefault();
-              return false;
-          }
-          if (!exportFormat) {
-              alert("Please select an export format.");
-              event.preventDefault();
-              return false;
-          }
-          return true;
-      }
-
-      deleteBtn.addEventListener("click", validateDelete);
-      exportBtn.addEventListener("click", validateExport);
+      deleteBtn.addEventListener("click", (event) => validateAction(event, "delete"));
+      exportBtn.addEventListener("click", (event) => validateAction(event, "export"));
+      downloadBtn.addEventListener("click", (event) => validateAction(event, "download"));
   });
 </script>
 

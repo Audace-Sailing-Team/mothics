@@ -1,5 +1,8 @@
+import io
+import zipfile
+import os
 from datetime import datetime
-from flask import Blueprint, render_template, jsonify, request, Response, current_app, redirect, url_for, flash
+from flask import Blueprint, render_template, jsonify, request, Response, current_app, redirect, url_for, flash, send_file
 from ..database import Database
 
 
@@ -67,6 +70,11 @@ def track_action():
         flash(f"Exported {exported_count} track(s) to {export_format}.", "success")
         return redirect(url_for('database.tracks_view'))
 
+    # Download Track
+    elif action == "download":
+        return track_download(track_ids)
+
+    
     # Fallback for unexpected actions
     flash("Invalid action requested.", "warning")
     return redirect(url_for('database.tracks_view'))
@@ -122,3 +130,38 @@ def tracks_view():
         current_order=order,
         export_methods=db.export_methods
     )
+
+def track_download(track_ids):
+    """
+    Download selected tracks. If one track is selected, download it directly.
+    If multiple tracks are selected, package them into a ZIP.
+    """
+    db = current_app.config['TRACK_MANAGER']
+
+    # Get file paths of the selected tracks
+    file_paths = []
+    for track_id in track_ids:
+        track = next((t for t in db.tracks if t["filename"] == track_id), None)
+        track_path = os.path.join(db.directory, track['filename'])
+        if track['checkpoint']:
+            track_path = os.path.join(db.checkpoint_directory, track['filename'])
+        file_paths.append(os.path.join(current_app.config['INSTANCE_DIRECTORY'], track_path))
+            
+    if not file_paths:
+        flash("No valid tracks found.", "error")
+        return redirect(url_for('database.tracks_view'))
+
+    # Direct download for single file
+    if len(file_paths) == 1:
+        return send_file(file_paths[0], as_attachment=True)
+
+    # Zip multiple files
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for file_path in file_paths:
+            zip_file.write(file_path, os.path.basename(file_path))
+
+    zip_buffer.seek(0)
+    zip_fname = f'{datetime.now().strftime("%Y%m%d-%H%M%S")}.zip'
+    return send_file(zip_buffer, mimetype="application/zip", as_attachment=True, download_name=zip_fname)
+

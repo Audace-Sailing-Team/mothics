@@ -20,13 +20,11 @@ from .blueprints.bp_database import database_bp
 
 
 class WebApp:
-    def __init__(self, getters=None, setters=None, out_dir=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data_cards=None, hidden_data_plots=None, timeout_offline=60, timeout_noncomm=30, track_manager=None, track_manager_directory=None, plot_mode='real-time', gps_tiles_directory=None, track_variable='speed', track_thresholds=None, track_colors=None, track_units=None):
+    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data_cards=None, hidden_data_plots=None, timeout_offline=60, timeout_noncomm=30, track_manager=None, track_manager_directory=None, plot_mode='real-time', gps_tiles_directory=None, track_variable='speed', track_thresholds=None, track_colors=None, track_units=None, out_dir=None, instance_dir=None):
         self.getters = getters or {}
         """Getter methods from other Mothics components"""
         self.setters = setters or {}
         """Setter methods for settings, etc..."""
-        self.out_dir = out_dir
-        """Main output directory"""
         self.logger_fname = logger_fname
         """Logger filename"""
         self.auto_refresh_table = auto_refresh_table * 1000  # milliseconds
@@ -57,6 +55,10 @@ class WebApp:
         """Colors for GPS track"""
         self.track_units = track_units
         """Units of measurement for variable in GPS track"""
+        self.out_dir = out_dir
+        """Output directory"""
+        self.instance_dir = instance_dir
+        """Main process directory"""
         self.plot_mode = plot_mode
         """Data plot mode - `static` or `real-time`"""
         
@@ -77,6 +79,7 @@ class WebApp:
         self.app.config.update({
             'GETTERS': self.getters,
             'SETTERS': self.setters,
+            'INSTANCE_DIRECTORY': self.instance_dir,
             'AUTO_REFRESH_TABLE': self.auto_refresh_table,
             'RM_THESAURUS': self.rm_thesaurus,
             'DATA_THESAURUS': self.data_thesaurus,

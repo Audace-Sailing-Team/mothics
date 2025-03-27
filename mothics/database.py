@@ -156,6 +156,7 @@ class Database:
     def __init__(self, directory, db_fname="tracks_metadata.json", rm_thesaurus=None, validation=True):
         self.directory = Path(directory)
         """Database path."""
+        self.checkpoint_directory = self.directory / "chk"
         self.db_fname = db_fname
         """Database file name."""
         self.validation = validation
@@ -194,7 +195,7 @@ class Database:
             self.logger.warning(f"validation error in {filepath.name}: {e}")
             return False
 
-    def load_tracks(self):
+    def load_tracks(self, load_exports=True):
         """
         Scan the directory for JSON files, including files in the 'chk' subdirectory.
         Validate each JSON file before extracting metadata and storing it in TinyDB.
@@ -203,11 +204,12 @@ class Database:
         self.db.truncate()
         self.tracks = []
 
-        def process_file(file: Path, is_checkpoint: bool):
+        def process_file(fname: Path, is_checkpoint: bool):
             """Helper to validate and process a JSON file."""
-            if self.validate_json(file) or not self.validation:
-                meta = self.extractor.extract_all(file)
+            if self.validate_json(fname) or not self.validation:
+                meta = self.extractor.extract_all(fname)
                 meta["checkpoint"] = is_checkpoint
+                meta["filepath"] = fname
                 self.db.insert(meta)
                 self.tracks.append(meta)
             else:
@@ -222,10 +224,9 @@ class Database:
             process_file(fname, is_checkpoint)
 
         # Process 'chk' subdirectory JSON files
-        chk_dir = self.directory / "chk"
-        if chk_dir.exists() and chk_dir.is_dir():
-            for fname in chk_dir.glob("*.chk.json"):
-                process_file(fname, is_checkpoint=True)        
+        if self.checkpoint_directory.exists() and self.checkpoint_directory.is_dir():
+            for fname in self.checkpoint_directory.glob("*.chk.json"):
+                process_file(fname, is_checkpoint=True)
             
     def list_tracks(self) -> List[Dict[str, Any]]:
         """
