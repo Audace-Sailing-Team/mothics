@@ -1,127 +1,171 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <h1>Available Tracks</h1>
-
-  {% if tracks %}
-    <table class="table table-striped mt-4">
-      <thead>
-        <tr>
-          <th>Index</th>
-          <th>
-            <a href="{{ url_for('database.tracks_view', sort_by='filename', order='desc' if current_sort=='filename' and current_order=='asc' else 'asc') }}">
-              Filename
-              {% if current_sort == 'filename' %}
-                {% if current_order == 'asc' %}
-                  &#9650;
-                {% else %}
-                  &#9660;
-                {% endif %}
-              {% endif %}
-            </a>
-          </th>
-          <th>
-            <a href="{{ url_for('database.tracks_view', sort_by='track_datetime', order='desc' if current_sort=='track_datetime' and current_order=='asc' else 'asc') }}">
-              Date/Time
-              {% if current_sort == 'track_datetime' %}
-                {% if current_order == 'asc' %}
-                  &#9650;
-                {% else %}
-                  &#9660;
-                {% endif %}
-              {% endif %}
-            </a>
-          </th>
-          <th>
-            <a href="{{ url_for('database.tracks_view', sort_by='checkpoint', order='desc' if current_sort=='checkpoint' and current_order=='asc' else 'asc') }}">
-              Checkpoint
-              {% if current_sort == 'checkpoint' %}
-                {% if current_order == 'asc' %}
-                  &#9650;
-                {% else %}
-                  &#9660;
-                {% endif %}
-              {% endif %}
-            </a>
-          </th>
-          <th>
-            <a href="{{ url_for('database.tracks_view', sort_by='track_duration', order='desc' if current_sort=='track_duration' and current_order=='asc' else 'asc') }}">
-              Duration
-              {% if current_sort == 'track_duration' %}
-                {% if current_order == 'asc' %}
-                  &#9650;
-                {% else %}
-                  &#9660;
-                {% endif %}
-              {% endif %}
-            </a>
-          </th>
-          <th>
-            <a href="{{ url_for('database.tracks_view', sort_by='datapoint_count', order='desc' if current_sort=='datapoint_count' and current_order=='asc' else 'asc') }}">
-              Data Points
-              {% if current_sort == 'datapoint_count' %}
-                {% if current_order == 'asc' %}
-                  &#9650;
-                {% else %}
-                  &#9660;
-                {% endif %}
-              {% endif %}
-            </a>
-          </th>
-          <th>
-            <a href="{{ url_for('database.tracks_view', sort_by='remote_units', order='desc' if current_sort=='remote_units' and current_order=='asc' else 'asc') }}">
-              Remote Units
-              {% if current_sort == 'remote_units' %}
-                {% if current_order == 'asc' %}
-                  &#9650;
-                {% else %}
-                  &#9660;
-                {% endif %}
-              {% endif %}
-            </a>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for track in tracks %}
-          <tr>
-            <td>{{ loop.index0 }}</td>
-            <td>{{ track.filename }}</td>
-            <td>{{ track.track_datetime or "N/A" }}</td>
-            <td>{{ track.checkpoint }}</td>
-            <td>
-              {% if track.track_duration %}
-                {% set seconds = track.track_duration | int %}
-                {% set hours = seconds // 3600 %}
-                {% set remainder = seconds % 3600 %}
-                {% set minutes = remainder // 60 %}
-                {% set secs = remainder % 60 %}
-                {{ hours }}h {{ minutes }}m {{ secs }}s
-              {% else %}
-                N/A
-              {% endif %}
-            </td>
-            <td>{{ track.datapoint_count or "N/A" }}</td>
-            <td>
-              {% if track.remote_units %}
-                {% set thesaurized_units = [] %}
-                {% for rm in track.remote_units %}
-                  {% if rm_thesaurus and rm in rm_thesaurus %}
-                    {% set _ = thesaurized_units.append(rm_thesaurus[rm]) %}
-                  {% else %}
-                    {% set _ = thesaurized_units.append(rm) %}
-                  {% endif %}
-                {% endfor %}
-                {{ thesaurized_units | join(", ") }}
-              {% else %}
-                N/A
-              {% endif %}
-            </td>
-          </tr>
+  <div class="container">
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
         {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>No tracks available.</p>
-  {% endif %}
+      {% endif %}
+    {% endwith %}
+
+    <h1 class="mb-4">Tracks</h1>
+
+    {% if tracks %}
+      <!-- Refresh All Tracks Button -->
+      <div class="mb-4">
+        <form action="{{ url_for('database.track_action') }}" method="POST" class="d-inline">
+          <button type="submit" name="action" value="refresh_all" class="btn btn-primary btn-sm">
+            <i class="fas fa-sync"></i> Refresh All Tracks
+          </button>
+        </form>
+      </div>
+
+      <!-- Track Action Form -->
+      <form action="{{ url_for('database.track_action') }}" method="POST" id="trackActionForm">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="btn-group">
+              <!-- Delete button with confirmation -->
+              <button type="submit" name="action" value="delete" class="btn btn-danger btn-sm" id="deleteBtn"> 
+                Delete 
+              </button>
+
+              <!-- Export section -->
+              <select name="export_format" class="form-control form-control-sm mx-2" id="exportSelect">
+                <option value="">Select Export Format</option>
+                {% for format in export_methods %}
+                  <option value="{{ format }}">{{ format.upper() }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" name="action" value="export" class="btn btn-success btn-sm" id="exportBtn">
+                <i class="fas fa-file-export"></i> Export
+              </button>
+            </div>
+          </div>
+
+          <!-- Track Table -->
+          <div class="table-responsive">
+            <table class="table table-striped table-hover">
+              <thead>
+                <tr>
+                  <th>Index</th>
+                  {% for column in ['filename', 'track_datetime', 'checkpoint', 'track_duration', 'datapoint_count', 'remote_units'] %}
+                    <th>
+                      <a href="{{ url_for('database.tracks_view', 
+                                          sort_by=column, 
+                                          order='desc' if current_sort==column and current_order=='asc' else 'asc') }}">
+                        {{ column.replace('_', ' ').title() }}
+                        {% if current_sort == column %}
+                          <i class="fas {{ 'fa-sort-up' if current_order == 'asc' else 'fa-sort-down' }}"></i>
+                        {% endif %}
+                      </a>
+                    </th>
+                  {% endfor %}
+                  <th>Select</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for track in tracks %}
+                  <tr>
+                    <td>{{ loop.index0 }}</td>
+                    <td>{{ track.filename }}</td>
+                    <td>{{ track.track_datetime or "N/A" }}</td>
+                    <td>{{ track.checkpoint }}</td>
+                    <td>
+                      {% if track.track_duration %}
+                        {% set seconds = track.track_duration | int %}
+                        {% set hours = seconds // 3600 %}
+                        {% set remainder = seconds % 3600 %}
+                        {% set minutes = remainder // 60 %}
+                        {% set secs = remainder % 60 %}
+                        {{ hours }}h {{ minutes }}m {{ secs }}s
+                      {% else %}
+                        N/A
+                      {% endif %}
+                    </td>
+                    <td>{{ track.datapoint_count or "N/A" }}</td>
+                    <td>
+                      {% if track.remote_units %}
+                        {% set thesaurized_units = [] %}
+                        {% for rm in track.remote_units %}
+                          {% if rm_thesaurus and rm in rm_thesaurus %}
+                            {% set _ = thesaurized_units.append(rm_thesaurus[rm]) %}
+                          {% else %}
+                            {% set _ = thesaurized_units.append(rm) %}
+                          {% endif %}
+                        {% endfor %}
+                        {{ thesaurized_units | join(", ") }}
+                      {% else %}
+                        N/A
+                      {% endif %}
+                    </td>
+                    <td>
+                      <input type="checkbox" name="track_id" value="{{ track.filename }}">
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </form>
+    {% else %}
+      <div class="alert alert-info">No tracks available.</div>
+    {% endif %}
+  </div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+      const form = document.getElementById("trackActionForm");
+      const deleteBtn = document.getElementById("deleteBtn");
+      const exportBtn = document.getElementById("exportBtn");
+
+      function getSelectedTracks() {
+          return Array.from(document.querySelectorAll('input[name="track_id"]:checked'))
+                      .map(input => input.value);
+      }
+
+      function validateDelete(event) {
+          const selectedTracks = getSelectedTracks();
+          if (selectedTracks.length === 0) {
+              alert("Please select at least one track to delete.");
+              event.preventDefault();
+              return false;
+          }
+          if (!confirm(`Are you sure you want to delete ${selectedTracks.length} selected track(s)? This action cannot be undone.`)) {
+              event.preventDefault();
+              return false;
+          }
+          return true;
+      }
+
+      function validateExport(event) {
+          const selectedTracks = getSelectedTracks();
+          const exportFormat = document.getElementById("exportSelect").value;
+          if (selectedTracks.length === 0) {
+              alert("Please select at least one track to export.");
+              event.preventDefault();
+              return false;
+          }
+          if (!exportFormat) {
+              alert("Please select an export format.");
+              event.preventDefault();
+              return false;
+          }
+          return true;
+      }
+
+      deleteBtn.addEventListener("click", validateDelete);
+      exportBtn.addEventListener("click", validateExport);
+  });
+</script>
+
 {% endblock %}
