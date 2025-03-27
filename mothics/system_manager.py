@@ -253,7 +253,6 @@ class SystemManager:
             self.webapp = WebApp(
                 getters=getters,
                 setters=setters,
-                out_dir=self.config["files"]["output_dir"],
                 auto_refresh_table=self.config["webapp"]["data_refresh"],
                 logger_fname=self.config["files"]["logger_fname"],
                 rm_thesaurus=self.config["webapp"]["rm_thesaurus"],
@@ -268,7 +267,9 @@ class SystemManager:
                 track_variable=self.config["webapp"]["gps"]["track_variable"],
                 track_thresholds=self.config["webapp"]["gps"]["track_thresholds"],
                 track_colors=self.config["webapp"]["gps"]["track_colors"],
-                track_units=self.config["webapp"]["gps"]["track_units"]
+                track_units=self.config["webapp"]["gps"]["track_units"],
+                instance_dir=os.path.dirname(sys.modules['__main__'].__file__),
+                out_dir=self.config["files"]["output_dir"]
             )
             self.webapp.run()
 
