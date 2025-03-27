@@ -1,3 +1,4 @@
+import secrets
 import socket
 import os
 import requests
@@ -19,11 +20,13 @@ from .blueprints.bp_database import database_bp
 
 
 class WebApp:
-    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data_cards=None, hidden_data_plots=None, timeout_offline=60, timeout_noncomm=30, track_manager_directory=None, plot_mode='real-time', gps_tiles_directory=None, track_variable='speed', track_thresholds=None, track_colors=None, track_units=None):
+    def __init__(self, getters=None, setters=None, out_dir=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data_cards=None, hidden_data_plots=None, timeout_offline=60, timeout_noncomm=30, track_manager=None, track_manager_directory=None, plot_mode='real-time', gps_tiles_directory=None, track_variable='speed', track_thresholds=None, track_colors=None, track_units=None):
         self.getters = getters or {}
         """Getter methods from other Mothics components"""
         self.setters = setters or {}
         """Setter methods for settings, etc..."""
+        self.out_dir = out_dir
+        """Main output directory"""
         self.logger_fname = logger_fname
         """Logger filename"""
         self.auto_refresh_table = auto_refresh_table * 1000  # milliseconds
@@ -40,6 +43,8 @@ class WebApp:
         """Threshold to set remote unit as offline"""
         self.timeout_noncomm = timeout_noncomm
         """Threshold to set remote unit as non communicative"""
+        self.track_manager = track_manager
+        """Database instance"""
         self.track_manager_directory = track_manager_directory
         """Database directory"""
         self.gps_tiles_directory = gps_tiles_directory
@@ -54,7 +59,6 @@ class WebApp:
         """Units of measurement for variable in GPS track"""
         self.plot_mode = plot_mode
         """Data plot mode - `static` or `real-time`"""
-        self.track_manager = None
         
         # Setup logger
         self.setup_logging()
@@ -108,10 +112,13 @@ class WebApp:
 
         if self.plot_mode == "real-time":
             self.start_bokeh_server()
-    
+
+        # Setup secret key
+        self.setup_secret_key()
+            
         # Setup routes
         self.setup_routes()
-
+        
     def setup_logging(self):
         # Silence Tornado
         for tlog in [access_log, app_log, gen_log]:
@@ -197,6 +204,48 @@ class WebApp:
         time.sleep(1)  # Give time for port to release
         self.start_bokeh_server()
 
+    def setup_secret_key(self):
+        """
+        Configure a secure secret key for Flask sessions and security.
+        
+        Priority for secret key sources:
+        1. Environment variable (most secure)
+        2. Instance-specific file
+        3. Generated secure random key (fallback)
+        """
+        # Get path
+        instance_path = os.path.join(self.out_dir, 'instance')
+        os.makedirs(instance_path, exist_ok=True)
+        secret_key_path = os.path.join(instance_path, 'secret_key')
+
+        # Try environment variable first
+        secret_key = os.environ.get('FLASK_SECRET_KEY')
+
+        # If no environment variable, try reading from file
+        if not secret_key and os.path.exists(secret_key_path):
+            with open(secret_key_path, 'r') as f:
+                secret_key = f.read().strip()
+
+        # If no existing key, generate a new one
+        if not secret_key:
+            secret_key = secrets.token_hex(32)  # 256-bit key
+            
+            # Save generated key to file for persistence
+            with open(secret_key_path, 'w') as f:
+                f.write(secret_key)
+            
+            # Secure the file
+            os.chmod(secret_key_path, 0o600)  # Read/write for owner only
+
+        # Configure the app with the secret key
+        self.app.secret_key = secret_key
+
+        # Additional security configurations
+        self.app.config.update(
+            SESSION_COOKIE_SECURE=True,  # Only send cookie over HTTPS
+            SESSION_COOKIE_HTTPONLY=True,  # Prevent JavaScript access to session cookie
+            SESSION_COOKIE_SAMESITE='Lax',  # Protect against CSRF
+        )
         
     def setup_routes(self):
         # Register the monitoring blueprint (and others if created)

@@ -15,6 +15,8 @@ from tinydb.middlewares import CachingMiddleware
 from jsonschema import validate, ValidationError
 
 from .helpers import format_duration
+from .track import _export_methods, Track
+
 
 # Validation schema
 TRACK_SCHEMA = {
@@ -160,6 +162,8 @@ class Database:
         """Require track validation on insertion in database"""
         self.rm_thesaurus = rm_thesaurus
         """Aliases for remote unit names"""
+        self.export_methods = _export_methods
+        """Export functions for tracks"""
         
         # Initialize TinyDB with caching middleware for better performance.
         self.db = TinyDB(os.path.join(self.directory, db_fname),
@@ -220,8 +224,8 @@ class Database:
         # Process 'chk' subdirectory JSON files
         chk_dir = self.directory / "chk"
         if chk_dir.exists() and chk_dir.is_dir():
-            for file in chk_dir.glob("*.chk.json"):
-                process_file(file, is_checkpoint=True)        
+            for fname in chk_dir.glob("*.chk.json"):
+                process_file(fname, is_checkpoint=True)        
             
     def list_tracks(self) -> List[Dict[str, Any]]:
         """
@@ -233,7 +237,7 @@ class Database:
             self.logger.warning("no tracks available.")
             return []
 
-        # Prepare tabular data.
+        # Prepare tabular data
         table_data = []
         for i, track in enumerate(self.tracks):
             # Skip database file
@@ -253,7 +257,7 @@ class Database:
                 ", ".join(thesaurized_units)
             ])
 
-        # Define headers.
+        # Define headers
         headers = ["Index", "Filename", "Date/Time", "Checkpoint", "Duration", "Data Points", "Remote Units"]
 
         # Print table using github format.
@@ -271,23 +275,23 @@ class Database:
         self.logger.warning("invalid track index")
         return {}
 
-    def get_track_path(self, identifier: Union[int, str]) -> Optional[Path]:
+    def get_track_path(self, track_id: Union[int, str]) -> Optional[Path]:
         """
         Return full path for the selected track, identified by index or filename.
         If the track is a checkpoint, check both the main directory and 'chk' subdirectory.
         """
         self.tracks = self.db.all()
 
-        if isinstance(identifier, int):  # Lookup by index
-            if 0 <= identifier < len(self.tracks):
-                track = self.tracks[identifier]
+        if isinstance(track_id, int):  # Lookup by index
+            if 0 <= track_id < len(self.tracks):
+                track = self.tracks[track_id]
             else:
                 self.logger.warning("invalid track index")
                 return None
-        elif isinstance(identifier, str):  # Lookup by filename
-            track = next((t for t in self.tracks if t["filename"] == identifier), None)
+        elif isinstance(track_id, str):  # Lookup by filename
+            track = next((t for t in self.tracks if t["filename"] == track_id), None)
             if not track:
-                self.logger.warning(f"track with filename '{identifier}' not found in DB")
+                self.logger.warning(f"track with filename '{track_id}' not found in DB")
                 return None
         else:
             self.logger.warning("invalid identifier type")
@@ -317,3 +321,79 @@ class Database:
         self.db.update(new_metadata, Track.filename == filename)
         # Reflect the update in our local list as well.
         self.tracks = self.db.all()
+        
+    def export_track(self, track_id: Union[int, str], export_format: str):
+        """
+        Export the specified track to a different format by:
+         1) Finding the original track JSON on disk
+         2) Creating a temporary Track object
+         3) Exporting it via the Track's export method
+
+        :param track_id: The track filename (as stored in the DB) to export
+        :param export_format: The format to export to (e.g. 'csv', 'json', etc.)
+        """
+        # Fetch JSON
+        track_path = self.get_track_path(track_id)
+        if not track_path:
+            msg = f"track {track_id} not found in the file system."
+            self.logger.warning(msg)
+            return msg
+
+        # Create temporary Track
+        temp_track = Track(output_dir=self.directory)
+
+        # Load JSON data temp Track
+        try:
+            temp_track.load(track_path.as_posix())
+        except Exception as e:
+            msg = f"Error loading track {track_id}: {e}"
+            self.logger.warning(msg)
+            return msg
+
+        # Export data
+        export_fname, _ = os.path.splitext(os.path.basename(track_path))
+        try:
+            temp_track.save(file_format=export_format, fname=export_fname)
+        except Exception as e:
+            msg = f"Error exporting track {track_id} to {export_format}: {e}"
+            self.logger.critical(msg)
+            return msg
+
+        # Close temp Track
+        del temp_track
+
+    def remove_track(self, track_id: Union[int, str], delete_from_disk: bool=False):
+        """
+        Remove a track from the database, with an optional flag to delete the file from disk.
+
+        :param identifier: Track identifier (index or filename)
+        :param delete_from_disk: If True, physically delete the track file
+        :return: Boolean indicating whether the track was successfully removed
+        """
+        # Find the track path first
+        track_path = self.get_track_path(track_id)
+        if not track_path:
+            self.logger.critical(f"cannot remove track: track {track_id} not found")
+            raise RuntimeError(f"cannot remove track: track {track_id} not found")
+
+        # Remove from database
+        Track = Query()
+        removal_count = self.db.remove(Track.filename == track_path.name)
+
+        if removal_count == 0:
+            self.logger.critical(f"no database entries found for track {track_id}")
+            raise RuntimeError(f"no database entries found for track {track_id}")
+
+        # Refresh tracks list
+        self.tracks = self.db.all()
+
+        # Optionally delete from disk
+        if delete_from_disk:
+            try:
+                os.remove(track_path)
+                self.logger.info(f"deleted track file: {track_path}")
+            except [Exception, OSError] as e:
+                self.logger.critical(f"error deleting track file {track_path}: {e}")
+                raise RuntimeError(f"error deleting track file {track_path}: {e}")
+            
+        self.logger.info(f"successfully removed track: {track_path.name}")

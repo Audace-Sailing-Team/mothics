@@ -60,11 +60,18 @@ def export_to_csv(data_points, filename, interval=None, field_names=None):
     if interval is not None:
         data_points_to_export = data_points[interval]
 
+    # Generate field names if not provided or invalid
+    if not field_names:
+        # NOTE: not the best way to proceed, but it works
+        #       ideally, a "get_fields" method should be implemented
+        #       in DataPoint
+        field_names = list(data_points_to_export[0].input_data.keys())
+        
     with open(filename, mode='w', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=['timestamp'] + field_names)
         writer.writeheader()
         for point in data_points_to_export:
-            row = {'timestamp': point.timestamp.isoformat(), **point.data}
+            row = {'timestamp': point.timestamp.isoformat(), **point.input_data}
             writer.writerow(row)
 
 def export_to_gpx(data_points, filename, interval=None):
@@ -81,19 +88,23 @@ def export_to_gpx(data_points, filename, interval=None):
     gpx = ET.Element("gpx", version="1.1", creator="TrackExporter")
     
     # Metadata (creator, time, etc.)
-    # metadata = ET.SubElement(gpx, "metadata")
-    # name = ET.SubElement(metadata, "name")
-    # name.text = "Track Export"
-    # desc = ET.SubElement(metadata, "desc")
-    # desc.text = "Exported track data"
+    metadata = ET.SubElement(gpx, "metadata")
+    name = ET.SubElement(metadata, "name")
+    name.text = "Mothics Track export"
+    desc = ET.SubElement(metadata, "desc")
+    desc.text = "Exported track data generated using Mothics"
     
     # Add a track (trk)
     trk = ET.SubElement(gpx, "trk")
     trkseg = ET.SubElement(trk, "trkseg")  # Track segment
 
     for dp in data_points_to_export:
-        lat = dp.input_data.get('lat')
-        lon = dp.input_data.get('lon')
+        # Get lat, lon keys
+        lat_key = next((key for key in dp.input_data if key.endswith('lat')), None)
+        lon_key = next((key for key in dp.input_data if key.endswith('lon') or key.endswith('long')), None)
+        
+        lat = dp.input_data.get(lat_key)
+        lon = dp.input_data.get(lon_key)
 
         if lat is None or lon is None:
             continue
@@ -182,14 +193,17 @@ class Track:
         self.data_points = [DataPoint(datetime.fromisoformat(dp["timestamp"]), dp["input_data"]) for dp in data]
         self.mode = 'replay'
         
-    def save(self, file_format='json', fname=None, interval=None):
+    def save(self, file_format='json', fname=None, output_dir=None, interval=None):
         """
         Save track on JSON or CSV file.
         Note: `file_format` must coincide with the file extension
         """
-        # File name
+        # File name and directory
         if fname is None:
-            fname = os.path.join(self.output_dir, f'{datetime.now().strftime("%Y%m%d-%H%M%S")}')
+            fname = f'{datetime.now().strftime("%Y%m%d-%H%M%S")}'
+
+        if output_dir is None:
+            output_dir = self.output_dir
             
         # Strategy - check if file_format is key in export_methods
         if file_format in self.export_methods:
@@ -202,11 +216,13 @@ class Track:
         
         # Export
         try:
-            filename = fname + file_format
-            export(self.data_points, filename, interval=interval)
-            self.logger.info(f"saving track to {file_format}: {fname}")
+            file_path = os.path.join(output_dir, fname + '.' + file_format)
+            export(self.data_points, file_path, interval=interval)
+            self.logger.info(f"saving track to {file_format}: {file_path}")
         except Exception as e:
+            import traceback
             self.logger.critical(f'error in saving track: {e}')
+            print(traceback.format_exc())
     
     def _remove_datapoints(self, start=0, fraction=0.1):
         """Remove data points from memory according to a specified percentage from a given starting point (i.e., point index).
@@ -248,10 +264,11 @@ class Track:
             # Generate slice and save track
             interval = slice(self._save_interval_start, len(self.data_points) - 1)
             self.save(interval=interval)
-            # Cleanup checkpoint storage
-            chk_files = os.listdir(self.checkpoint_dir)
+            # Cleanup checkpoint storage (except -full files)
+            chk_files_all= glob.glob(os.path.join(self.checkpoint_dir, "*.chk.json"))
+            chk_files = [f for f in chk_files_all if not re.search(r"-full\.chk\.json$", f)]
             for f in chk_files:
-                os.remove(os.path.join(self.checkpoint_dir, f))
+                os.remove(f)
             # Clean up interval indices and reset mode
             self._save_interval_start = None
             self._last_checkpoint = None
@@ -268,10 +285,10 @@ class Track:
             if self._last_checkpoint is None or (now - self._last_checkpoint).total_seconds() > self.checkpoint_interval or force:
                 self._last_checkpoint = now
                 interval = slice(self._save_interval_start, len(self.data_points) - 1)
-                fname=os.path.join(self.checkpoint_dir, f'{now.strftime("%Y%m%d-%H%M%S")}.chk')
+                fname=f'{now.strftime("%Y%m%d-%H%M%S")}.chk'
                 if specifier is not None:
-                    fname=os.path.join(self.checkpoint_dir, f'{now.strftime("%Y%m%d-%H%M%S")+str(specifier)}.chk')
-                self.save(interval=interval, fname=fname)
+                    fname=f'{now.strftime("%Y%m%d-%H%M%S")+str(specifier)}.chk'
+                self.save(interval=interval, fname=fname, output_dir=self.checkpoint_dir)
 
             # Remove older files from checkpoint directory
             chk_files_all= glob.glob(os.path.join(self.checkpoint_dir, "*.chk.json"))
