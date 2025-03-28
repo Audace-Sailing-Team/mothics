@@ -860,7 +860,7 @@ class MothicsCLI(Cmd):
             if self._check_updates():
                 self._install_updates()
             else:
-                self.print("No update needed.", level='info')
+                return
         else:
             self.print(f"Unknown subcommand: {mode}", level='error')
             self.print("Available subcommands: check, install, offline", level='info')
@@ -963,16 +963,7 @@ class MothicsCLI(Cmd):
         """Runs 'git pull' to install updates, and optionally restarts the CLI."""
         try:
             subprocess.run(["git", "pull"], check=True)
-            self.print("Update complete.", level='success')
-
-            if self._confirm_action("restart the CLI now to apply changes"):
-                self.print("Restarting CLI...", level='info')
-                self.do_stop()
-                python = sys.executable
-                os.execl(python, python, *sys.argv)
-
-            else:
-                self.print("You can restart the CLI later to apply the changes.", level='info')
+            self.print("Update complete. You can restart the CLI later to apply the changes.", level='success')
 
         except subprocess.CalledProcessError:
             self.print("Update failed. Check your Git settings or internet connection.", level='error')
@@ -1019,6 +1010,7 @@ class MothicsCLI(Cmd):
             # Compare commits
             if local_commit != remote_commit:
                 self.print("A new version is available! Run \033[2mupdate\033[0m now or \033[2mgit pull\033[0m after exiting Mothics", level='update')
+                return True
             else:
                 self.print("No updates available.", level='info')
                         
