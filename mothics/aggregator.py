@@ -77,7 +77,7 @@ class Aggregator:
         """Start the loop in non-blocking mode."""
         if not self.running:
             self.running = True
-            self.thread = threading.Thread(target=self._run_loop, daemon=True)
+            self.thread = threading.Thread(target=self._run_loop, daemon=True, name='Aggregator loop')
             self.thread.start()
             self.logger.info("started non-blocking loop.")
 
