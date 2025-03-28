@@ -445,7 +445,7 @@ class MothicsCLI(Cmd):
                 output.append("\n\033[94mSystem\033[0m")
                 output.append(tabulate(self._get_system_resources(), headers=["Resource", "Usage"], tablefmt="github"))
 
-            if mode == "threads":
+            if mode == ["threads", "both"]:
                 output.append("\n\033[94mActive Threads\033[0m")
                 output.append(tabulate(self._get_threads_resources(), headers=["Thread native ID", "Thread ID", "Name", "Alive", 'Daemon', 'User time', 'System time', 'CPU % (1s)'], tablefmt="github"))
                 
