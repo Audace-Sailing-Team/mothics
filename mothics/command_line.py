@@ -85,7 +85,7 @@ class MothicsCLI(Cmd):
                 self.print(f"GPIO Error: {e}", level='error')
 
         # Run GPIO monitoring in a separate thread
-        self.gpio_thread = threading.Thread(target=gpio_listener, daemon=True)
+        self.gpio_thread = threading.Thread(target=gpio_listener, daemon=True, name='CLI GPIO listener')
         self.gpio_thread.start()
 
     def _shutdown_or_reboot(self):
@@ -359,7 +359,47 @@ class MothicsCLI(Cmd):
             ["Open file descriptors", len(process.open_files())],
             ["Thread count", process.num_threads()]
         ]
-                
+
+    def _get_threads_resources(self):
+        """Retrieve and format active threads with their CPU usage."""
+        threads_info = []
+        process = psutil.Process()
+
+        # Capture initial CPU times per native thread ID
+        start_times = {t.id: t.user_time + t.system_time for t in process.threads()}
+        time.sleep(1.0)  # 1-second interval for CPU usage sampling
+        end_times = {t.id: t.user_time + t.system_time for t in process.threads()}
+
+        # Compute CPU usage %
+        cpu_percent = {
+            tid: (end_times.get(tid, 0.0) - start_times.get(tid, 0.0)) * 100.0
+            for tid in start_times
+        }
+
+        # Grab latest psutil thread snapshot
+        psutil_threads = {t.id: t for t in process.threads()}
+
+        for thread in threading.enumerate():
+            native_id = getattr(thread, 'native_id', None)
+            psutil_info = psutil_threads.get(native_id)
+
+            user_time = psutil_info.user_time if psutil_info else None
+            system_time = psutil_info.system_time if psutil_info else None
+            cpu = round(cpu_percent.get(native_id, 0.0), 2)
+
+            threads_info.append((
+                native_id,
+                thread.ident,
+                thread.name,
+                thread.is_alive(),
+                thread.daemon,
+                user_time,
+                system_time,
+                cpu,
+            ))
+
+        return threads_info
+        
     def do_resources(self, args):
         """
         Show resource usage, with an optional monitor mode.
@@ -389,7 +429,7 @@ class MothicsCLI(Cmd):
             monitor = True
 
         # Validate mode
-        if mode not in ["mothics", "system", "both"]:
+        if mode not in ["mothics", "system", "threads", "both"]:
             self.print("Invalid option. Use 'resources mothics', 'resources system', or 'resources'.", level='error')
             return
 
@@ -405,6 +445,10 @@ class MothicsCLI(Cmd):
                 output.append("\n\033[94mSystem\033[0m")
                 output.append(tabulate(self._get_system_resources(), headers=["Resource", "Usage"], tablefmt="github"))
 
+            if mode == "threads":
+                output.append("\n\033[94mActive Threads\033[0m")
+                output.append(tabulate(self._get_threads_resources(), headers=["Thread native ID", "Thread ID", "Name", "Alive", 'Daemon', 'User time', 'System time', 'CPU % (1s)'], tablefmt="github"))
+                
             return "\n".join(output) + "\n"
 
         if monitor:
@@ -582,7 +626,7 @@ class MothicsCLI(Cmd):
 
         # Start a thread for each port
         for port in ports:
-            thread = threading.Thread(target=read_serial, args=(port,), daemon=True)
+            thread = threading.Thread(target=read_serial, args=(port,), daemon=True, name='CLI serial port listener')
             self.serial_threads.append(thread)
             thread.start()
 

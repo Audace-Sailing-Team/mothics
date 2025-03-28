@@ -77,7 +77,7 @@ class SerialInterface(BaseInterface):
         """Start a non-blocking loop"""
         if not self.running:
             self.running = True
-            self.thread = threading.Thread(target=self._run_loop, daemon=True)
+            self.thread = threading.Thread(target=self._run_loop, daemon=True, name=f'serial communication interface - {self.name}')
             self.thread.start()
             self.logger.info("started non-blocking loop.")
 

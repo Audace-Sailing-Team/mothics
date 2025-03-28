@@ -173,7 +173,7 @@ class WebApp:
             except Exception as e:
                 self.logger.error(f"Bokeh server failed to start: {e}")
 
-        self.bokeh_thread = Thread(target=bokeh_server_thread)
+        self.bokeh_thread = Thread(target=bokeh_server_thread, name='bokeh server')
         self.bokeh_thread.daemon = True
         self.bokeh_thread.start()
 
@@ -259,6 +259,6 @@ class WebApp:
         self.app.register_blueprint(database_bp)
 
     def run(self, host="0.0.0.0", port=5000, debug=False):
-        self.process = Thread(target=self.app.run, kwargs={"host": host, "port": port, "debug": debug, "use_reloader": False})
+        self.process = Thread(target=self.app.run, kwargs={"host": host, "port": port, "debug": debug, "use_reloader": False}, name='webapp')
         self.process.daemon = True
         self.process.start()
