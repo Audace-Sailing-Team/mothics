@@ -178,7 +178,7 @@ class Database:
         self.logger = logging.getLogger("Database")
         self.logger.info("-------------Database-------------")
 
-        # Load tracks
+        # Load tracks (scan directory and load)
         self.load_tracks()
 
     def validate_json(self, filepath: Path):
@@ -195,7 +195,65 @@ class Database:
             self.logger.warning(f"validation error in {filepath.name}: {e}")
             return False
 
-    def load_tracks(self, load_exports=True):
+    def load_tracks_incrementally(self):
+        """
+        Incrementally load tracks: only re-validate & insert new/modified files,
+        and remove DB entries whose files were deleted.
+        """
+        # Grab everything that's currently in TinyDB
+        existing_tracks = {t["filename"]: t for t in self.db.all()}
+
+        # Build a set of (filename -> last modification time) from the filesystem
+        found_files = {}
+        for fname in self.directory.glob("*.json"):
+            if fname.name == self.db_fname:
+                continue
+            found_files[fname.name] = fname.stat().st_mtime
+
+        # Include *.chk.json
+        if self.checkpoint_directory.exists():
+            for fname in self.checkpoint_directory.glob("*.chk.json"):
+                found_files[fname.name] = fname.stat().st_mtime
+
+        # Remove DB entries for files that no longer exist
+        Track = Query()
+        for db_filename in list(existing_tracks.keys()):
+            if db_filename not in found_files:
+                # remove from DB
+                self.logger.info(f"Removing {db_filename} from DB (file missing on disk).")
+                self.db.remove(Track.filename == db_filename)
+                del existing_tracks[db_filename]
+
+        # Check if file is new or modified
+        for fname, mtime in found_files.items():
+            db_track = existing_tracks.get(fname)
+            # If not in DB or modification time changed, re-validate + store
+            if (not db_track) or (db_track.get("mtime") != mtime):
+                # Validate and load metadata
+                full_path = self.directory / fname
+                # If it's a checkpoint file, we know to look in /chk
+                is_checkpoint = fname.endswith(".chk.json")
+                if is_checkpoint:
+                    full_path = self.checkpoint_directory / fname
+
+                if self.validate_json(full_path) or not self.validation:
+                    meta = self.extractor.extract_all(full_path)
+                    meta["checkpoint"] = is_checkpoint
+                    meta["filename"] = fname
+                    meta["filepath"] = full_path
+                    meta["mtime"] = mtime  # Store the modification time
+
+                    # If existed in DB, update; else insert
+                    if db_track:
+                        self.db.update(meta, Track.filename == fname)
+                    else:
+                        self.db.insert(meta)
+                    self.logger.info(f"Updated DB entry for {fname} (new or changed).")
+
+        # Update self.tracks in memory
+        self.tracks = self.db.all()
+        
+    def load_tracks(self):
         """
         Scan the directory for JSON files, including files in the 'chk' subdirectory.
         Validate each JSON file before extracting metadata and storing it in TinyDB.
