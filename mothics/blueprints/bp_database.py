@@ -8,76 +8,112 @@ from ..database import Database
 
 database_bp = Blueprint('database', __name__)
 
+
+def send_files_as_download(file_paths: list, zip_name_prefix: str = "download") -> Response:
+    """
+    Send one or more files as a download. If multiple, zip them in-memory.
+    
+    :param file_paths: List of Path objects (absolute paths)
+    :param zip_name_prefix: Prefix for zip file name (used if multiple files)
+    :return: Flask response with send_file
+    """
+    if not file_paths:
+        flash("No valid files found for download.", "danger")
+        return redirect(url_for('database.tracks_view'))
+
+    if len(file_paths) == 1:
+        fpath = os.path.join(current_app.config['INSTANCE_DIRECTORY'], file_paths[0])
+        return send_file(fpath, as_attachment=True)
+
+    # Zip multiple files into a buffer
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for path in file_paths:
+            path = os.path.join(current_app.config['INSTANCE_DIRECTORY'], path)
+            zip_file.write(path, os.path.basename(path))
+    zip_buffer.seek(0)
+
+    zip_name = f"{zip_name_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    return send_file(zip_buffer, mimetype="application/zip",
+                     as_attachment=True, download_name=zip_name)
+
+
+def refresh_all_tracks(db):
+    try:
+        db.load_tracks_incrementally()
+        flash("All tracks refreshed successfully.", "success")
+    except Exception as e:
+        flash(f"Error refreshing tracks: {str(e)}", "danger")
+    return redirect(url_for('database.tracks_view'))
+
+
+def delete_tracks(db, track_ids):
+    deleted_count = 0
+    for track_id in track_ids:
+        track = next((t for t in db.tracks if t["filename"] == track_id), None)
+        if track:
+            try:
+                db.remove_track(track_id, delete_from_disk=True)
+                deleted_count += 1
+            except Exception as e:
+                flash(f"Error deleting track '{track_id}': {str(e)}", "danger")
+    flash(f"Deleted {deleted_count} track(s).", "success")
+    return redirect(url_for('database.tracks_view'))
+
+
+def export_and_download_tracks(db, track_ids, export_format):
+    if not export_format or export_format not in db.export_methods:
+        flash("Invalid export format selected.", "warning")
+        return redirect(url_for('database.tracks_view'))
+
+    exported_files = []
+    errors = []
+
+    for track_id in track_ids:
+        try:
+            db.export_track(track_id, export_format=export_format)
+            base_name, _ = os.path.splitext(track_id)
+            exported_fname = f"{base_name}.{export_format}"
+            exported_path = db.directory / exported_fname
+            if exported_path.exists():
+                exported_files.append(exported_path)
+            else:
+                errors.append(f"Exported file not found: {exported_fname}")
+        except Exception as e:
+            errors.append(f"Export error for track '{track_id}': {str(e)}")
+
+    if errors:
+        for err in errors:
+            flash(err, "danger")
+        return redirect(url_for('database.tracks_view'))
+
+    return send_files_as_download(exported_files, zip_name_prefix="export")
+
+
 @database_bp.route("/track/action", methods=["POST"])
 def track_action():
-    """
-    Handle track-related actions including refreshing tracks, deleting tracks, and exporting tracks.
-    
-    Supports actions:
-    - Refresh all tracks
-    - Delete selected tracks
-    - Export selected tracks to a specified format
-    """
     db = current_app.config['TRACK_MANAGER']
-    track_ids = request.form.getlist("track_id")  # Get multiple selected track IDs
+    track_ids = request.form.getlist("track_id")
     action = request.form.get("action")
     export_format = request.form.get("export_format")
 
-    # Refresh All Tracks Action
     if action == "refresh_all":
-        try:
-            db.load_tracks()
-            flash("All tracks refreshed successfully.", "success")
-        except Exception as e:
-            flash(f"Error refreshing tracks: {str(e)}", "danger")
-        return redirect(url_for('database.tracks_view'))
+        return refresh_all_tracks(db)
 
-    # Validate track selection
     if not track_ids:
         flash("No track selected.", "warning")
         return redirect(url_for('database.tracks_view'))
 
-    # Delete Tracks Action
-    if action == "delete":
-        deleted_count = 0
-        for track_id in track_ids:
-            track = next((t for t in db.tracks if t["filename"] == track_id), None)
-            if track:
-                try:
-                    db.remove_track(track_id, delete_from_disk=True)
-                    deleted_count += 1
-                except Exception as e:
-                    flash(f"Error deleting track '{track_id}': {str(e)}", "danger")
-        flash(f"Deleted {deleted_count} track(s).", "success")
-        return redirect(url_for('database.tracks_view'))
-
-    # Export Tracks Action
-    elif action == "export":
-        # Validate export format
-        if not export_format or export_format not in db.export_methods:
-            flash("Invalid export format selected.", "warning")
+    match action:
+        case "delete":
+            return delete_tracks(db, track_ids)
+        case "export":
+            return export_and_download_tracks(db, track_ids, export_format)
+        case "download":
+            return track_download(track_ids)
+        case _:
+            flash("Invalid action requested.", "warning")
             return redirect(url_for('database.tracks_view'))
-
-        exported_count = 0
-        for track_id in track_ids:
-            track = next((t for t in db.tracks if t["filename"] == track_id), None)
-            if track:
-                try:
-                    db.export_track(track_id, export_format=export_format)
-                    exported_count += 1
-                except Exception as e:
-                    flash(f"Export error for track '{track_id}': {str(e)}", "danger")
-        flash(f"Exported {exported_count} track(s) to {export_format}.", "success")
-        return redirect(url_for('database.tracks_view'))
-
-    # Download Track
-    elif action == "download":
-        return track_download(track_ids)
-
-    
-    # Fallback for unexpected actions
-    flash("Invalid action requested.", "warning")
-    return redirect(url_for('database.tracks_view'))
 
 
 @database_bp.route("/tracks")
@@ -133,35 +169,57 @@ def tracks_view():
 
 def track_download(track_ids):
     """
-    Download selected tracks. If one track is selected, download it directly.
-    If multiple tracks are selected, package them into a ZIP.
+    Download selected original JSON track files.
     """
     db = current_app.config['TRACK_MANAGER']
+    base_dir = current_app.config['INSTANCE_DIRECTORY']
 
-    # Get file paths of the selected tracks
     file_paths = []
     for track_id in track_ids:
         track = next((t for t in db.tracks if t["filename"] == track_id), None)
-        track_path = os.path.join(db.directory, track['filename'])
-        if track['checkpoint']:
-            track_path = os.path.join(db.checkpoint_directory, track['filename'])
-        file_paths.append(os.path.join(current_app.config['INSTANCE_DIRECTORY'], track_path))
+        if not track:
+            continue
+        if track.get("checkpoint"):
+            path = base_dir / db.checkpoint_directory / track["filename"]
+        else:
+            path = base_dir / db.directory / track["filename"]
+        if path.exists():
+            file_paths.append(path)
+
+    return send_files_as_download(file_paths, zip_name_prefix="tracks")
+
+
+# def track_download(track_ids):
+#     """
+#     Download selected tracks. If one track is selected, download it directly.
+#     If multiple tracks are selected, package them into a ZIP.
+#     """
+#     db = current_app.config['TRACK_MANAGER']
+
+#     # Get file paths of the selected tracks
+#     file_paths = []
+#     for track_id in track_ids:
+#         track = next((t for t in db.tracks if t["filename"] == track_id), None)
+#         track_path = os.path.join(db.directory, track['filename'])
+#         if track['checkpoint']:
+#             track_path = os.path.join(db.checkpoint_directory, track['filename'])
+#         file_paths.append(os.path.join(current_app.config['INSTANCE_DIRECTORY'], track_path))
             
-    if not file_paths:
-        flash("No valid tracks found.", "error")
-        return redirect(url_for('database.tracks_view'))
+#     if not file_paths:
+#         flash("No valid tracks found.", "error")
+#         return redirect(url_for('database.tracks_view'))
 
-    # Direct download for single file
-    if len(file_paths) == 1:
-        return send_file(file_paths[0], as_attachment=True)
+#     # Direct download for single file
+#     if len(file_paths) == 1:
+#         return send_file(file_paths[0], as_attachment=True)
 
-    # Zip multiple files
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        for file_path in file_paths:
-            zip_file.write(file_path, os.path.basename(file_path))
+#     # Zip multiple files
+#     zip_buffer = io.BytesIO()
+#     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+#         for file_path in file_paths:
+#             zip_file.write(file_path, os.path.basename(file_path))
 
-    zip_buffer.seek(0)
-    zip_fname = f'{datetime.now().strftime("%Y%m%d-%H%M%S")}.zip'
-    return send_file(zip_buffer, mimetype="application/zip", as_attachment=True, download_name=zip_fname)
+#     zip_buffer.seek(0)
+#     zip_fname = f'{datetime.now().strftime("%Y%m%d-%H%M%S")}.zip'
+#     return send_file(zip_buffer, mimetype="application/zip", as_attachment=True, download_name=zip_fname)
 
