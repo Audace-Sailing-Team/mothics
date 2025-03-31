@@ -13,6 +13,7 @@ from tinydb import TinyDB, Query
 from tinydb.storages import JSONStorage
 from tinydb.middlewares import CachingMiddleware
 from jsonschema import validate, ValidationError
+from collections import defaultdict
 
 from .helpers import format_duration
 from .track import _export_methods, Track
@@ -202,7 +203,7 @@ class Database:
         """
         # Grab everything that's currently in TinyDB
         existing_tracks = {t["filename"]: t for t in self.db.all()}
-
+        
         # Build a set of (filename -> last modification time) from the filesystem
         found_files = {}
         for fname in self.directory.glob("*.json"):
@@ -224,6 +225,16 @@ class Database:
                 self.db.remove(Track.filename == db_filename)
                 del existing_tracks[db_filename]
 
+        # Exported files
+        export_extensions = list(self.export_methods.keys())
+
+        # Build list of known exported files
+        existing_exports = defaultdict(list)
+        for ext in export_extensions:
+            for f in self.directory.glob(f"*.{ext}"):
+                base = f.stem  # filename without extension
+                existing_exports[base].append(ext)
+        
         # Check if file is new or modified
         for fname, mtime in found_files.items():
             db_track = existing_tracks.get(fname)
@@ -243,6 +254,11 @@ class Database:
                     meta["filepath"] = full_path
                     meta["mtime"] = mtime  # Store the modification time
 
+                    # Attach export info if any
+                    base_name = fname.replace(".chk.json", "").replace(".json", "")
+                    if base_name in existing_exports:
+                        meta["exports"] = existing_exports[base_name]
+                    
                     # If existed in DB, update; else insert
                     if db_track:
                         self.db.update(meta, Track.filename == fname)
@@ -252,15 +268,22 @@ class Database:
 
         # Update self.tracks in memory
         self.tracks = self.db.all()
-        
+
     def load_tracks(self):
         """
-        Scan the directory for JSON files, including files in the 'chk' subdirectory.
-        Validate each JSON file before extracting metadata and storing it in TinyDB.
-        Files ending with '.chk.json' are flagged with a "Checkpoint" flag.
+        Full rescan of the directory for JSON files, including 'chk' subdirectory.
+        Validates and extracts metadata, and tracks available exports (e.g., gpx, csv).
         """
         self.db.truncate()
         self.tracks = []
+
+        # Gather known exports before loading track metadata
+        export_extensions = list(self.export_methods.keys())  # e.g., ['gpx', 'csv', ...]
+        existing_exports = defaultdict(list)
+        for ext in export_extensions:
+            for f in self.directory.glob(f"*.{ext}"):
+                base = f.stem  # filename without extension
+                existing_exports[base].append(ext)
 
         def process_file(fname: Path, is_checkpoint: bool):
             """Helper to validate and process a JSON file."""
@@ -268,23 +291,62 @@ class Database:
                 meta = self.extractor.extract_all(fname)
                 meta["checkpoint"] = is_checkpoint
                 meta["filepath"] = fname
+                meta["filename"] = fname.name
+
+                # Attach available exports
+                base_name = fname.stem.replace(".chk", "")
+                if base_name in existing_exports:
+                    meta["exports"] = sorted(existing_exports[base_name])
+
                 self.db.insert(meta)
                 self.tracks.append(meta)
             else:
-                self.logger.warning(f"skipping invalid file: {file.name}")
+                self.logger.warning(f"Skipping invalid file: {fname.name}")
 
-        # Process main directory JSON files
+        # Process JSON files in main directory
         for fname in self.directory.glob("*.json"):
-            # Skip database file
-            if str(fname).split('/')[1] == self.db_fname:
+            if fname.name == self.db_fname:
                 continue
             is_checkpoint = fname.name.endswith(".chk.json")
             process_file(fname, is_checkpoint)
 
-        # Process 'chk' subdirectory JSON files
+        # Process JSON files in 'chk' subdirectory
         if self.checkpoint_directory.exists() and self.checkpoint_directory.is_dir():
             for fname in self.checkpoint_directory.glob("*.chk.json"):
                 process_file(fname, is_checkpoint=True)
+        
+    # def load_tracks(self):
+    #     """
+    #     Scan the directory for JSON files, including files in the 'chk' subdirectory.
+    #     Validate each JSON file before extracting metadata and storing it in TinyDB.
+    #     Files ending with '.chk.json' are flagged with a "Checkpoint" flag.
+    #     """
+    #     self.db.truncate()
+    #     self.tracks = []
+
+    #     def process_file(fname: Path, is_checkpoint: bool):
+    #         """Helper to validate and process a JSON file."""
+    #         if self.validate_json(fname) or not self.validation:
+    #             meta = self.extractor.extract_all(fname)
+    #             meta["checkpoint"] = is_checkpoint
+    #             meta["filepath"] = fname
+    #             self.db.insert(meta)
+    #             self.tracks.append(meta)
+    #         else:
+    #             self.logger.warning(f"skipping invalid file: {file.name}")
+
+    #     # Process main directory JSON files
+    #     for fname in self.directory.glob("*.json"):
+    #         # Skip database file
+    #         if str(fname).split('/')[1] == self.db_fname:
+    #             continue
+    #         is_checkpoint = fname.name.endswith(".chk.json")
+    #         process_file(fname, is_checkpoint)
+
+    #     # Process 'chk' subdirectory JSON files
+    #     if self.checkpoint_directory.exists() and self.checkpoint_directory.is_dir():
+    #         for fname in self.checkpoint_directory.glob("*.chk.json"):
+    #             process_file(fname, is_checkpoint=True)
             
     def list_tracks(self) -> List[Dict[str, Any]]:
         """
@@ -380,46 +442,101 @@ class Database:
         self.db.update(new_metadata, Track.filename == filename)
         # Reflect the update in our local list as well.
         self.tracks = self.db.all()
-        
+
     def export_track(self, track_id: Union[int, str], export_format: str):
         """
-        Export the specified track to a different format by:
-         1) Finding the original track JSON on disk
-         2) Creating a temporary Track object
-         3) Exporting it via the Track's export method
-
-        :param track_id: The track filename (as stored in the DB) to export
-        :param export_format: The format to export to (e.g. 'csv', 'json', etc.)
+        Export a track to the given format, unless the export already exists.
+        Updates the track metadata with the list of available exports.
         """
-        # Fetch JSON
-        track_path = self.get_track_path(track_id)
-        if not track_path:
-            msg = f"track {track_id} not found in the file system."
+        # Fetch track metadata
+        self.tracks = self.db.all()
+        track = None
+
+        if isinstance(track_id, int):
+            if 0 <= track_id < len(self.tracks):
+                track = self.tracks[track_id]
+        elif isinstance(track_id, str):
+            track = next((t for t in self.tracks if t["filename"] == track_id), None)
+
+        if not track:
+            msg = f"track {track_id} not found in the database"
             self.logger.warning(msg)
             return msg
 
-        # Create temporary Track
-        temp_track = Track(output_dir=self.directory)
+        base_name, _ = os.path.splitext(track["filename"])
+        export_fname = f"{base_name}.{export_format}"
+        export_path = self.directory / export_fname
 
-        # Load JSON data temp Track
-        try:
-            temp_track.load(track_path.as_posix())
-        except Exception as e:
-            msg = f"Error loading track {track_id}: {e}"
-            self.logger.warning(msg)
-            return msg
+        # If already exported, skip
+        if export_path.exists():
+            self.logger.info(f"{export_fname} already exists, skipping regeneration.")
+        else:
+            # Load track JSON into temporary Track object
+            track_path = self.get_track_path(track_id)
+            if not track_path:
+                msg = f"track file not found for export: {track_id}"
+                self.logger.warning(msg)
+                return msg
 
-        # Export data
-        export_fname, _ = os.path.splitext(os.path.basename(track_path))
-        try:
-            temp_track.save(file_format=export_format, fname=export_fname)
-        except Exception as e:
-            msg = f"Error exporting track {track_id} to {export_format}: {e}"
-            self.logger.critical(msg)
-            return msg
+            temp_track = Track(output_dir=self.directory)
 
-        # Close temp Track
-        del temp_track
+            try:
+                temp_track.load(track_path.as_posix())
+                temp_track.save(file_format=export_format, fname=base_name)
+            except Exception as e:
+                msg = f"Error exporting track {track_id} to {export_format}: {e}"
+                self.logger.critical(msg)
+                return msg
+            finally:
+                del temp_track
+
+            self.logger.info(f"Exported {track['filename']} to {export_format}")
+
+        # Update exports in DB
+        exports = set(track.get("exports", []))
+        exports.add(export_format)
+        self.update_track_metadata(track["filename"], {"exports": list(exports)})
+
+        
+    # def export_track(self, track_id: Union[int, str], export_format: str):
+    #     """
+    #     Export the specified track to a different format by:
+    #      1) Finding the original track JSON on disk
+    #      2) Creating a temporary Track object
+    #      3) Exporting it via the Track's export method
+
+    #     :param track_id: The track filename (as stored in the DB) to export
+    #     :param export_format: The format to export to (e.g. 'csv', 'json', etc.)
+    #     """
+    #     # Fetch JSON
+    #     track_path = self.get_track_path(track_id)
+    #     if not track_path:
+    #         msg = f"track {track_id} not found in the file system."
+    #         self.logger.warning(msg)
+    #         return msg
+
+    #     # Create temporary Track
+    #     temp_track = Track(output_dir=self.directory)
+
+    #     # Load JSON data temp Track
+    #     try:
+    #         temp_track.load(track_path.as_posix())
+    #     except Exception as e:
+    #         msg = f"Error loading track {track_id}: {e}"
+    #         self.logger.warning(msg)
+    #         return msg
+
+    #     # Export data
+    #     export_fname, _ = os.path.splitext(os.path.basename(track_path))
+    #     try:
+    #         temp_track.save(file_format=export_format, fname=export_fname)
+    #     except Exception as e:
+    #         msg = f"Error exporting track {track_id} to {export_format}: {e}"
+    #         self.logger.critical(msg)
+    #         return msg
+
+    #     # Close temp Track
+    #     del temp_track
 
     def remove_track(self, track_id: Union[int, str], delete_from_disk: bool=False):
         """
