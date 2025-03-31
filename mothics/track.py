@@ -149,7 +149,8 @@ class Track:
         """Maximum number of datapoints stored before full removal"""
         self.export_methods = _export_methods
         """Dictionary of available export methods"""
-        
+        self.preprocessors = []
+        """List of available preprocessing function for incoming data"""
         # Internal attributes not exposed as parameters
         self._replay_index = 0
         self._last_checkpoint = None
@@ -318,8 +319,14 @@ class Track:
             # Fraction of points to trim
             fraction = (len(self.data_points)-1)/len(self.data_points)
             self._remove_datapoints(fraction=fraction)
-        
-        self.data_points.append(DataPoint(timestamp, data))
+
+        # Pre-process data before generating the datapoint
+        datapoint = DataPoint(timestamp, data)
+        for processor in self.preprocessors:
+            datapoint = processor(datapoint)
+       
+        # Append the datapoint
+        self.data_points.append(datapoint)
         # Run checkpointing
         self._save_checkpoint()
 
