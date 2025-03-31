@@ -284,6 +284,8 @@ class Communicator:
         """Trim threshold for raw_data dict"""
         self.trim_fraction = trim_fraction
         """Fraction of values to trim from raw_data"""
+        self.preprocessors = []
+        """Preprocessors for incoming data"""
         
         # Setup logger
         self.logger = logging.getLogger("Communicator")
@@ -411,6 +413,16 @@ class Communicator:
         # Sort data by timestamp for each topic
         for topic in merged_data:
             merged_data[topic].sort(key=lambda x: list(x.keys())[0])
+
+            # Preprocess each data item
+            # NOTE: processing functions should operate on data columns            
+            if hasattr(self, 'preprocessors') and self.preprocessors:
+                processed_list = []
+                for item in merged_data[topic]:
+                    for processor in self.preprocessors:
+                        item = processor(item, topic)
+                    processed_list.append(item)
+                merged_data[topic] = processed_list
             
         return merged_data        
     
