@@ -30,9 +30,6 @@
                 </button>
               </div>
               <div class="btn-group">
-                <button type="submit" name="action" value="download" class="btn btn-info btn-sm" id="downloadBtn">
-                  <i class="fas fa-download"></i> Download
-                </button>
                 <button type="submit" name="action" value="delete" class="btn btn-danger btn-sm" id="deleteBtn"> 
                   Delete 
                 </button>
@@ -55,7 +52,7 @@
               <thead>
                 <tr>
                   <th>Index</th>
-                  {% for column in ['filename', 'track_datetime', 'checkpoint', 'track_duration', 'datapoint_count', 'remote_units'] %}
+                  {% for column in ['filename', 'track_datetime', 'checkpoint', 'track_duration', 'datapoint_count', 'remote_units', 'exports'] %}
                     <th>
                       <a href="{{ url_for('database.tracks_view', 
                                           sort_by=column, 
@@ -105,6 +102,13 @@
                         N/A
                       {% endif %}
                     </td>
+		    <td>
+		      {% if track.exports %}
+		      {{ track.exports | join(", ") | upper }}
+		      {% else %}
+		      None
+		      {% endif %}
+		    </td>
                     <td>
                       <input type="checkbox" name="track_id" value="{{ track.filename }}">
                     </td>
@@ -125,7 +129,6 @@
       const form = document.getElementById("trackActionForm");
       const deleteBtn = document.getElementById("deleteBtn");
       const exportBtn = document.getElementById("exportBtn");
-      const downloadBtn = document.getElementById("downloadBtn");
 
       function getSelectedTracks() {
           return Array.from(document.querySelectorAll('input[name="track_id"]:checked'))
@@ -144,7 +147,6 @@
 
       deleteBtn.addEventListener("click", (event) => validateAction(event, "delete"));
       exportBtn.addEventListener("click", (event) => validateAction(event, "export"));
-      downloadBtn.addEventListener("click", (event) => validateAction(event, "download"));
   });
 </script>
 

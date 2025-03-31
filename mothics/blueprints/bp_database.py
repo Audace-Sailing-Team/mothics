@@ -109,8 +109,6 @@ def track_action():
             return delete_tracks(db, track_ids)
         case "export":
             return export_and_download_tracks(db, track_ids, export_format)
-        case "download":
-            return track_download(track_ids)
         case _:
             flash("Invalid action requested.", "warning")
             return redirect(url_for('database.tracks_view'))
