@@ -1,11 +1,17 @@
 <div class="data-grid">
     {% if table_data %}
         {% for row in table_data %}
-            {% for field, value in row.items() if field != "timestamp" %}
+            {% for field, data in row.items() if field != "timestamp" %}
                 <div class="data-card">
                     <h4>{{ field.replace("_", " ").title() }}</h4>
-                    <p class="value">{{ value }}</p>
-                    <p class="timestamp">Last Sampled: {{ row["timestamp"] | replace("T", " ") | truncate(22) }}</p>
+                    {% if data is mapping %}
+                    <p class="value">{{ data.value }}</p>
+                    <p class="timestamp">Sampling rate: {{ data.sample_rate }}</p>
+                    <p class="timestamp">Last sampled: {{ row["timestamp"] | replace("T", " ") | truncate(22) }}</p>
+                    {% else %}
+                    <p class="value">{{ data }}</p>
+                    <p class="timestamp">Last sampled: {{ row["timestamp"] | replace("T", " ") | truncate(22) }}</p>
+                    {% endif %}
                 </div>
             {% endfor %}
         {% endfor %}
@@ -13,4 +19,3 @@
         <p>No data available.</p>
     {% endif %}
 </div>
-
