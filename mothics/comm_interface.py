@@ -1,3 +1,64 @@
+"""
+Communications 
+==============
+
+This module defines a flexible system for managing multiple
+communication interfaces, such as Serial (USB) and MQTT, and merging
+all their incoming data into one coherent structure. It is able to
+manage multiple data sources and can potentially publish messages
+through several different protocols.
+
+Classes
+-------
+- BaseInterface : Abstract base class defining the required methods for any interface.
+- SerialInterface : Implementation for reading from and writing to a serial (USB) port.
+- MQTTInterface : Implementation for connecting to and communicating with an MQTT broker.
+- Communicator : High-level manager that orchestrates all interfaces, merges their data, 
+                 and provides a unified interface for publishing and retrieving messages.
+
+Quick example
+-------------
+1. Define a Communicator and configure interfaces:
+
+    from your_module_name import Communicator, SerialInterface, MQTTInterface
+
+    # Define which interfaces to load:
+    interfaces_config = {
+        SerialInterface: [
+            {'port': '/dev/ttyUSB0', 'baudrate': 9600, 'name': 'serial_device_1'},
+            {'port': '/dev/ttyUSB1', 'baudrate': 115200, 'name': 'serial_device_2'}
+        ],
+        MQTTInterface: {
+            'hostname': 'mqtt.broker.local',
+            'topics': ['rm1/gps/lat', 'rm1/gps/long'],
+        }
+    }
+
+    comm = Communicator(interfaces=interfaces_config)
+
+2. Connect all interfaces and begin collecting data:
+
+    comm.connect()
+    # Data from each interface will accumulate in comm.raw_data
+
+3. Publish a message to a specific interface:
+    
+    comm.publish('rm1/gps/lat', {'value': 42.1234}, interfaces=['MQTTInterface_mqtt.broker.local'])
+
+4. When finished, disconnect all interfaces:
+
+    comm.disconnect()
+
+Notes
+-----
+- By default, each interface runs its own internal loop to capture data. 
+- Use the `raw_data` property to get a merged dictionary of data from all active interfaces.
+- You can add your own custom interfaces by subclassing `BaseInterface` and implementing
+  `connect`, `disconnect`, and `publish` methods.
+
+"""
+
+
 import threading
 import random
 import json
