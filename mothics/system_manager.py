@@ -59,7 +59,8 @@ DEFAULT_CONFIG = {
         "max_datapoints": 1e5
     },
     "database":{
-        "validation": True
+        "validation": True,
+        "startup": False
     },
     "files": {
         "logger_fname": "default.log",
