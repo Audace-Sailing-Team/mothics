@@ -20,7 +20,6 @@ Quick example
     ```
     from mothics.comm_interface import Communicator, SerialInterface, MQTTInterface
 
-    # Define which interfaces to load:
     interfaces_config = {
         SerialInterface: [
             {'port': '/dev/ttyUSB0', 'baudrate': 9600, 'name': 'serial_device_1'},
@@ -39,7 +38,6 @@ Quick example
 
     ```
     comm.connect()
-    # Data from each interface will accumulate in comm.raw_data
     ```
 
 3. Publish a message to a specific interface:
