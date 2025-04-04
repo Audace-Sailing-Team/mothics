@@ -205,10 +205,12 @@ class SystemManager:
         self.mode = mode
         self.logger.info(f"initializing {mode} mode")
 
-        try:
-            self.initialize_database()
-        except Exception as e:
-            self.logger.critical(f"error in database initialization, got {e}" )
+        # Start database if required at startup
+        if self.config["database"]["startup"]:
+            try:
+                self.initialize_database()
+            except Exception as e:
+                self.logger.critical(f"error in database initialization, got {e}" )
 
         # Initialize track
         self.track = Track(mode=mode,
