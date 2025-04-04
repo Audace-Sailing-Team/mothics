@@ -16,6 +16,7 @@ Classes
 Quick example
 -------------
 1. Define a Communicator and configure interfaces:
+
     ```
     from mothics.comm_interface import Communicator, SerialInterface, MQTTInterface
 
@@ -35,17 +36,20 @@ Quick example
     ```
 
 2. Connect all interfaces and begin collecting data:
+
     ```
     comm.connect()
     # Data from each interface will accumulate in comm.raw_data
     ```
 
 3. Publish a message to a specific interface:
+
     ```
     comm.publish('rm1/gps/lat', {'value': 42.1234}, interfaces=['MQTTInterface_mqtt.broker.local'])
     ```
 
 4. When finished, disconnect all interfaces:
+
     ```
     comm.disconnect()
     ```
