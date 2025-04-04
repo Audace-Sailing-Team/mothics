@@ -1,7 +1,4 @@
 """
-Communications 
-==============
-
 This module defines a flexible system for managing multiple
 communication interfaces, such as Serial (USB) and MQTT, and merging
 all their incoming data into one coherent structure. It is able to
@@ -19,8 +16,8 @@ Classes
 Quick example
 -------------
 1. Define a Communicator and configure interfaces:
-
-    from your_module_name import Communicator, SerialInterface, MQTTInterface
+    ```
+    from mothics.comm_interface import Communicator, SerialInterface, MQTTInterface
 
     # Define which interfaces to load:
     interfaces_config = {
@@ -35,19 +32,23 @@ Quick example
     }
 
     comm = Communicator(interfaces=interfaces_config)
+    ```
 
 2. Connect all interfaces and begin collecting data:
-
+    ```
     comm.connect()
     # Data from each interface will accumulate in comm.raw_data
+    ```
 
 3. Publish a message to a specific interface:
-    
+    ```
     comm.publish('rm1/gps/lat', {'value': 42.1234}, interfaces=['MQTTInterface_mqtt.broker.local'])
+    ```
 
 4. When finished, disconnect all interfaces:
-
+    ```
     comm.disconnect()
+    ```
 
 Notes
 -----
