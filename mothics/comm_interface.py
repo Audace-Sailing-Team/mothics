@@ -19,7 +19,6 @@ Quick example
 
     ```
     from mothics.comm_interface import Communicator, SerialInterface, MQTTInterface
-
     interfaces_config = {
         SerialInterface: [
             {'port': '/dev/ttyUSB0', 'baudrate': 9600, 'name': 'serial_device_1'},
@@ -30,7 +29,6 @@ Quick example
             'topics': ['rm1/gps/lat', 'rm1/gps/long'],
         }
     }
-
     comm = Communicator(interfaces=interfaces_config)
     ```
 
