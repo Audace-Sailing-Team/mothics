@@ -1,7 +1,4 @@
 """
-Aggregator
-==========
-
 This module provides the `Aggregator` class, which periodically
 collects and aggregates incoming data from one or more sources, then
 stores or processes it for later use. Typical usage is to instantiate
