@@ -27,13 +27,35 @@ def get_table():
     hidden = set(current_app.config.get('HIDDEN_DATA_CARDS') or [])
     data_thesaurus = current_app.config.get('DATA_THESAURUS', {})
 
-    # Filter + apply thesaurus in one loop
-    filtered_row = {
-        data_thesaurus.get(key, key): value
-        for key, value in latest_row.items()
-        if '/last_timestamp' not in key and key not in hidden
-    }
+    # Extract all sample rates into a dictionary keyed by their base path.                
+    # This makes it easy to associate a sample rate with its corresponding metric.    
+    sample_rates = {}
+    for key, value in latest_row.items():
+        if key.endswith('/sample_rate'):
+            base = key.rsplit('/', 1)[0]
+            sample_rates[base] = value
 
+    # Build the filtered row with each metric as a nested dictionary.
+    # This structure allows for future expansion (e.g. adding units, quality indicators, etc.) 
+    filtered_row = {}
+    for key, value in latest_row.items():
+        # Skip hidden keys, last_timestamp entries, and sample_rate keys (already handled)
+        if '/last_timestamp' in key or key in hidden or key.endswith('/sample_rate'):
+            continue
+        # Use thesaurus for aliasing if defined, otherwise use the original key.
+        alias = data_thesaurus.get(key, key)
+        filtered_row[alias] = {'value': value}
+
+        # Associate the sample rate if available
+        base = key.rsplit('/', 1)[0]
+        if base in sample_rates:
+            filtered_row[alias]['sample_rate'] = sample_rates[base]
+
+    # Include a global timestamp (for "Last Sampled") if available
+    if 'timestamp' in latest_row:
+        filtered_row['timestamp'] = latest_row['timestamp']
+
+    # The template expects table_data as a list of rows
     return render_template("table.html", table_data=[filtered_row])
 
 @monitor_bp.route("/get_status")
