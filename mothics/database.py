@@ -1,3 +1,27 @@
+"""
+This module integrates a local TinyDB instance to store and manage track metadata,
+including checkpoints and exports, as well as a `MetadataExtractor` utility for
+collecting high-level information about each track file. It also validates JSON
+track files against a predefined schema and monitors changes in the filesystem,
+keeping the database in sync.
+
+Classes
+-------
+- MetadataExtractor: Extracts metadata (timestamp, duration, remote units, etc.) 
+  from JSON track files.
+- Database: Maintains a TinyDB database of all discovered track files, 
+  enabling incremental updates, file validation, listing, and exporting.
+
+Notes
+-----
+- Use `load_tracks()` for a full directory rescan, or `load_tracks_incrementally()`
+  to detect only new/modified files.
+- `validate_json()` is used internally to ensure each track file adheres to the
+  required schema (`TRACK_SCHEMA`).
+- The `MetadataExtractor` methods can be extended if you need additional metadata
+  (e.g., sensor statistics or geospatial bounding boxes).
+"""
+
 import re
 import glob
 import os
@@ -20,6 +44,7 @@ from .track import _export_methods, Track
 
 
 # Validation schema
+# TODO: load schema from external file
 TRACK_SCHEMA = {
     "type": "array",
     "items": {
@@ -40,12 +65,39 @@ TRACK_SCHEMA = {
 
 
 class MetadataExtractor:
+    """
+    Extracts various pieces of metadata from a JSON track file.
+
+    This helper class provides multiple extractor methods to gather:
+    - approximate track datetime (parsed from filename)
+    - track duration (start to end timestamp)
+    - total data point count
+    - remote units involved in the track
+    - any additional common data keys
+
+    Attributes:
+        logger (logging.Logger): Logger instance for debug/info/error messages.
+    """
+    
     def __init__(self):
+        """
+        Initialize the MetadataExtractor, setting up the logger.
+        """
         # Setup logger
         self.logger = logging.getLogger("MetadataExtractor")
         self.logger.info("-------------MetadataExtractor-------------")
 
     def extract_track_datetime(self, filepath: Path, data: Any) -> Dict[str, Any]:
+        """
+        Attempt to parse a track datetime from the file name.
+
+        Args:
+            filepath (Path): The path of the file being processed.
+            data (Any): The JSON data that was loaded from `filepath`.
+
+        Returns:
+            dict: A dictionary with a 'track_datetime' key (ISO 8601 string or None).
+        """
         pattern = r'(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}|\d{8}-\d{6})'
         match = re.search(pattern, filepath.name)
         if match:
@@ -62,6 +114,16 @@ class MetadataExtractor:
         return {"track_datetime": None}
 
     def extract_datapoint_count(self, filepath: Path, data: Any) -> Dict[str, Any]:
+        """
+        Count the number of data points in a track file.
+
+        Args:
+            filepath (Path): The file's location on disk.
+            data (Any): Parsed JSON data (list of dict or a dict with "data" list).
+
+        Returns:
+            dict: A dictionary with a 'datapoint_count' key indicating the total data points.
+        """
         if isinstance(data, list):
             count = len(data)
         elif isinstance(data, dict):
@@ -71,6 +133,19 @@ class MetadataExtractor:
         return {"datapoint_count": count}
 
     def extract_remote_units(self, filepath: Path, data: Any) -> Dict[str, Any]:
+        """
+        Identify unique remote units from the earliest data record.
+
+        Remote unit name is parsed as the substring before the first '/' or '_'
+        (depending on data style).
+
+        Args:
+            filepath (Path): The track file path.
+            data (Any): Parsed JSON structure for the track.
+
+        Returns:
+            dict: A dictionary with 'remote_units', a list of discovered unit names.
+        """
         remote_units = set()
         if isinstance(data, list) and data:
             first_dp = data[0]
@@ -87,6 +162,19 @@ class MetadataExtractor:
         return {"remote_units": list(remote_units)}
 
     def extract_additional_metadata(self, filepath: Path, data: Any) -> Dict[str, Any]:
+        """
+        Extract a list of keys that appear in every data point.
+
+        Useful for identifying common sensor fields.
+
+        Args:
+            filepath (Path): The file path.
+            data (Any): The JSON data loaded from disk.
+
+        Returns:
+            dict: A dictionary with 'common_datapoint_keys' 
+                  indicating the shared sensor fields across all data points.
+        """
         metadata = {}
         if isinstance(data, list) and data:
             if "input_data" in data[0]:
@@ -105,6 +193,17 @@ class MetadataExtractor:
         return metadata
 
     def extract_track_duration(self, filepath: Path, data: Any) -> Dict[str, Any]:
+        """
+        Compute the total duration of the track based on the earliest
+        and latest timestamps in the file.
+
+        Args:
+            filepath (Path): The path to the track file.
+            data (Any): The parsed JSON content.
+
+        Returns:
+            dict: Dictionary with 'track_duration' in seconds or None if unavailable.
+        """
         def parse_timestamp(ts_str):
             try:
                 return datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S.%f")
@@ -129,6 +228,15 @@ class MetadataExtractor:
         return {"track_duration": None}
 
     def extract_all(self, filepath: Path) -> Dict[str, Any]:
+        """
+        Apply all available extractors to the specified file.
+
+        Args:
+            filepath (Path): The path to the JSON file containing track data.
+
+        Returns:
+            dict: A dictionary of extracted metadata (filename, track_datetime, etc.).
+        """
         metadata = {"filename": filepath.name}
         try:
             with open(filepath, "r") as f:
@@ -154,10 +262,32 @@ class MetadataExtractor:
 
 
 class Database:
+    """
+    Maintains a TinyDB database of track metadata, providing utilities to
+    - validate and load track files from disk
+    - incrementally update the database if tracks are added/removed/modified
+    - list available tracks in a tabular form
+    - export track data into different formats
+    - delete tracks from the database and optionally from disk.
+    """
+    
     def __init__(self, directory, db_fname="tracks_metadata.json", rm_thesaurus=None, validation=True):
+        """
+        Initialize the Database instance.
+
+        Args:
+            directory (str or Path): The filesystem path where track JSON files 
+                and optionally a 'chk' subdirectory are located.
+            db_fname (str, optional): The TinyDB file name. Defaults to "tracks_metadata.json".
+            rm_thesaurus (dict, optional): A mapping for remote unit aliases, e.g.
+                {"rm1": "Unit 1", "rm2": "Unit 2"}. Defaults to None.
+            validation (bool, optional): If True, each track JSON must pass 
+                schema validation before insertion. Defaults to True.
+        """
         self.directory = Path(directory)
-        """Database path."""
+        """Database path"""
         self.checkpoint_directory = self.directory / "chk"
+        """Checkpoint directory path."""
         self.db_fname = db_fname
         """Database file name."""
         self.validation = validation
@@ -184,8 +314,13 @@ class Database:
 
     def validate_json(self, filepath: Path):
         """
-        Validate a JSON file against the schema.
-        Returns True if valid, False otherwise.
+        Validate a JSON file against the global TRACK_SCHEMA.
+
+        Args:
+            filepath (Path): The JSON file to check.
+
+        Returns:
+            bool: True if valid, False otherwise.
         """
         try:
             with open(filepath, "r") as f:
@@ -198,8 +333,9 @@ class Database:
 
     def load_tracks_incrementally(self):
         """
-        Incrementally load tracks: only re-validate & insert new/modified files,
-        and remove DB entries whose files were deleted.
+        Incrementally update the database. This only re-validates and
+        inserts new/modified files, and removes DB entries whose files
+        were deleted.
         """
         # Grab everything that's currently in TinyDB
         existing_tracks = {t["filename"]: t for t in self.db.all()}
@@ -271,8 +407,8 @@ class Database:
 
     def load_tracks(self):
         """
-        Full rescan of the directory for JSON files, including 'chk' subdirectory.
-        Validates and extracts metadata, and tracks available exports (e.g., gpx, csv).
+        Perform a full rescan of the directory (and 'chk' subdirectory) for
+        JSON track files, clearing the database before re-inserting everything.
         """
         self.db.truncate()
         self.tracks = []
@@ -314,46 +450,17 @@ class Database:
         if self.checkpoint_directory.exists() and self.checkpoint_directory.is_dir():
             for fname in self.checkpoint_directory.glob("*.chk.json"):
                 process_file(fname, is_checkpoint=True)
-        
-    # def load_tracks(self):
-    #     """
-    #     Scan the directory for JSON files, including files in the 'chk' subdirectory.
-    #     Validate each JSON file before extracting metadata and storing it in TinyDB.
-    #     Files ending with '.chk.json' are flagged with a "Checkpoint" flag.
-    #     """
-    #     self.db.truncate()
-    #     self.tracks = []
-
-    #     def process_file(fname: Path, is_checkpoint: bool):
-    #         """Helper to validate and process a JSON file."""
-    #         if self.validate_json(fname) or not self.validation:
-    #             meta = self.extractor.extract_all(fname)
-    #             meta["checkpoint"] = is_checkpoint
-    #             meta["filepath"] = fname
-    #             self.db.insert(meta)
-    #             self.tracks.append(meta)
-    #         else:
-    #             self.logger.warning(f"skipping invalid file: {file.name}")
-
-    #     # Process main directory JSON files
-    #     for fname in self.directory.glob("*.json"):
-    #         # Skip database file
-    #         if str(fname).split('/')[1] == self.db_fname:
-    #             continue
-    #         is_checkpoint = fname.name.endswith(".chk.json")
-    #         process_file(fname, is_checkpoint)
-
-    #     # Process 'chk' subdirectory JSON files
-    #     if self.checkpoint_directory.exists() and self.checkpoint_directory.is_dir():
-    #         for fname in self.checkpoint_directory.glob("*.chk.json"):
-    #             process_file(fname, is_checkpoint=True)
-            
+                    
     def list_tracks(self) -> List[Dict[str, Any]]:
         """
-        Returns the list of available tracks metadata from the database, formatted using tabulate (github style).
+        Print a table of discovered tracks and return their metadata,
+        formatted using tabulate (github style)..
         Remote unit keys are converted using the rm_thesaurus.
+
+        Returns:
+            list[dict]: The entire list of track metadata from the database.
         """
-        self.tracks = self.db.all()  # Reload tracks from DB.
+        self.tracks = self.db.all()  # Reload tracks from DB
         if not self.tracks:
             self.logger.warning("no tracks available.")
             return []
@@ -388,7 +495,14 @@ class Database:
 
     def select_track(self, index: int) -> Dict[str, Any]:
         """
-        Return metadata for the selected track (by index) from the DB.
+        Retrieve metadata for the track at a given list index.
+
+        Args:
+            index (int): Zero-based index of the track in the DB list.
+
+        Returns:
+            dict: The metadata dictionary for the requested track,
+                  or empty if the index is invalid.
         """
         self.tracks = self.db.all()
         if 0 <= index < len(self.tracks):
@@ -398,8 +512,16 @@ class Database:
 
     def get_track_path(self, track_id: Union[int, str]) -> Optional[Path]:
         """
-        Return full path for the selected track, identified by index or filename.
-        If the track is a checkpoint, check both the main directory and 'chk' subdirectory.
+        Determine the full filesystem path for a given track, by index or filename.
+
+        If the track is marked as a checkpoint, checks the 'chk' subdirectory.
+        Otherwise, looks in the main directory.
+
+        Args:
+            track_id (int|str): The index or filename identifying the track.
+
+        Returns:
+            Path or None: The path to the file, or None if not found.
         """
         self.tracks = self.db.all()
 
@@ -436,7 +558,11 @@ class Database:
     
     def update_track_metadata(self, filename: str, new_metadata: Dict[str, Any]):
         """
-        Update the metadata for a given track identified by filename.
+        Update an existing track's metadata in the TinyDB.
+
+        Args:
+            filename (str): The track filename to update.
+            new_metadata (dict): The fields to add/update in that track's metadata.
         """
         Track = Query()
         self.db.update(new_metadata, Track.filename == filename)
@@ -445,8 +571,15 @@ class Database:
 
     def export_track(self, track_id: Union[int, str], export_format: str):
         """
-        Export a track to the given format, unless the export already exists.
-        Updates the track metadata with the list of available exports.
+        Export the specified track to the given format if it doesn't already exist; this
+         1. retrieves the track's path and creates a temporary `Track` object
+         2. loads the track JSON into `Track`
+         3. exports via `Track.save(file_format=export_format)`
+         4. updates the track's metadata in TinyDB to record that this export now exists.
+
+        Args:
+            track_id (int|str): The track index or filename to export.
+            export_format (str): Format to export (e.g., 'json', 'csv', or 'gpx').
         """
         # Fetch track metadata
         self.tracks = self.db.all()
@@ -495,56 +628,20 @@ class Database:
         # Update exports in DB
         exports = set(track.get("exports", []))
         exports.add(export_format)
-        self.update_track_metadata(track["filename"], {"exports": list(exports)})
-
-        
-    # def export_track(self, track_id: Union[int, str], export_format: str):
-    #     """
-    #     Export the specified track to a different format by:
-    #      1) Finding the original track JSON on disk
-    #      2) Creating a temporary Track object
-    #      3) Exporting it via the Track's export method
-
-    #     :param track_id: The track filename (as stored in the DB) to export
-    #     :param export_format: The format to export to (e.g. 'csv', 'json', etc.)
-    #     """
-    #     # Fetch JSON
-    #     track_path = self.get_track_path(track_id)
-    #     if not track_path:
-    #         msg = f"track {track_id} not found in the file system."
-    #         self.logger.warning(msg)
-    #         return msg
-
-    #     # Create temporary Track
-    #     temp_track = Track(output_dir=self.directory)
-
-    #     # Load JSON data temp Track
-    #     try:
-    #         temp_track.load(track_path.as_posix())
-    #     except Exception as e:
-    #         msg = f"Error loading track {track_id}: {e}"
-    #         self.logger.warning(msg)
-    #         return msg
-
-    #     # Export data
-    #     export_fname, _ = os.path.splitext(os.path.basename(track_path))
-    #     try:
-    #         temp_track.save(file_format=export_format, fname=export_fname)
-    #     except Exception as e:
-    #         msg = f"Error exporting track {track_id} to {export_format}: {e}"
-    #         self.logger.critical(msg)
-    #         return msg
-
-    #     # Close temp Track
-    #     del temp_track
+        self.update_track_metadata(track["filename"], {"exports": list(exports)})        
 
     def remove_track(self, track_id: Union[int, str], delete_from_disk: bool=False):
         """
-        Remove a track from the database, with an optional flag to delete the file from disk.
+        Remove a track from the TinyDB, optionally deleting the file from disk.
 
-        :param identifier: Track identifier (index or filename)
-        :param delete_from_disk: If True, physically delete the track file
-        :return: Boolean indicating whether the track was successfully removed
+        Args:
+            track_id (int|str): Index or filename identifying the track to remove.
+            delete_from_disk (bool, optional): If True, physically delete the file 
+                in addition to removing its DB entry.
+
+        Raises:
+            RuntimeError: If the track doesn't exist in DB or if there's an error 
+                deleting from disk.
         """
         # Find the track path first
         track_path = self.get_track_path(track_id)
