@@ -15,53 +15,118 @@ from .helpers import setup_logger, tipify
 # Interface
 
 class BaseInterface:
-    """Base Interface class for communications"""
+    """
+    Base Interface class for communications
+    
+    This abstract base class defines the structure for communication
+    interfaces (e.g., serial, MQTT). Subclasses should implement
+    their own connection, disconnection, and publishing logic.
+    """
 
     def connect(self):
-        """Establish a connection."""
+        """
+        Establish a connection to the communication channel.
+
+        This method should set up and open the communication channel
+        (e.g., open a serial port, connect to an MQTT broker).
+        Implementations in subclasses should raise exceptions on failure.
+        """
         pass
 
     def disconnect(self):
-        """Close the connection."""
+        """
+        Close the connection gracefully.
+
+        This method should safely shut down the communication channel
+        and release any resources (e.g., close the serial port,
+        disconnect from the MQTT broker).
+        """
         pass
     
     def publish(self):
-        """Send data."""
+        """
+        Send or publish data to the communication channel.
+
+        Subclasses should implement logic to serialize (if needed) and
+        send the payload to the remote endpoint. Usually, preferred
+        serialization is JSON.
+
+        Generally, a strict addressing convention is used to send and
+        receive message from remote units. Units should always listen
+        on the `<remote_unit>/sudo` address.
+
+        """
         pass
 
 
 class SerialInterface(BaseInterface):
-    """Interface class for communication via USB Serial."""
+    """
+    Interface class for communication via USB Serial.
+
+    This interface continuously reads data from a specified serial
+    port in a non-blocking thread and updates a `raw_data` dictionary
+    accordingly. It can also publish data back through the same serial
+    port in JSON format.
+    """
     
     def __init__(self, port, baudrate=9600, topics=None, name=None):
-        self.port = port
-        self.baudrate = baudrate
-        self.serial_conn = None
-        """Serial connection object."""
-        self.running = False
+        """
+        Initialize the SerialInterface.
 
+        Args:
+            port (str): The system name/path of the serial port.
+            baudrate (int, optional): The baud rate for communication.
+                Defaults to 9600.
+            topics (list[str] or str, optional): A list (or single string) of
+                topics to which this interface will subscribe. Defaults to
+                ['rm1/gps/lat', 'rm1/gps/long'].
+            name (str, optional): Optional (but strongly recommended) nickname 
+                for this interface.
+
+        Raises:
+            ValueError: If `topics` is given in an unrecognized format.
+        """
+        self.port = port
+        """System name of the serial port (e.g., '/dev/ttyUSB0')"""
+        self.baudrate = baudrate
+        """Baud rate for the serial communication"""
+        self.serial_conn = None
+        """Serial connection object"""
+        self.running = False
+        """Status of the listening thread"""
+        # Topics parsing
         if topics is None:
-            # NOTE: `<topic>_sudo` should only be used to push
-            #       commands to the remote unit (rm)
+            # FLAWED: no address should be explicitly specified!
             # NOTE: topic syntax is <module>/<sensor>/<quantity>
             topics = ['rm1/gps/lat', 'rm1/gps/long']
+            
         elif isinstance(topics, str):
             topics = [topics]
         self.topics = topics
         """Client topics to subscribe to"""
         self.name = name
-        """Interface name"""
+        """Name for the interface instance"""
         self.raw_data = {k: [] for k in self.topics}
-        """Dictionary of all raw data fetched from available topics. Topics are keys, list of {timestamp: quantity} as values"""
+        """Dictionary of all raw data fetched from subscribed topics. Keys are topics, values are lists of {timestamp: quantity}"""
         self.connected = False
-        """Connection status flag"""
+        """Connection status"""
         
         # Setup logger
         self.logger = logging.getLogger(f"Serial-Interface - {self.name}")
         self.logger.info("-------------Serial Interface-------------")
         
     def connect(self):
-        """Connect to the serial port and start the loop."""
+        """
+        Connect to the serial port and start the listener loop.
+
+        This method attempts to open a serial connection using the
+        configured port and baud rate. If successful, it sets
+        `connected=True` and starts a non-blocking thread to read
+        incoming data.
+
+        Raises:
+            RuntimeError: If the serial connection fails to open.
+        """
         try:
             self.serial_conn = serial.Serial(self.port, self.baudrate, timeout=1)
             self.logger.info(f"connected to {self.port} at {self.baudrate} baud.")
@@ -74,7 +139,13 @@ class SerialInterface(BaseInterface):
         self._loop_start()
     
     def _loop_start(self):
-        """Start a non-blocking loop"""
+        """
+        Start a non-blocking background thread to continuously read the serial port.
+
+        The reading loop runs in a separate daemon thread, allowing the main thread
+        to continue execution. This loop processes incoming lines, attempts to parse
+        them as JSON objects, and routes them to `on_message_callback`.
+        """
         if not self.running:
             self.running = True
             self.thread = threading.Thread(target=self._run_loop, daemon=True, name=f'serial communication interface - {self.name}')
@@ -82,14 +153,22 @@ class SerialInterface(BaseInterface):
             self.logger.info("started non-blocking loop.")
 
     def _loop_stop(self):
-        """Stop non-blocking loop"""
+        """
+        Stop the non-blocking background reading loop and wait for it to exit.
+        """
         self.running = False
         if self.thread and self.thread.is_alive():
             self.thread.join()
             self.logger.info("stopped loop.")
             
     def _run_loop(self):
-        """Blocking listening loop"""
+        """
+        Blocking method that continually reads the serial connection.
+
+        Each line read from the serial port is decoded from UTF-8 and stripped.
+        If multiple JSON objects are concatenated in the line, they are split
+        and parsed individually. Unparseable data is logged as a warning.
+        """
         # Sanity check - connection
         if not self.serial_conn or not self.serial_conn.is_open:
             raise RuntimeError("Serial connection is not open.")
@@ -117,14 +196,29 @@ class SerialInterface(BaseInterface):
                 continue
 
     def on_message_callback(self, topic, data):
-        """Aggregate raw data from messages into dict"""
+        """
+        Handle incoming data for a particular topic.
+
+        This method appends a dict containing the current timestamp
+        and the received data to `raw_data[topic]`. If the topic did not
+        previously exist, a new entry is created.
+
+        Args:
+            topic (str): The topic under which data was received.
+            data (Any): The decoded data for that topic.
+        """
         if topic not in self.topics:
             self.raw_data[topic] = []
         timestamp = datetime.now()
         self.raw_data[topic].append({timestamp: data})
                 
     def disconnect(self):
-        """Close the serial connection."""
+        """
+        Close the serial connection and stop the reading loop.
+
+        If the loop is still running, it is gracefully shut down first.
+        Then the serial connection is closed and `connected` is set to False.
+        """
         # Stop loop
         if self.running:
             self._loop_stop()
@@ -136,7 +230,16 @@ class SerialInterface(BaseInterface):
         self.connected = False
             
     def publish(self, topic: str, payload):
-        """Send data over serial."""
+        """
+        Send data over the serial connection as a JSON string.
+
+        Args:
+            topic (str): The topic or identifier for the data being sent.
+            payload (Any): The payload to be JSON-encoded and transmitted.
+
+        Raises:
+            RuntimeError: If the serial connection is not open.
+        """
         if not self.serial_conn or not self.serial_conn.is_open:
             self.logger.critical("attempted to publish without an open connection.")
             raise RuntimeError("serial connection is not open.")
@@ -147,9 +250,27 @@ class SerialInterface(BaseInterface):
 
 
 class MQTTInterface(BaseInterface):
-    """Interface class for remote communications via MQTT protocol"""
+    """
+    Interface class for remote communications via MQTT protocol.
+
+    This interface connects to an MQTT broker and subscribes to a set
+    of topics. Incoming messages are passed to `on_message_callback`,
+    and data can be published back to the broker.
+    """
 
     def __init__(self, hostname, topics=None, port=1883, keep_alive=120):
+        """
+        Initialize the MQTTInterface.
+
+        Args:
+            hostname (str): The MQTT broker's hostname or IP address.
+            topics (list[str] or str, optional): List (or single string) of
+                topics to subscribe to. Defaults to ['rm1/gps/lat', 'rm1/gps/long'].
+            port (int, optional): Broker's port. Defaults to 1883.
+            keep_alive (int, optional): Maximum keepalive interval in seconds
+                before the broker disconnects the client. Defaults to 120.
+        """
+        
         self.hostname = hostname
         """MQTT broker hostname"""
         self.port = port
@@ -157,8 +278,7 @@ class MQTTInterface(BaseInterface):
         self.keep_alive = keep_alive
         """Maximum time between comms with broker, before being disconnected (in seconds)"""
         if topics is None:
-            # NOTE: `<topic>_sudo` should only be used to push
-            #       commands to the remote unit (rm)
+            # FLAWED: no address should be explicitly specified!
             # NOTE: topic syntax is <module>/<sensor>/<quantity>
             topics = ['rm1/gps/lat', 'rm1/gps/long']
         elif isinstance(topics, str):
@@ -166,7 +286,7 @@ class MQTTInterface(BaseInterface):
         self.topics = topics
         """Client topics to subscribe to"""
         self.raw_data = {k: [] for k in self.topics}
-        """Dictionary of all raw data fetched from available topics. Topics are keys, list of {timestamp: quantity} as values"""
+        """Dictionary of all raw data fetched from subscribed topics. Keys are topics, values are lists of {timestamp: quantity}"""
         self.connected = False
         """Connection status flag"""
         
@@ -184,8 +304,16 @@ class MQTTInterface(BaseInterface):
         
     def _on_connect(self, client, userdata, flags, rc):
         """
-        Callback function for MQTT connection.
-        Subscribes to topics upon successful connection.
+        Callback triggered when the MQTT client connects to the broker.
+
+        If the connection is successful (rc == 0), the client subscribes
+        to all configured topics.
+
+        Args:
+            client (mqtt.Client): The MQTT client instance for this callback.
+            userdata (Any): User-defined data passed to the client object.
+            flags (dict): Response flags sent by the broker.
+            rc (int): The connection result.
         """
         if rc == 0:
             self.logger.info("connected to MQTT broker.")
@@ -197,18 +325,30 @@ class MQTTInterface(BaseInterface):
 
     def _on_disconnect(self, client, userdata, rc):
         """
-        Callback function for MQTT disconnection.
-        Handles automatic reconnection attempts.
+        Callback triggered when the MQTT client disconnects from the broker.
+
+        By default, this method attempts to reconnect automatically.
+
+        Args:
+            client (mqtt.Client): The MQTT client instance for this callback.
+            userdata (Any): User-defined data passed to the client object.
+            rc (int): The disconnection result.
         """
         self.logger.info("disconnected from MQTT broker. Attempting to reconnect...")
         self.client.reconnect()
 
     def _on_message(self, client, userdata, msg):
         """
-        Callback function for incoming MQTT messages.
-        Processes and passes data to the provided callback.
-        
-        :param msg: The MQTT message received.
+        Callback triggered when an MQTT message is received.
+
+        Decodes payload to a string, then attempts to convert it into
+        typed data (`tipify` helper). The result is handed off to
+        `on_message_callback`.
+
+        Args:
+            client (mqtt.Client): The MQTT client instance for this callback.
+            userdata (Any): User-defined data passed to the client object.
+            msg (mqtt.MQTTMessage): The received MQTT message.
         """
         self.logger.debug(f"message received on {msg.topic}: {msg.payload.decode()}")
         try:
@@ -221,7 +361,16 @@ class MQTTInterface(BaseInterface):
             self.logger.critical("failed to store MQTT message.")
 
     def connect(self):
-        """Connect to the MQTT broker and start the loop."""
+        """
+        Connect to the MQTT broker and start the network loop (non-blocking).
+
+        This method attempts to create a connection to the specified
+        hostname/port. If successful, the MQTT network loop is started
+        to process network events asynchronously.
+
+        Raises:
+            RuntimeError: If connecting to the broker fails.
+        """
         try:
             self.client.connect(self.hostname, self.port, keepalive=self.keep_alive)
             self.logger.info(f"connected to {self.hostname} at port {self.port}.")
@@ -234,7 +383,12 @@ class MQTTInterface(BaseInterface):
         self.client.loop_start()
 
     def disconnect(self):
-        """Disconnect from the MQTT broker and stop the loop."""
+        """
+        Disconnect from the MQTT broker and stop the network loop.
+
+        This method requests a disconnection from the broker and then
+        stops the background MQTT listener.
+        """
         # Stop loop
         self.client.loop_stop()
         # Close connection
@@ -242,7 +396,17 @@ class MQTTInterface(BaseInterface):
         self.connected = False
         
     def on_message_callback(self, topic, data):
-        """Aggregate raw data from messages into dict"""
+        """
+        Callback to handle incoming data for a particular topic.
+
+        This method appends a dict containing the current timestamp
+        and the received data to `raw_data[topic]`. If the topic did not
+        previously exist in the dictionary, it is created.
+
+        Args:
+            topic (str): The topic under which data was received.
+            data (Any): The typed or raw data payload.
+        """
         if topic not in self.topics:
             self.raw_data[topic] = []
         timestamp = datetime.now()
@@ -250,10 +414,14 @@ class MQTTInterface(BaseInterface):
 
     def publish(self, topic, payload):
         """
-        Publish a message to a specified topic.
-        
-        :param topic: Topic to publish the message to.
-        :param payload: Dictionary to be JSON-encoded and published.
+        Publish a JSON-encoded message to a specified topic.
+
+        Args:
+            topic (str): MQTT topic to publish the message to.
+            payload (dict): Data to be JSON-encoded and published.
+
+        Raises:
+            RuntimeError: If `topic` is not in the subscribed topics list.
         """
         message = json.dumps(payload)
         if topic in self.topics:
@@ -267,19 +435,37 @@ class MQTTInterface(BaseInterface):
 # Communicator
 
 class Communicator:
-    """Class to manage multiple communication interfaces and merge their data."""
+    """
+    Class to manage multiple communication interfaces and merge their data.
+
+    This keeps track of any number of interfaces (Serial, MQTT, etc.),
+    allowing you to start or stop them all together, publish messages
+    selectively, and retrieve merged data from all interfaces.
+    """
     
     def __init__(self, interfaces=None, max_values=1e3, trim_fraction=0.5):
         """
-        Initialize communicator with optional interfaces.
-        
+        Initialize the Communicator with desired interfaces.
+
+        If `interfaces` is provided, each interface class is instantiated
+        with the supplied kwargs. This approach allows you to specify multiple
+        interfaces or multiple instances of the same interface, each with
+        its own parameters.
+
         Args:
-            interfaces (dict): Dictionary mapping interface classes to their kwargs
-                             Format: {InterfaceClass: {'arg1': val1, ...}}
+            interfaces (dict, optional): Dictionary mapping interface classes
+                to their kwargs in this form:
+                {InterfaceClass: {'arg1': val1, ...}} or
+                {InterfaceClass: [ {...}, {...} ]}.
+                If you pass a single interface class, it will be initialized
+                with default kwargs.
+            max_values (int, optional): Maximum number of data points stored
+                per topic before old data is trimmed. Defaults to 1000.
+            trim_fraction (float, optional): Fraction of oldest data to remove
+                whenever a topic exceeds `max_values`. Defaults to 0.5.
         """
         self.interfaces = {}
-        """Initialized interfaces"""
-        # Parameters
+        """Dictionary of interface instances keyed by a unique name."""
         self.max_values = max_values
         """Trim threshold for raw_data dict"""
         self.trim_fraction = trim_fraction
@@ -297,11 +483,20 @@ class Communicator:
             
     def add_interfaces(self, interfaces):
         """
-        Add new interfaces to the communicator.
-        
+        Add new interfaces to the Communicator.
+
+        You can pass either a single interface class or a dictionary
+        of interface classes to kwargs.
+
         Args:
-            interfaces (dict or class): Single interface class or dict of 
-                                      {InterfaceClass: {'arg1': val1, ...}}
+            interfaces (Union[type, dict]): If it is a class, it is
+                instantiated with no kwargs. If it is a dict, it should
+                have the format {InterfaceClass: {'arg': val, ...}} or
+                {InterfaceClass: [ {...}, {...} ]} for multiple instances.
+
+        Raises:
+            ValueError: If the `interfaces` argument is not a class or dict.
+            RuntimeError: If an interface fails to initialize.
         """
         # Handle single interface class case
         if isinstance(interfaces, type):
@@ -330,10 +525,16 @@ class Communicator:
     
     def remove_interface(self, interface_class):
         """
-        Remove an interface from the communicator.
-        
+        Remove an interface from the Communicator by class.
+
+        This method looks up the interface by the class name and disconnects
+        it before removing it from the internal dictionary.
+
         Args:
-            interface_class: The class of the interface to remove
+            interface_class (type): The class of the interface to remove.
+
+        Raises:
+            RuntimeError: If disconnecting the interface fails.
         """
         class_name = interface_class.__name__
         if class_name in self.interfaces:
@@ -350,7 +551,16 @@ class Communicator:
             self.logger.warning(f"interface {class_name} not found")
     
     def connect(self):
-        """Start all communication interfaces."""
+        """
+        Start all communication interfaces.
+
+        For each interface in `self.interfaces`, calls its `connect`
+        method. If any fail to connect, logs a warning. If all fail,
+        an additional warning is logged.
+
+        Raises:
+            RuntimeError: If critical connection logic fails in a subclass.
+        """
         failed_interfaces = []
         
         for name, interface in self.interfaces.items():
@@ -369,7 +579,13 @@ class Communicator:
             self.logger.warning(error_msg)
     
     def disconnect(self):
-        """Stop all communication interfaces."""
+        """
+        Stop all communication interfaces.
+
+        Calls the `disconnect` method on each managed interface.
+        If any interface fails to disconnect, a critical error is logged
+        and a `RuntimeError` is raised.
+        """
         for name, interface in self.interfaces.items():
             try:
                 interface.disconnect()
@@ -380,8 +596,19 @@ class Communicator:
 
     def _format_topic(self, topic):
         """
-        Split MQTT topic in its components.  
-        MQTT topics are composed by <module>/<sensor>/<quantity>
+        Split a topic in its components.
+
+        This helper expects the MQTT-style topic format ("address"):
+        <module>/<sensor>/<quantity>.
+
+        Args:
+            topic (str): The topic string.
+
+        Returns:
+            list[str]: A list of components (module, sensor, quantity).
+
+        Raises:
+            AssertionError: If the topic does not have exactly 3 sections.
         """
         topic_split = topic.split("/")
         assert len(topic_split) == 3, "topic is malformed, got {topic_split}"
@@ -391,9 +618,16 @@ class Communicator:
     def raw_data(self):
         """
         Merge and return raw data from all interfaces.
-        
+
+        This property iterates over every interface's `raw_data` dict,
+        merges them into a single dictionary keyed by topic, and sorts
+        each topic's data by timestamp. If any topic in a particular
+        interface exceeds `max_values`, the oldest data are trimmed
+        according to `trim_fraction`.
+
         Returns:
-            dict: Merged dictionary of all raw data from all interfaces
+            dict: A merged dictionary of raw data from all interfaces.
+                  Structure is {topic: [ {timestamp: data}, ... ]}.
         """
         merged_data = {}
         
@@ -428,13 +662,19 @@ class Communicator:
     
     def publish(self, topic, payload, interfaces=None):
         """
-        Publish message to specified interfaces.
-        
+        Publish a message to one or more interfaces.
+
         Args:
-            topic (str): Topic to publish to
-            payload: Message payload
-            interfaces (list, optional): List of interface names to publish to.
-                                      If None, publish to all interfaces.
+            topic (str): Topic string where the message is to be published.
+            payload (Any): Data or object to be published. In some interfaces
+                           (e.g., MQTT, serial), this may be JSON-encoded.
+            interfaces (list[str], optional): A list of interface names (keys of
+                           `self.interfaces`) to which the message should be
+                           published. If None, publish to all interfaces.
+
+        Raises:
+            RuntimeError: If an interface rejects the publish due to being
+                          disconnected or invalid topic.
         """
         if interfaces is None:
             interfaces = self.interfaces.keys()
@@ -451,14 +691,17 @@ class Communicator:
 
     def refresh(self, force_reconnect=False):
         """
-        Refresh the communicator by connecting any new interfaces and optionally
-        reconnecting existing ones
-        
+        Refresh the Communicator by connecting any new interfaces and optionally
+        reconnecting existing ones.
+
+        If `force_reconnect=True`, all interfaces are disconnected and then
+        reconnected. Otherwise, only interfaces that are currently disconnected
+        will be connected.
+
         Args:
             force_reconnect (bool): If True, forcibly disconnect and reconnect
-                                    all existing interfaces
+                                    all existing interfaces.
         """
-        
         if force_reconnect:
             # Disconnect everything first
             self.logger.info("force reconnect: stopping all interfaces before refresh")
@@ -481,16 +724,4 @@ class Communicator:
 
         if failed_interfaces:
             error_msg = f"failed to refresh interfaces: {', '.join(failed_interfaces)}"
-            self.logger.warning(error_msg)
-            
-                
-if __name__ == "__main__":
-    pass
-#    # Test code
-#     setup_logger('test', fname='test_logger.log')
-    
-#     topic = "remote_module/gps_test"
-#     message = f"Lorem ipsum dolor sit amet. {random.uniform(0., 1.)}"
-
-#     test_publish_fetch(topic, message, publish=True)
-    
+            self.logger.warning(error_msg)    
