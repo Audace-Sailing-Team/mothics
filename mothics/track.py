@@ -205,8 +205,17 @@ def export_to_gpx(data_points, filename, interval=None):
 
         if lat is None or lon is None:
             continue
-
+        
         trkpt = ET.SubElement(trkseg, "trkpt", lat=str(lat), lon=str(lon))
+
+        # Optional: Add elevation if available
+        alt_key = next((key for key in dp.input_data if key.endswith(('alt', 'elev', 'altitude'))), None)
+        alt = dp.input_data.get(alt_key)
+        if alt is not None:
+            ele = ET.SubElement(trkpt, "ele")
+            ele.text = str(alt)
+
+        # Timestamp
         time = ET.SubElement(trkpt, "time")
         time.text = dp.timestamp.isoformat()  # Timestamp in ISO 8601 format
 
