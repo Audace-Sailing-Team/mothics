@@ -1,33 +1,67 @@
-{% extends 'base.html' %}
-
+{% extends "base.html" %}
 {% block content %}
+
 <h2>Settings</h2>
 
-{% if success %}
-    <div class="alert alert-success" role="alert">
-        Settings saved successfully!
-    </div>
-{% endif %}
+{# Gather unique tabs #}
+{% set tab_list = [] %}
+{% for key, field in registry.items() %}
+    {% if field['tab'] is not none and field['tab'] not in tab_list %}
+        {% set _ = tab_list.append(field['tab']) %}
+    {% endif %}
+{% endfor %}
 
-<form method="post">
-    <div class="mb-3">
-        <label for="auto_refresh_table" class="form-label">Website refresh rate</label>
-        <input type="text" class="form-control" id="auto_refresh_table" name="auto_refresh_table" placeholder="Enter value in seconds...">
-    </div>
+<ul class="nav nav-tabs">
+  {% for t in tab_list %}
+    <li class="nav-item">
+      <button class="nav-link {% if loop.first %}active{% endif %}"
+              data-bs-toggle="tab"
+              data-bs-target="#tab-{{ t | replace(' ', '-') }}">
+        {{ t }}
+      </button>
+    </li>
+  {% endfor %}
+</ul>
 
-    <div class="mb-3">
-        <label for="aggregator_interval" class="form-label">Aggregator refresh rate</label>
-        <input type="text" class="form-control" id="aggregator_interval" name="aggregator_interval" placeholder="Enter value in seconds...">
-    </div>
+<div class="tab-content mt-3">
+  {% for t in tab_list %}
+    <div class="tab-pane fade {% if loop.first %}show active{% endif %}"
+         id="tab-{{ t | replace(' ', '-') }}">
 
-    <div class="mb-3">
-        <label for="plot_mode" class="form-label">Plot Mode</label>
-        <select class="form-select" id="plot_mode" name="plot_mode">
-            <option value="static">Static</option>
-            <option value="real-time">Real-time</option>
-        </select>
-    </div>
+      <form method="post">
+        {% for key, field in registry.items() if field['tab'] == t %}
+        <div class="mb-3">
+	  <label for="{{ key }}" class="form-label">
+	    {{ field.get('label', key) }}
+	  </label>
+	  
+	  {% if field.get('choices') %}
+	  <select class="form-select" name="{{ key }}">
+	    {% for choice in field.get('choices') %}
+	    <option value="{{ choice }}">{{ choice }}</option>
+	    {% endfor %}
+	  </select>
+	  
+	  {% elif field.get('type') == 'bool' %}
+	  <select class="form-select" name="{{ key }}">
+	    <option value="true">True</option>
+	    <option value="false">False</option>
+	  </select>
+	  
+	  {% else %}
+	  <input type="text"
+		 class="form-control"
+		 name="{{ key }}"
+		 placeholder="{{ field.get('placeholder', '') }}">
+	  {% endif %}
+        </div>
+        {% endfor %}
 
-    <button type="submit" class="btn btn-primary">Save Settings</button>
-</form>
+        <button type='submit' class='btn btn-primary'>Save {{ t }}</button>
+      </form>
+
+    </div>
+  {% endfor %}
+</div>
+
 {% endblock %}
