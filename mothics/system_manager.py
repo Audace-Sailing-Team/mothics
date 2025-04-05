@@ -243,16 +243,21 @@ class SystemManager:
             self.initialize_cdns()
             # Initialize tiles
             self.initialize_tiles()
-            # Initialize Webapp
+            
+            # Pass all getter functions
             getters = {
                 'database': lambda: self.track.get_current(),
                 'save_status': lambda: self.track.save_mode
             }
+            
+            # Pass all setter functions
             setters = {
                 'aggregator_refresh_rate': lambda interval: self.aggregator.set_interval(interval),
                 'start_save': lambda: self.track.start_run(),
                 'stop_save': lambda: self.track.end_run(),
             }
+
+            # Initialize Webapp
             self.webapp = WebApp(
                 getters=getters,
                 setters=setters,
@@ -272,7 +277,8 @@ class SystemManager:
                 track_colors=self.config["webapp"]["gps"]["track_colors"],
                 track_units=self.config["webapp"]["gps"]["track_units"],
                 instance_dir=os.path.dirname(sys.modules['__main__'].__file__),
-                out_dir=self.config["files"]["output_dir"]
+                out_dir=self.config["files"]["output_dir"],
+                system_manager=self
             )
             self.webapp.run()
 
