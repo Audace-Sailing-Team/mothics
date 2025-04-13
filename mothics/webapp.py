@@ -11,6 +11,7 @@ from bokeh.server.server import Server
 from bokeh.application import Application
 from bokeh.application.handlers.function import FunctionHandler
 from tornado.log import access_log, app_log, gen_log
+from waitress import serve
 
 from .bokeh_plots import create_realtime_bokeh_app
 from .blueprints.bp_monitoring import monitor_bp
@@ -128,6 +129,9 @@ class WebApp:
         self.setup_routes()
         
     def setup_logging(self):
+        # Silence Waitress
+        logging.getLogger("waitress").setLevel(logging.ERROR)
+        
         # Silence Tornado
         for tlog in [access_log, app_log, gen_log]:
             tlog.setLevel(logging.ERROR)
@@ -272,5 +276,4 @@ class WebApp:
         self.process.start()
         
     def serve(self, host="0.0.0.0", port=5000):
-        from waitress import serve
         serve(self.app, host=host, port=port)
