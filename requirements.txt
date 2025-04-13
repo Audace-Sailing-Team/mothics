@@ -14,4 +14,4 @@ rpi-lgpio==0.6
 tabulate==0.9.0
 tinydb==4.8.2
 toml==0.10.2
-
+waitress==3.0.2

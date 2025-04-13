@@ -280,7 +280,9 @@ class SystemManager:
                 out_dir=self.config["files"]["output_dir"],
                 system_manager=self
             )
-            self.webapp.run()
+            # self.webapp.run()
+            t = threading.Thread(target=self.webapp.serve, daemon=True, name="WaitressServer")
+            t.start()
 
     def start_live(self):
         self.initialize_common_components("live")
