@@ -20,7 +20,13 @@
         {{ t }}
       </button>
     </li>
-  {% endfor %}
+    {% endfor %}
+
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-user-prefs">
+      Local preferences
+    </button>
+  </li>
 </ul>
 
 <div class="tab-content mt-3">
@@ -56,12 +62,32 @@
 	  {% endif %}
         </div>
         {% endfor %}
-
+	
         <button type='submit' class='btn btn-primary'>Save {{ t }}</button>
       </form>
 
     </div>
-  {% endfor %}
+    {% endfor %}
+    
+    <div class="tab-pane fade" id="tab-user-prefs">
+      <p class="text-muted">These settings are stored in your browser and do not affect other users.</p>
+      
+      <div id="local-user-prefs-form"></div>
+      <button class="btn btn-secondary mt-3" id="saveLocalPrefsBtn">Save preferences</button>
+    </div>
 </div>
 
+<script type="module">
+  import {
+    buildLocalPrefsForm,
+    loadLocalPrefsToForm,
+    saveLocalPrefsFromForm
+  } from "{{ url_for('static', filename='local_preferences.js') }}";
+
+  window.addEventListener('DOMContentLoaded', () => {
+    buildLocalPrefsForm("local-user-prefs-form");
+    loadLocalPrefsToForm();
+    document.getElementById("saveLocalPrefsBtn").addEventListener("click", saveLocalPrefsFromForm);
+  });
+</script>
 {% endblock %}

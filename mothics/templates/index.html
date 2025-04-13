@@ -173,15 +173,34 @@
                 populateDropdown();
             }
 
-            // Restore previous selections from localStorage
-            document.querySelectorAll('.data-card').forEach(card => {
-                let metricName = card.querySelector('h4')?.textContent.trim();
-                if (selectedMetrics.size > 0 && !selectedMetrics.has(metricName)) {
-                    card.style.display = 'none';
-                } else {
-                    card.style.display = 'block';
-                }
-            });
+	    // === Unit Conversion: Apply per-user speed units ===
+	    const prefs = JSON.parse(localStorage.getItem("mothicsLocalPrefs") || "{}");
+	    const displayUnit = prefs.prefSpeedUnits || "km/h";
+	    
+	    // Patch speed metrics in cards
+	    document.querySelectorAll('.data-card').forEach(card => {
+		const label = card.querySelector("h4")?.textContent?.toLowerCase();
+		if (label && label.includes("speed")) {
+		    const valElem = card.querySelector(".value");
+		    if (valElem) {
+			const raw = parseFloat(valElem.textContent);
+			if (!isNaN(raw)) {
+			    const converted = convertSpeedFromKmh(raw, displayUnit);
+			    valElem.textContent = converted.toFixed(2) + " " + displayUnit;
+			}
+		    }
+		}
+	    });
+	    
+            // // Restore previous selections from localStorage
+            // document.querySelectorAll('.data-card').forEach(card => {
+            //     let metricName = card.querySelector('h4')?.textContent.trim();
+            //     if (selectedMetrics.size > 0 && !selectedMetrics.has(metricName)) {
+            //         card.style.display = 'none';
+            //     } else {
+            //         card.style.display = 'block';
+            //     }
+            // });
 
             // Fetch and update the remote unit status
             const statusResponse = await fetch('/get_status');
@@ -363,10 +382,17 @@ function updateGPS() {
         return;
       }
 
-      const { lat, lon } = cfg.latest_position;
-      const now = Date.now();
+	const { lat, lon } = cfg.latest_position;
+	const prefs = JSON.parse(localStorage.getItem("mothicsLocalPrefs") || "{}");
+	const gpsUnit = prefs.prefSpeedUnits || "km/h";
+	
+	if (typeof cfg.latest_position.speed === "number") {
+	    cfg.latest_position.speed = convertSpeedFromKmh(cfg.latest_position.speed, gpsUnit);
+	}
+	
+	const now = Date.now();
 
-      gpsFlag.style.display = "none";
+	gpsFlag.style.display = "none";
 
       if (!gpsMarker) {
         gpsMarker = L.circleMarker([lat, lon], {
