@@ -381,6 +381,13 @@ function drawTrack() {
   }
 }
 
+function resetTrack() {
+  gpsSegments.forEach(segment => leafletMap.removeLayer(segment));
+  gpsSegments = [];
+  gpsHistory = [];
+  localStorage.removeItem("gpsHistoryCache"); // only if you persist it
+}
+  
 function updateGPS() {
   fetch("/api/gps_info")
     .then(res => res.ok ? res.json() : null)
@@ -496,6 +503,16 @@ fetch("/api/gps_info")
         btn.title = 'Recenter GPS';
         btn.onclick = () => gpsAutoFollow = true;
         return btn;
+      };
+      const resetBtn = L.control({ position: 'topright' });
+      resetBtn.onAdd = function () {
+      const btn = L.DomUtil.create('button', 'leaflet-bar');
+	  btn.innerHTML = '✖'; // or "Reset"
+	  btn.title = 'Clear Track';
+	  btn.style.padding = '4px 8px';
+	  btn.style.cursor = 'pointer';
+	  btn.onclick = () => resetTrack();
+	  return btn;
       };
 
       const legendControl = L.control({ position: "bottomright" });
