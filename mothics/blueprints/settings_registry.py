@@ -107,15 +107,6 @@ SETTINGS_REGISTRY = {
         "config_path": ("webapp", "gps", "track_variable"),
         "log_success": "Track variable set to {value}"
     },
-    "track_units": {
-        "type": "string",
-        "tab": "GPS Track",
-        "label": "Track variable units",
-        "placeholder": "e.g. m/s",
-        "real_time_setter": lambda v, mgr: mgr.webapp.app.config.__setitem__('TRACK_UNITS', v),
-        "config_path": ("webapp", "gps", "track_units"),
-        "log_success": "Track units set to {value}"
-    },
 
     # ========= Database =========
     "database_validation": {
