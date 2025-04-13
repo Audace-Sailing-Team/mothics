@@ -49,6 +49,7 @@ to run Mothics, which are
 - `argh==0.31.3`
 - `bokeh==3.6.2`
 - `Flask==3.1.0`
+- `Flask-Compress==1.17`
 - `jsonschema==4.23.0`
 - `jsonschema-specifications==2024.10.1`
 - `numpy==2.1.3`
@@ -61,6 +62,7 @@ to run Mothics, which are
 - `tabulate==0.9.0`
 - `tinydb==4.8.2`
 - `toml==0.10.2`
+- `waitress==3.0.2`
 
 Now, activate the virtual environment
 

@@ -8,24 +8,11 @@ Mothics provides a dashboard, an integrated command-line interface,
 and system management tools to analyze navigation tracks.
 
 ## Documentation
-Partial documentation is available on the [internal website](https://audace-sailing-team.github.io) of the Sensor Technology department of Audace Sailing Team.  
-
-The API is available [here](https://audace-sailing-team.github.io/mothics/api/mothics). 
-
-[Full documentation](https://audace-sailing-team.github.io/mothics/docs) will be released soon.
+The API is available
+[here](https://audace-sailing-team.github.io/mothics/api/mothics). [Full documentation](https://audace-sailing-team.github.io/mothics/docs) will be released soon.
 
 ## Quick setup
-### Prerequisites
-The following packages are required:
-- `tmux`
-- `python3`
-- `python3-venv`
-- `pip`
-- `git`
-- `systemd`
-
-> Note: Mothics is designed for use on DietPi and Ubuntu.
-
+Full setup information is available [here](https://audace-sailing-team.github.io/mothics/docs/setup.html).
 ### Installation
 Clone the repository
 ```sh
@@ -47,40 +34,6 @@ To clean up generated files
 ```sh
 make clean
 ```
-
-### Automatic startup configuration
-To run Mothics automatically on startup of the Raspberry Pi as a background service
-```sh
-make install-service
-```
-This will install and start `mothics.service`, ensuring it runs automatically at startup.
-
-## Automatic startup and SSH access
-Mothics can be accessed remotely via SSH. The default address is
-```sh
-ssh root@192.168.42.1
-```
-
-To manually run Mothics
-```sh
-cd mothics
-. .venv/bin/activate
-python3 cli.py 
-```
-
-## Session management
-Mothics runs inside a `tmux` session to keep it active in the background.
-
-To connect to the automatically started session
-```sh
-tmux attach -t mothics
-```
-
-> **Note:** by running `make alias-tmux`, you can join the active
-> Mothics session by using the command `mothics-join` - which is far
-> easier to remember!
-
-To detach from the session (keeping it active), press `CTRL + B`, then `D`.
 
 ## Dashboard
 Mothics provides a web dashboard for viewing navigation data. It is accessible at
@@ -107,7 +60,7 @@ system status. Ensure the virtual environment is active
 
 and start the CLI with
 ```sh
-python -m cli.py
+python3 cli.py
 ```
 
 To exit the CLI, use `exit` or `CTRL-D`. 
@@ -118,6 +71,8 @@ Documentation for most CLI commands is available; run
 ```
 
 ### Available commands
+A partial list of available commands is
+
 - `start live`: starts real-time monitoring
 - `start replay <track_file>`: replays a saved track
 - `start database`: initializes the database
