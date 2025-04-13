@@ -164,7 +164,7 @@
     async function updateDashboard() {
         try {
             // Fetch and update the latest data cards
-            const tableResponse = await fetch('/get_table');
+            const tableResponse = await fetch('/api/get_table');
             const tableHtml = await tableResponse.text();
             document.getElementById('table-container').innerHTML = tableHtml;
 
@@ -192,18 +192,8 @@
 		}
 	    });
 	    
-            // // Restore previous selections from localStorage
-            // document.querySelectorAll('.data-card').forEach(card => {
-            //     let metricName = card.querySelector('h4')?.textContent.trim();
-            //     if (selectedMetrics.size > 0 && !selectedMetrics.has(metricName)) {
-            //         card.style.display = 'none';
-            //     } else {
-            //         card.style.display = 'block';
-            //     }
-            // });
-
             // Fetch and update the remote unit status
-            const statusResponse = await fetch('/get_status');
+            const statusResponse = await fetch('/api/get_status');
             const statusHtml = await statusResponse.text();
             document.getElementById('status-container').innerHTML = statusHtml;
 
@@ -359,8 +349,26 @@ function drawTrack() {
     const prev = gpsHistory[i - 1];
     const curr = gpsHistory[i];
 
+    // Check for missing or non-numeric lat/lon
+    if (
+	!Number.isFinite(prev.lat) ||
+	    !Number.isFinite(prev.lon) ||
+	    !Number.isFinite(curr.lat) ||
+	    !Number.isFinite(curr.lon)
+    ) {
+	continue;
+    }
+      
     const latlngs = [[prev.lat, prev.lon], [curr.lat, curr.lon]];
-    const val = curr[trackColorKey] ?? prev[trackColorKey];
+    let val = curr[trackColorKey] ?? prev[trackColorKey];
+
+    // Apply user-preferred unit conversion if the track color key is "speed"
+    if (trackColorKey === "speed") {
+	const prefs = JSON.parse(localStorage.getItem("mothicsLocalPrefs") || "{}");
+	const userUnit = prefs.prefSpeedUnits || "km/h";
+	val = convertSpeedFromKmh(val, userUnit);
+    }
+
     const color = (val != null && isFinite(val)) ? getColorForTrack(val) : "#3388ff";
 
     const seg = L.polyline(latlngs, {
@@ -490,16 +498,16 @@ fetch("/api/gps_info")
         return btn;
       };
 
-const legendControl = L.control({ position: "bottomright" });
-
-legendControl.onAdd = function () {
-  const div = L.DomUtil.create("div", "leaflet-control leaflet-bar track-legend");
-  updateLegendHTML(div);
-  return div;
-};
-
-legendControl.addTo(leafletMap);
-
+      const legendControl = L.control({ position: "bottomright" });
+	
+      legendControl.onAdd = function () {
+	  const div = L.DomUtil.create("div", "leaflet-control leaflet-bar track-legend");
+	  updateLegendHTML(div);
+	  return div;
+      };
+	
+      legendControl.addTo(leafletMap);
+	
 function updateLegendHTML(container) {
   const title = document.createElement("div");
   title.className = "legend-title";
@@ -508,6 +516,11 @@ function updateLegendHTML(container) {
   const entries = document.createElement("div");
   entries.className = "legend-entries";
 
+  const prefs = JSON.parse(localStorage.getItem("mothicsLocalPrefs") || "{}");
+  const displayUnit = trackColorKey === "speed"
+	? (prefs.prefSpeedUnits || "km/h")
+	: (trackColorUnits || "");
+    
   for (let i = 0; i < colorThresholds.length; i++) {
     const row = document.createElement("div");
     row.className = "legend-row";
@@ -517,8 +530,10 @@ function updateLegendHTML(container) {
     swatch.style.backgroundColor = colorPalette[i];
 
     const label = document.createElement("span");
-    label.textContent = `< ${colorThresholds[i]} ${trackColorUnits}`;
-
+      
+    const labelText = `< ${colorThresholds[i]} ${displayUnit}`;
+      label.textContent = labelText;
+  
     row.appendChild(swatch);
     row.appendChild(label);
     entries.appendChild(row);
@@ -531,7 +546,7 @@ function updateLegendHTML(container) {
   swatch.className = "legend-color";
   swatch.style.backgroundColor = colorPalette[colorPalette.length - 1];
   const label = document.createElement("span");
-  label.textContent = `≥ ${colorThresholds[colorThresholds.length - 1]} ${trackColorUnits}`;
+  label.textContent = `≥ ${colorThresholds[colorThresholds.length - 1]} ${displayUnit}`;
   row.appendChild(swatch);
   row.appendChild(label);
   entries.appendChild(row);
@@ -547,10 +562,35 @@ function updateLegendHTML(container) {
       leafletMap.on("movestart", () => gpsAutoFollow = false);
 
       updateGPS();
-      gpsTimer = setInterval(updateGPS, refreshMs);
+
+      // Fetch backend GPS track history
+      fetch("/api/gps_track")
+	    .then(res => res.ok ? res.json() : null)
+	    .then(trackPayload => {
+		if (!trackPayload || !Array.isArray(trackPayload.track)) return;
+		
+		const prefs = JSON.parse(localStorage.getItem("mothicsLocalPrefs") || "{}");
+		const userUnit = prefs.prefSpeedUnits || "km/h";
+		
+		// Convert the server-supplied 'value' if it's "speed"
+		gpsHistory = trackPayload.track.map(p => ({
+		    time: new Date(p.timestamp).getTime(),
+		    lat: p.lat,
+		    lon: p.lon,
+		    [trackColorKey]: (trackColorKey === "speed" && typeof p.value === "number")
+			? convertSpeedFromKmh(p.value, userUnit)
+			: p.value
+		}));
+		
+		// Render the history on the map
+		drawTrack();
+	    });
+	
+	
+	gpsTimer = setInterval(updateGPS, refreshMs);
     });
   });
-
+  
 const refreshSlider = document.getElementById("gpsRefreshSlider");
 const trackSlider = document.getElementById("gpsTrackSlider");
 

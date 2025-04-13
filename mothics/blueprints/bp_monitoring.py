@@ -15,7 +15,7 @@ def index():
     auto_refresh = current_app.config['AUTO_REFRESH_TABLE']
     return render_template("index.html", script=script, div=div, auto_refresh=auto_refresh)
 
-@monitor_bp.route("/get_table")
+@monitor_bp.route("/api/get_table")
 def get_table():
     database = current_app.config['GETTERS']['database']()
     data_points = database.data_points
@@ -58,7 +58,7 @@ def get_table():
     # The template expects table_data as a list of rows
     return render_template("table.html", table_data=[filtered_row])
 
-@monitor_bp.route("/get_status")
+@monitor_bp.route("/api/get_status")
 def get_status():
     database = current_app.config['GETTERS']['database']()
     latest_data = database.data_points[-1].to_dict() if database.data_points else {}
@@ -126,3 +126,32 @@ def gps_info():
             "units": track_units
         }
     })
+
+@monitor_bp.route("/api/gps_track")
+def gps_track():
+    db = current_app.config['GETTERS']['database']()
+    datapoints = db.data_points[-500:]  # configurable slice (e.g., last 500 points)
+    track_data = []
+
+    track_key = current_app.config.get("TRACK_VARIABLE", "speed")
+    for dp in datapoints:
+        d = dp.to_dict()
+
+        lat_key = next((k for k in d if k.endswith("/gps/lat")), None)
+        lon_key = next((k for k in d if k.endswith("/gps/long")), None)
+        value_key = next((k for k in d if track_key in k and "/gps/" in k), None)
+
+        if lat_key and lon_key:
+            lat = d[lat_key]
+            lon = d[lon_key]
+            val = d.get(value_key)
+
+            track_data.append({
+                "lat": lat,
+                "lon": lon,
+                "value": val,
+                "timestamp": d.get("timestamp")
+            })
+
+    return jsonify({"track": track_data})
+
