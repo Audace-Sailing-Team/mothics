@@ -22,7 +22,7 @@ from .blueprints.bp_database import database_bp
 
 
 class WebApp:
-    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data_cards=None, hidden_data_plots=None, timeout_offline=60, timeout_noncomm=30, track_manager=None, track_manager_directory=None, plot_mode='real-time', gps_tiles_directory=None, track_variable='speed', track_thresholds=None, track_colors=None, track_units=None, out_dir=None, instance_dir=None, system_manager=None):
+    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data_cards=None, hidden_data_plots=None, timeout_offline=60, timeout_noncomm=30, track_manager=None, track_manager_directory=None, plot_mode='real-time', gps_tiles_directory=None, track_variable='speed', track_thresholds=None, track_colors=None, track_units=None, out_dir=None, instance_dir=None, system_manager=None, track_history_minutes=None):
         self.getters = getters or {}
         """Getter methods from other Mothics components"""
         self.setters = setters or {}
@@ -63,6 +63,8 @@ class WebApp:
         """Main process directory"""
         self.plot_mode = plot_mode
         """Data plot mode - `static` or `real-time`"""
+        self.track_history_minutes = track_history_minutes
+        """Track history length in minutes"""
         
         # Setup logger
         self.setup_logging()
@@ -101,8 +103,9 @@ class WebApp:
             'GPS_TILES_DIRECTORY': self.gps_tiles_directory,
             'TRACK_VARIABLE': self.track_variable,
             'TRACK_THRESHOLDS': self.track_thresholds,
-            'TRACK_COLORS': track_colors,
-            'TRACK_UNITS': track_units,
+            'TRACK_COLORS': self.track_colors,
+            'TRACK_UNITS': self.track_units,
+            'GPS_HISTORY_MINUTES': self.track_history_minutes,
             'SYSTEM_MGR': system_manager
         })
         

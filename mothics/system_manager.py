@@ -86,7 +86,8 @@ DEFAULT_CONFIG = {
             "track_variable":'speed',
             "track_thresholds": None,
             "track_colors": None,
-            "track_units": 'm/s'
+            "track_units": 'm/s',
+            "track_history": 10
         },
     },
     "cli": {
@@ -276,6 +277,7 @@ class SystemManager:
                 track_thresholds=self.config["webapp"]["gps"]["track_thresholds"],
                 track_colors=self.config["webapp"]["gps"]["track_colors"],
                 track_units=self.config["webapp"]["gps"]["track_units"],
+                track_history_minutes=self.config["webapp"]["gps"]["track_history"],
                 instance_dir=os.path.dirname(sys.modules['__main__'].__file__),
                 out_dir=self.config["files"]["output_dir"],
                 system_manager=self
