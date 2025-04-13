@@ -1,5 +1,3 @@
-// local_prefs.js
-
 const LOCAL_PREFS_KEY = "mothicsLocalPrefs";
 
 export const LOCAL_SETTINGS_REGISTRY = {
@@ -103,7 +101,7 @@ export function convertSpeedFromKmh(kmh, unit) {
   switch (unit) {
     case "knots": return kmh * 0.539957;
     case "mph": return kmh * 0.621371;
-    case "m_s": return kmh / 3.6;
+    case "m/s": return kmh / 3.6;
     default: return kmh; // km/h
   }
 }
