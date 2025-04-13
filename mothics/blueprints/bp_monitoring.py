@@ -130,7 +130,16 @@ def gps_info():
 @monitor_bp.route("/api/gps_track")
 def gps_track():
     db = current_app.config['GETTERS']['database']()
-    datapoints = db.data_points[-500:]  # configurable slice (e.g., last 500 points)
+    window_minutes = current_app.config.get("GPS_HISTORY_MINUTES", 10)
+    cutoff = datetime.utcnow() - timedelta(minutes=window_minutes)
+
+    # Filter all data points newer than the cutoff timestamp
+    datapoints = [
+        dp for dp in db.data_points
+        if "timestamp" in dp.to_dict() and
+        datetime.fromisoformat(dp.to_dict()["timestamp"]) >= cutoff
+    ]
+    
     track_data = []
 
     track_key = current_app.config.get("TRACK_VARIABLE", "speed")

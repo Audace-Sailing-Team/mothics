@@ -108,6 +108,17 @@ SETTINGS_REGISTRY = {
         "log_success": "Track variable set to {value}"
     },
 
+    "gps_history_minutes": {
+    "type": "int",
+    "tab": "GPS Track",
+    "label": "GPS track history window (minutes)",
+    "placeholder": "e.g. 10",
+    "validate": lambda v: v > 0,
+    "real_time_setter": lambda v, mgr: mgr.webapp.app.config.__setitem__('GPS_HISTORY_MINUTES', v),
+    "config_path": ("webapp", "gps_history_window"),
+    "log_success": "Set GPS history window to {value} minutes."
+    },
+
     # ========= Database =========
     "database_validation": {
         "type": "bool",
