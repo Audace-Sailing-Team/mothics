@@ -569,5 +569,11 @@ trackSlider.addEventListener("input", () => {
 });
 </script>
 
+<script type="module">
+  import { convertSpeedFromKmh } from "{{ url_for('static', filename='local_preferences.js') }}";
+
+  // Make it globally available
+  window.convertSpeedFromKmh = convertSpeedFromKmh;
+</script>
 </body>
 </html>
