@@ -263,7 +263,14 @@ class WebApp:
         self.app.register_blueprint(save_bp)
         self.app.register_blueprint(database_bp)
 
-    def run(self, host="0.0.0.0", port=5000, debug=False):
+    def run_developement(self, host="0.0.0.0", port=5000, debug=False):
+        """
+        Start the integrated Werkzeug server for developement.
+        """
         self.process = Thread(target=self.app.run, kwargs={"host": host, "port": port, "debug": debug, "use_reloader": False}, name='webapp')
         self.process.daemon = True
         self.process.start()
+        
+    def serve(self, host="0.0.0.0", port=5000):
+        from waitress import serve
+        serve(self.app, host=host, port=port)
