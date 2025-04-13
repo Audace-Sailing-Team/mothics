@@ -575,7 +575,8 @@ function updateLegendHTML(container) {
 
 	
       recenterBtn.addTo(leafletMap);
-
+      resetBtn.addTo(leafletMap);
+	
       leafletMap.on("movestart", () => gpsAutoFollow = false);
 
       updateGPS();
