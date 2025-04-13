@@ -6,6 +6,7 @@ import time
 import logging
 from flask import Flask
 from threading import Thread
+from flask_compress import Compress
 from bokeh.server.server import Server
 from bokeh.application import Application
 from bokeh.application.handlers.function import FunctionHandler
@@ -74,6 +75,9 @@ class WebApp:
         
         # Create the Flask app
         self.app = Flask(__name__, template_folder="templates", static_folder='static')
+
+        # Compress responses 
+        Compress(self.app)
         
         # Pass configuration to the app so blueprints can access it
         self.app.config.update({
