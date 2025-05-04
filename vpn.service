@@ -1,0 +1,12 @@
+[Unit]
+Description=FortiVPN Client for %%i
+After=wvdial@%i.service
+
+[Service]
+User=%i
+ExecStart=/usr/bin/openfortivpn --config /home/%i/.openfortivpn/config
+Restart=on-failure
+Type=simple
+
+[Install]
+WantedBy=multi-user.target
