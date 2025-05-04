@@ -23,7 +23,7 @@ from typing import Optional, List, Dict, Any
 from .aggregator import Aggregator
 from .comm_interface import MQTTInterface, SerialInterface, Communicator
 from .webapp import WebApp
-from .helpers import setup_logger, tipify, check_cdn_availability, download_cdn, check_internet_connectivity, download_tiles, list_required_tiles
+from .helpers import setup_logger, tipify, check_cdn_availability, download_cdn, check_internet_connectivity, download_tiles, list_required_tiles, get_device_platform
 from .track import Track
 from .database import Database
 
@@ -93,6 +93,8 @@ DEFAULT_CONFIG = {
     "cli": {
         "button_pin": 21,
         "startup_commands": None
+    },
+    "gpio": {
     }
 }
 
@@ -108,8 +110,9 @@ class SystemManager:
         self.track = None
         self.database = None
         self.config = copy.deepcopy(DEFAULT_CONFIG)  # Always start with default settings as a failsafe
-        
+
         self.load_config()
+        self.device_type = get_device_platform()
 
     def _setup_logger(self, logger_fname, level=logging.INFO):
         setup_logger('logger', fname=logger_fname, silent=False)
@@ -289,14 +292,16 @@ class SystemManager:
     def start_live(self):
         self.initialize_common_components("live")
 
+        # TODO: move on from hardcoded initialization
         interfaces = {}
-
         # Initialize serial interfaces
-        interfaces[SerialInterface] = list(self.config['serial'].values())
-        
+        interfaces[SerialInterface] = list(self.config['serial'].values())        
         # Initialize MQTT interfaces
         interfaces[MQTTInterface] = self.config["mqtt"]
-
+        # Initialize GPIO interfaces
+        if self.device_type == 'rpi':
+            interfaces[GPIOInterface] = list(self.config['gpio'].values())
+        
         # Initialize Communicator
         try:
             self.communicator = Communicator(interfaces=interfaces,
