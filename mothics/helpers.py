@@ -1,3 +1,4 @@
+import platform
 import requests
 import os
 import math
@@ -245,8 +246,55 @@ def list_required_tiles(lat_range, lon_range, zoom_levels):
 
     return tiles                        
 
+
 def get_tile_zoom_levels(tile_dir="static/tiles"):
     if not os.path.exists(tile_dir):
         return 10, 17
     zooms = [int(z) for z in os.listdir(tile_dir) if z.isdigit()]
     return min(zooms), max(zooms) if zooms else (10, 17)
+
+
+def get_device_platform():
+    """
+    Returns a string identifier for the platform:
+    - 'rpi'        Raspberry Pi
+    - 'jetson'     NVIDIA Jetson
+    - 'beaglebone' TI BeagleBone
+    - 'linux'      Generic Linux
+    - 'windows'    Windows
+    - 'darwin'     macOS
+    - 'unknown'    Could not determine
+    """
+    # ARM embedded boards often have this file
+    try:
+        with open("/proc/device-tree/model", "r") as f:
+            model = f.read().lower().strip('\x00\n')
+            if "raspberry pi" in model:
+                return "rpi"
+            elif "jetson" in model:
+                return "jetson"
+            elif "beaglebone" in model:
+                return "beaglebone"
+            else:
+                return "linux"  # ARM SBC, not Pi/Jetson/BB
+    except FileNotFoundError:
+        pass
+
+    # Fallback: /proc/cpuinfo for Pi detection
+    try:
+        with open("/proc/cpuinfo", "r") as f:
+            if any("raspberry pi" in line.lower() for line in f):
+                return "rpi"
+    except FileNotFoundError:
+        pass
+
+    # Fallback: general platform check
+    sysname = platform.system().lower()
+    if "linux" in sysname:
+        return "linux"
+    elif "windows" in sysname:
+        return "windows"
+    elif "darwin" in sysname:
+        return "darwin"
+    else:
+        return "unknown"

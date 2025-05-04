@@ -10,6 +10,7 @@ Classes
 - BaseInterface : Abstract base class defining the required methods for any interface.
 - SerialInterface : Implementation for reading from and writing to a serial (USB) port.
 - MQTTInterface : Implementation for connecting to and communicating with an MQTT broker.
+- GPIOInterface : Implementation for connecting to and communicating with boards via GPIO pins.
 - Communicator : High-level manager that orchestrates all interfaces, merges their data, 
                  and provides a unified interface for publishing and retrieving messages.
 
@@ -21,8 +22,6 @@ Notes
   `connect`, `disconnect`, and `publish` methods.
 
 """
-
-
 import threading
 import random
 import json
@@ -35,6 +34,7 @@ import paho.mqtt.client as mqtt
 from paho.mqtt import MQTTException
 
 from .helpers import setup_logger, tipify
+from .gpio_modules import MODULE_REGISTRY
 
 
 # Interface
@@ -457,6 +457,90 @@ class MQTTInterface(BaseInterface):
         self.logger.info(f"published to {topic}: {message}")
 
 
+class GPIOInterface(BaseInterface):
+    """
+    High-level interface driving one or many GPIOModuleBase instances.
+    """
+    def __init__(self, modules, name=None):
+        """
+        Args:
+            modules: single dict or list of dicts, each with a `type` key.
+        """
+        if isinstance(modules, dict):
+            modules = [modules]
+
+        self.name = name or "gpio"
+        self.logger = logging.getLogger(f"GPIOInterface - {self.name}")
+
+        self.modules = []
+        for mod_cfg in modules:
+            mod_type = mod_cfg.pop("type").lower()
+            mod_cls = MODULE_REGISTRY[mod_type]
+            mod = mod_cls(**mod_cfg)
+            self.modules.append(mod)
+            self.logger.info(f"Loaded module {mod_cls.__name__} for topic {mod.topic_root}")
+
+        self.raw_data = {}
+        self.running = False
+        self.connected = False
+
+    def connect(self):
+        for m in self.modules:
+            m.setup()
+        self.connected = True
+        self._loop_start()
+
+    def disconnect(self):
+        if self.running:
+            self._loop_stop()
+        for m in self.modules:
+            m.cleanup()
+        self.connected = False
+
+    def publish(self, topic, value):
+        """
+        Look for a module that exposes a write() method accepting this topic.
+        """
+        for m in self.modules:
+            if hasattr(m, "write"):               # not every module is writable
+                try:
+                    if m.write(topic, value):
+                        return
+                except KeyError:
+                    continue
+        raise RuntimeError(f"No module handles topic '{topic}'")
+
+    def _loop_start(self):
+        if not self.running:
+            self.running = True
+            threading.Thread(target=self._run_loop,
+                             daemon=True,
+                             name="gpio interface poller").start()
+
+    def _loop_stop(self):
+        self.running = False
+
+    def _run_loop(self):
+        while self.running:
+            for mod in self.modules:
+                # honor per-module polling interval
+                now = time.time()
+                if (mod.last_poll is None
+                        or now - mod.last_poll.timestamp() >= mod.poll_interval):
+                    try:
+                        readings = mod.read()
+                        mod.last_poll = datetime.now()
+                        for topic, val in readings.items():
+                            self.on_message_callback(topic, val)
+                    except Exception as e:
+                        self.logger.warning(f"{mod.name} read error: {e}")
+            time.sleep(0.01)    # tiny scheduler tick
+
+    def on_message_callback(self, topic, value):
+        ts = datetime.now()
+        self.raw_data.setdefault(topic, []).append({ts: value})
+
+        
 # Communicator
 
 class Communicator:
