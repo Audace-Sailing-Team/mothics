@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from .aggregator import Aggregator
-from .comm_interface import MQTTInterface, SerialInterface, Communicator
+from .comm_interface import MQTTInterface, SerialInterface, GPIOInterface, Communicator
 from .webapp import WebApp
 from .helpers import setup_logger, tipify, check_cdn_availability, download_cdn, check_internet_connectivity, download_tiles, list_required_tiles, get_device_platform
 from .track import Track
