@@ -38,13 +38,27 @@ clean:
 	find . -type f -name '*.pyc' -delete
 	rm -rf build/ dist/ *.egg-info
 
-# Install systemd service
+# Install systemd services
 install-service:
 	@echo "Installing systemd service..."
 	sudo cp mothics.service /etc/systemd/system/mothics@.service
 	sudo systemctl daemon-reload
 	sudo systemctl enable mothics@$(USER)
 	sudo systemctl start mothics@$(USER)
+
+install-vpn:
+	@echo "Installing systemd VPN service..."
+	sudo cp vpn.service /etc/systemd/system/openfortivpn@.service
+	sudo systemctl daemon-reload
+	sudo systemctl enable openfortivpn@$(USER)
+	sudo systemctl start openfortivpn@$(USER)
+
+install-modem:
+	@echo "Installing systemd modem service..."
+	sudo cp modem.service /etc/systemd/system/wvdial@.service
+	sudo systemctl daemon-reload
+	sudo systemctl enable wvdial@$(USER)
+	sudo systemctl start wvdial@$(USER)
 
 # Add an alias for quickly attaching to the tmux session
 alias-tmux:

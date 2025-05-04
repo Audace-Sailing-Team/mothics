@@ -1,0 +1,13 @@
+[Unit]
+Description=WvDial Modem Connection for %%i
+After=network.target
+Before=openfortivpn@%i.service
+
+[Service]
+User=%i
+ExecStart=/usr/bin/wvdial --config /home/%i/.wvdial.conf
+Restart=on-failure
+Type=simple
+
+[Install]
+WantedBy=multi-user.target
