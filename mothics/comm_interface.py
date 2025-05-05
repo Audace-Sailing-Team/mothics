@@ -459,88 +459,78 @@ class MQTTInterface(BaseInterface):
 
 class GPIOInterface(BaseInterface):
     """
-    High-level interface driving one or many GPIOModuleBase instances.
+    A GPIOInterface represents one sensor or actuator connected to GPIO.
+    It wraps a single GPIOModuleBase instance.
     """
-    def __init__(self, modules, name=None):
+
+    def __init__(self, type, name=None, **kwargs):
         """
         Args:
-            modules: single dict or list of dicts, each with a `type` key.
+            type (str): the type of the module (looked up in MODULE_REGISTRY)
+            name (str): optional label for logging
+            **kwargs: passed to the module constructor (e.g. pin, topic_root, etc.)
         """
-        if isinstance(modules, dict):
-            modules = [modules]
-
-        self.name = name or "gpio"
+        self.name = name or f"gpio-{type.lower()}"
         self.logger = logging.getLogger(f"GPIOInterface - {self.name}")
-
-        self.modules = []
-        for mod_cfg in modules:
-            mod_type = mod_cfg.pop("type").lower()
-            mod_cls = MODULE_REGISTRY[mod_type]
-            mod = mod_cls(**mod_cfg)
-            self.modules.append(mod)
-            self.logger.info(f"Loaded module {mod_cls.__name__} for topic {mod.topic_root}")
-
         self.raw_data = {}
         self.running = False
         self.connected = False
 
+        mod_cls = MODULE_REGISTRY[type.lower()]
+        self.module = mod_cls(**kwargs)
+        self.logger.info(f"Loaded {mod_cls.__name__} → {self.module.topic_root}")
+
     def connect(self):
-        for m in self.modules:
-            m.setup()
+        self.module.setup()
         self.connected = True
         self._loop_start()
 
     def disconnect(self):
         if self.running:
             self._loop_stop()
-        for m in self.modules:
-            m.cleanup()
+        self.module.cleanup()
         self.connected = False
 
     def publish(self, topic, value):
-        """
-        Look for a module that exposes a write() method accepting this topic.
-        """
-        for m in self.modules:
-            if hasattr(m, "write"):               # not every module is writable
-                try:
-                    if m.write(topic, value):
-                        return
-                except KeyError:
-                    continue
-        raise RuntimeError(f"No module handles topic '{topic}'")
+        if hasattr(self.module, "write"):
+            try:
+                if self.module.write(topic, value):
+                    return
+            except Exception:
+                pass
+        raise RuntimeError(f"[{self.name}] Module can't handle topic '{topic}'")
 
     def _loop_start(self):
-        if not self.running:
-            self.running = True
-            threading.Thread(target=self._run_loop,
-                             daemon=True,
-                             name="gpio interface poller").start()
+        self.running = True
+        self.thread = threading.Thread(target=self._run_loop,
+                                       daemon=True,
+                                       name=f"gpio-poller-{self.name}")
+        self.thread.start()
 
     def _loop_stop(self):
         self.running = False
+        if hasattr(self, 'thread') and self.thread.is_alive():
+            self.thread.join()
 
     def _run_loop(self):
         while self.running:
-            for mod in self.modules:
-                # honor per-module polling interval
-                now = time.time()
-                if (mod.last_poll is None
-                        or now - mod.last_poll.timestamp() >= mod.poll_interval):
-                    try:
-                        readings = mod.read()
-                        mod.last_poll = datetime.now()
-                        for topic, val in readings.items():
-                            self.on_message_callback(topic, val)
-                    except Exception as e:
-                        self.logger.warning(f"{mod.name} read error: {e}")
-            time.sleep(0.01)    # tiny scheduler tick
+            now = time.time()
+            m = self.module
+            if m.last_poll is None or (now - m.last_poll.timestamp()) >= m.poll_interval:
+                try:
+                    readings = m.read()
+                    m.last_poll = datetime.now()
+                    for topic, val in readings.items():
+                        self.on_message_callback(topic, val)
+                except Exception as e:
+                    self.logger.warning(f"[{self.name}] {m.__class__.__name__} read error: {e}")
+            time.sleep(0.01)
 
     def on_message_callback(self, topic, value):
         ts = datetime.now()
         self.raw_data.setdefault(topic, []).append({ts: value})
-
         
+
 # Communicator
 
 class Communicator:
