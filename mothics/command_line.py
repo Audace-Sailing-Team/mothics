@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import board
 import re
 import socket
 import threading
@@ -20,13 +21,14 @@ from typing import Optional, List, Dict, Any
 # Import GPIO and continue gracefully if we aren't on a RasPi
 try:
     import RPi.GPIO as GPIO
+    import tm1637
     IS_RASPI = True
 except:
     IS_RASPI = False
 
 from .helpers import setup_logger, tipify, check_internet_connectivity, list_required_tiles, download_tiles
 from .system_manager import SystemManager
-
+from .display_logger import DisplayLogger
 
 # Intro message
 margin = "  "  # 2-space left margin
@@ -88,6 +90,41 @@ class MothicsCLI(Cmd):
         self.gpio_thread = threading.Thread(target=gpio_listener, daemon=True, name='CLI GPIO listener')
         self.gpio_thread.start()
 
+    def _init_display(self):
+        if self.system_manager.device_type != 'rpi':
+            return
+        # Check if display is available at specified pins
+        clk_pin = 24  # Clock pin (SCL)
+        dio_pin = 25  # Data pin (SDA)
+
+        try:
+            # Convert BCM pins to board.Dxx
+            clk = getattr(board, f"D{clk_pin}")
+            dio = getattr(board, f"D{dio_pin}")
+            
+            # Attempt to connect to display
+            display = tm1637.TM1637(clk=clk, dio=dio)
+            display.brightness(1)
+            
+            # Test: flash something
+            display.show("INIT")
+            time.sleep(0.5)
+            display.show("   ")
+            
+            # Extend logger
+            logging.setLoggerClass(DisplayLogger)
+            logger = logging.getLogger()
+            logger.display_iface = display  # this is a raw tm1637.TM1637 object
+            
+            logger.info("Display ready", code="RDY")
+            
+        except Exception as e:
+            self.print(f"Display not initialized: {e}", level='warning')
+
+        
+        # Use logger with display capabilities
+        logging.setLoggerClass(DisplayLogger)
+        
     def _shutdown_or_reboot(self):
         """Determines whether to reboot or shut down based on button press duration."""
         start_time = time.time()
