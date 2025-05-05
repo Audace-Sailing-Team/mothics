@@ -32,7 +32,7 @@ from .database import Database
 DEFAULT_CONFIG = {
     "serial": {
         "port1": {
-            "name": "Port 1",
+            "name": "Fallback",
             "port": "/dev/ttyACM0",
             "baudrate": 9600,
             "topics": "rm2/wind/speed"
@@ -41,6 +41,8 @@ DEFAULT_CONFIG = {
     "mqtt": {
         "hostname": "test.mosquitto.org",
         "topics": ["rm1/gps/lat", "rm1/gps/long"]
+    },
+    "gpio": {
     },
     "communicator": {
         "max_values": 1e3,
@@ -93,8 +95,6 @@ DEFAULT_CONFIG = {
     "cli": {
         "button_pin": 21,
         "startup_commands": None
-    },
-    "gpio": {
     }
 }
 
@@ -301,7 +301,7 @@ class SystemManager:
         # Initialize GPIO interfaces
         if self.device_type == 'rpi':
             interfaces[GPIOInterface] = list(self.config['gpio'].values())
-        
+
         # Initialize Communicator
         try:
             self.communicator = Communicator(interfaces=interfaces,
@@ -309,7 +309,7 @@ class SystemManager:
                                              trim_fraction=self.config["communicator"]["trim_fraction"])
         except Exception as e:
             self.logger.critical(f"error in initializing communicator, got {e}")
-            
+
         self.communicator.connect()
 
         # Set up aggregator
