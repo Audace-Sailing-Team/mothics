@@ -165,8 +165,8 @@ class MothicsCLI(Cmd):
         commands = self.system_manager.config['cli']['startup_commands']
         # Start gpio monitor if we're on a RasPi
         if IS_RASPI and self.system_manager.device_type=='rpi':
-            # self._start_gpio_monitor()
-            self._init_display()
+            self._start_gpio_monitor()
+            # self._init_display()
         else:
             self.print("Shutdown button is not available.", level='warning')
         # Run commands 
