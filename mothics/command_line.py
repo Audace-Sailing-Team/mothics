@@ -94,17 +94,13 @@ class MothicsCLI(Cmd):
         if self.system_manager.device_type != 'rpi':
             return
         # Check if display is available at specified pins
-        clk_pin = 24  # Clock pin (SCL)
-        dio_pin = 25  # Data pin (SDA)
+        clk_pin = 23  # Clock pin (SCL)
+        dio_pin = 24  # Data pin (SDA)
 
         try:
-            # Convert BCM pins to board.Dxx
-            clk = getattr(board, f"D{clk_pin}")
-            dio = getattr(board, f"D{dio_pin}")
-            
             # Attempt to connect to display
-            display = tm1637.TM1637(clk=clk, dio=dio)
-            display.brightness(1)
+            display = tm1637.TM1637(clk=clk_pin, dio=dio_pin)
+            display.brightness(7)
             
             # Test: flash something
             display.show("INIT")
@@ -169,7 +165,8 @@ class MothicsCLI(Cmd):
         commands = self.system_manager.config['cli']['startup_commands']
         # Start gpio monitor if we're on a RasPi
         if IS_RASPI and self.system_manager.device_type=='rpi':
-            self._start_gpio_monitor()
+            # self._start_gpio_monitor()
+            self._init_display()
         else:
             self.print("Shutdown button is not available.", level='warning')
         # Run commands 
