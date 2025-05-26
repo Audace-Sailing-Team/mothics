@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from .aggregator import Aggregator
-from .comm_interface import MQTTInterface, SerialInterface, GPIOInterface, Communicator
+from .comm_interface import MQTTInterface, SerialInterface, GPIOInterface, Communicator, available_interfaces
 from .webapp import WebApp
 from .helpers import setup_logger, tipify, check_cdn_availability, download_cdn, check_internet_connectivity, download_tiles, list_required_tiles, get_device_platform
 from .track import Track
@@ -292,16 +292,29 @@ class SystemManager:
     def start_live(self):
         self.initialize_common_components("live")
 
-        # TODO: move on from hardcoded initialization
+        # Initialize intefaces
         interfaces = {}
-        # Initialize serial interfaces
-        interfaces[SerialInterface] = list(self.config['serial'].values())        
-        # Initialize MQTT interfaces
-        interfaces[MQTTInterface] = self.config["mqtt"]
-        # Initialize GPIO interfaces
-        if self.device_type == 'rpi':
-            interfaces[GPIOInterface] = list(self.config['gpio'].values())
 
+        for section_name, section_cfg in self.config.items():
+            iface_cls = available_interfaces.get(section_name)
+            if iface_cls is None:
+                self.logger.warning("Ignoring unknown interface section: %s", section_name)
+                continue
+            
+            # Skip GPIO on non-Raspberry Pi targets.
+            if iface_cls is GPIOInterface and self.device_type != "rpi":
+                continue
+            
+            # Distinguish “one interface” vs “many sub-interfaces”.
+            if isinstance(section_cfg, dict) and section_cfg and all(
+                    isinstance(v, dict) for v in section_cfg.values()
+            ):
+                # Many sub-interfaces (serial, gpio, …)
+                interfaces[iface_cls] = list(section_cfg.values())
+            else:
+                # Single interface (mqtt, …)
+                interfaces[iface_cls] = section_cfg
+                        
         # Initialize Communicator
         try:
             self.communicator = Communicator(interfaces=interfaces,
