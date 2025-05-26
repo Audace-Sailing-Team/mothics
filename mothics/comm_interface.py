@@ -532,6 +532,8 @@ class GPIOInterface(BaseInterface):
         
 
 # Communicator
+available_interfaces = {'serial': SerialInterface, 'mqtt': MQTTInterface, 'gpio': GPIOInterface}
+
 
 class Communicator:
     """
@@ -542,7 +544,8 @@ class Communicator:
     selectively, and retrieve merged data from all interfaces.
     """
     
-    def __init__(self, interfaces=None, max_values=1e3, trim_fraction=0.5):
+    def __init__(self, interfaces=None, max_values=1000,
+                 trim_fraction=0.5, preprocessors=None):
         """
         Initialize the Communicator with desired interfaces.
 
@@ -569,8 +572,6 @@ class Communicator:
         """Trim threshold for raw_data dict"""
         self.trim_fraction = trim_fraction
         """Fraction of values to trim from raw_data"""
-        self.preprocessors = []
-        """Preprocessors for incoming data"""
         
         # Setup logger
         self.logger = logging.getLogger("Communicator")
@@ -579,6 +580,41 @@ class Communicator:
         # Initialize interfaces if provided
         if interfaces:
             self.add_interfaces(interfaces)
+
+        # Initialize preprocessors
+        if preprocessors is None:
+            preprocessors = {}
+
+        self.preprocessors = preprocessors
+        """Preprocessors for incoming data"""
+        # Handle single processor class case
+        if isinstance(self.preprocessors, type):
+            self.preprocessors = {self.preprocessors: {}}
+        # Handle dict with single interface
+        elif not isinstance(self.preprocessors, dict):
+            raise ValueError("interfaces must be a class or dict of {class: kwargs}")
+            
+        # Initialize each processor
+        for processor_class, kwargs in self.preprocessors.items():
+            if isinstance(kwargs, list):
+                for kwarg in kwargs:
+                    class_name = processor_class.__name__
+                    if kwarg['name'] is not None:
+                        class_name = processor_class.__name__+'_'+kwarg['name']
+                    if class_name in self.preprocessors:
+                        self.logger.warning(f"interface {class_name} already exists, skipping")
+                        continue
+                
+                    try:
+                        self.preprocessors[class_name] = processor_class(**kwarg)
+                        self.logger.info(f"initialized {class_name} with kwargs: {kwarg}")
+                    except Exception as e:
+                        self.logger.critical(f"failed to initialize {class_name}: {e}")
+                        raise RuntimeError(f"failed to initialize {class_name}: {e}")
+        
+        # TODO: check preprocessors type (dict -> {Processor: [{arg1: value1, ...}, ...])
+        # TODO: initialize preprocessors, one by one (loop)
+        #       => self.preprocessors 
             
     def add_interfaces(self, interfaces):
         """
@@ -710,7 +746,7 @@ class Communicator:
             AssertionError: If the topic does not have exactly 3 sections.
         """
         topic_split = topic.split("/")
-        assert len(topic_split) == 3, "topic is malformed, got {topic_split}"
+        assert len(topic_split) == 3, f"topic is malformed, got {topic_split}"
         return topic_split
 
     @property
@@ -742,21 +778,15 @@ class Communicator:
                 if topic not in merged_data:
                     merged_data[topic] = []
                 merged_data[topic].extend(data_list)
-        
+
+        # Preprocess each data item
+        for processor in self.preprocessors.values():
+            merged_data = processor.apply(merged_data)
+
         # Sort data by timestamp for each topic
         for topic in merged_data:
             merged_data[topic].sort(key=lambda x: list(x.keys())[0])
 
-            # Preprocess each data item
-            # NOTE: processing functions should operate on data columns            
-            if hasattr(self, 'preprocessors') and self.preprocessors:
-                processed_list = []
-                for item in merged_data[topic]:
-                    for processor in self.preprocessors:
-                        item = processor(item, topic)
-                    processed_list.append(item)
-                merged_data[topic] = processed_list
-            
         return merged_data        
     
     def publish(self, topic, payload, interfaces=None):
