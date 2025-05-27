@@ -298,3 +298,21 @@ def get_device_platform():
         return "darwin"
     else:
         return "unknown"
+
+    
+def parse_uc_table(tbl):
+    """Return kwargs dict for Communicator, not the processor instance."""
+    conversions = {}
+    for key, value in tbl.items():
+        if key in {"name"}:
+            continue
+        dst, expr = value.split("@", 1)
+        dst, expr = dst.strip(), expr.strip()
+
+        code = compile(expr, "<unit_conversion>", "eval")
+        conversions[key] = (dst, lambda v, c=code: eval(c, {"value": v}))
+
+    return {
+        "conversions":   conversions,
+        "name":          tbl.get("name")
+    }
