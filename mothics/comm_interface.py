@@ -567,7 +567,9 @@ class Communicator:
                 whenever a topic exceeds `max_values`. Defaults to 0.5.
         """
         self.interfaces = {}
-        """Dictionary of interface instances keyed by a unique name."""
+        """Dictionary of interface instances keyed by a unique name"""
+        self.preprocessors = {}
+        """Preprocessing classes for data treatment"""
         self.max_values = max_values
         """Trim threshold for raw_data dict"""
         self.trim_fraction = trim_fraction
@@ -585,37 +587,81 @@ class Communicator:
         if preprocessors is None:
             preprocessors = {}
 
-        self.preprocessors = preprocessors
-        """Preprocessors for incoming data"""
-        # Handle single processor class case
-        if isinstance(self.preprocessors, type):
-            self.preprocessors = {self.preprocessors: {}}
-        # Handle dict with single interface
-        elif not isinstance(self.preprocessors, dict):
-            raise ValueError("interfaces must be a class or dict of {class: kwargs}")
-            
         # Initialize each processor
-        for processor_class, kwargs in self.preprocessors.items():
-            if isinstance(kwargs, list):
-                for kwarg in kwargs:
-                    class_name = processor_class.__name__
-                    if kwarg['name'] is not None:
-                        class_name = processor_class.__name__+'_'+kwarg['name']
-                    if class_name in self.preprocessors:
-                        self.logger.warning(f"interface {class_name} already exists, skipping")
+        if preprocessors:
+            self.add_preprocessors(preprocessors)
+
+    def add_preprocessors(self, processors):
+        """
+        Add new data-pre-processors to the Communicator.
+
+        You can pass a single processor class or a dictionary that maps
+        processor classes to their kwargs.
+
+        Args
+        ----
+        processors : Union[type, dict]
+            * Class  → instantiated with no kwargs.
+            * Dict   → {ProcessorClass: {arg: val, …}}
+                        or {ProcessorClass: [ {...}, {...} ]} for many instances.
+
+        Raises
+        ------
+        ValueError   If *processors* is neither a class nor a dict.
+        RuntimeError If any processor fails to initialise.
+        """
+        # -------- normalise input ----------------------------------------
+        if isinstance(processors, type):
+            processors = {processors: {}}
+        elif not isinstance(processors, dict):
+            raise ValueError("processors must be a class or dict of {class: kwargs}")
+
+        # -------- build all instances first, then merge ------------------
+        instances_to_add = {}        # avoid mutating self.preprocessors while iterating
+
+        for proc_cls, cfg in processors.items():
+
+            # -- many sub-instances (list of kwargs) ----------------------
+            if isinstance(cfg, list):
+                for kw in cfg:
+                    class_name = proc_cls.__name__
+                    suffix = kw.get("name") if isinstance(kw, dict) else None
+                    if suffix:
+                        class_name = f"{class_name}_{suffix}"
+
+                    if class_name in self.preprocessors or class_name in instances_to_add:
+                        self.logger.warning(f"processor {class_name} already exists, skipping")
                         continue
-                
+
                     try:
-                        self.preprocessors[class_name] = processor_class(**kwarg)
-                        self.logger.info(f"initialized {class_name} with kwargs: {kwarg}")
+                        instances_to_add[class_name] = proc_cls(**kw)
+                        self.logger.info(f"initialized {class_name} with kwargs: {kw}")
                     except Exception as e:
                         self.logger.critical(f"failed to initialize {class_name}: {e}")
                         raise RuntimeError(f"failed to initialize {class_name}: {e}")
-        
-        # TODO: check preprocessors type (dict -> {Processor: [{arg1: value1, ...}, ...])
-        # TODO: initialize preprocessors, one by one (loop)
-        #       => self.preprocessors 
-            
+
+            # -- single instance ------------------------------------------
+            else:
+                kw = cfg if isinstance(cfg, dict) else {}
+                class_name = proc_cls.__name__
+                suffix = kw.get("name")
+                if suffix:
+                    class_name = f"{class_name}_{suffix}"
+
+                if class_name in self.preprocessors or class_name in instances_to_add:
+                    self.logger.warning(f"processor {class_name} already exists, skipping")
+                    continue
+
+                try:
+                    instances_to_add[class_name] = proc_cls(**kw)
+                    self.logger.info(f"initialized {class_name} with kwargs: {kw}")
+                except Exception as e:
+                    self.logger.critical(f"failed to initialize {class_name}: {e}")
+                    raise RuntimeError(f"failed to initialize {class_name}: {e}")
+
+        # -------- finally merge into the live dict -----------------------
+        self.preprocessors.update(instances_to_add)
+
     def add_interfaces(self, interfaces):
         """
         Add new interfaces to the Communicator.

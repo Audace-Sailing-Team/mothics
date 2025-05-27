@@ -22,8 +22,9 @@ from typing import Optional, List, Dict, Any
 
 from .aggregator import Aggregator
 from .comm_interface import MQTTInterface, SerialInterface, GPIOInterface, Communicator, available_interfaces
+from .preprocessors import UnitConversion, available_processors
 from .webapp import WebApp
-from .helpers import setup_logger, tipify, check_cdn_availability, download_cdn, check_internet_connectivity, download_tiles, list_required_tiles, get_device_platform
+from .helpers import setup_logger, tipify, check_cdn_availability, download_cdn, check_internet_connectivity, download_tiles, list_required_tiles, get_device_platform, parse_uc_table
 from .track import Track
 from .database import Database
 
@@ -120,31 +121,65 @@ class SystemManager:
         self.logger = logging.getLogger("SystemManager")
 
     def load_config(self):
-        """Loads the configuration file and merges it with defaults."""
-        config_from_file = {}
-        
+        """Load TOML and overlay DEFAULT_CONFIG, but keep new sections intact."""
+        cfg_file = {}
         if os.path.exists(self.config_file):
             try:
-                config_from_file = toml.load(self.config_file)
+                cfg_file = toml.load(self.config_file)
             except Exception as e:
-                # Initialize the logger even if config loading fails
                 self._setup_logger(self.config["files"]["logger_fname"])
-                
-                self.logger.warning(f"error loading configuration from {self.config_file}: {e}. Using defaults.")
+                self.logger.warning(
+                    f"error loading {self.config_file}: {e}. Using defaults."
+                )
         else:
-            # If the config file doesn't exist, log a warning but keep using defaults
             self._setup_logger(self.config["files"]["logger_fname"])
+            self.logger.info(
+                f"no configuration file '{self.config_file}' found. Using defaults."
+            )
+
+        # --- merge --------------------------------------------------------
+        # 1) start with a *copy* of the defaults
+        self.config = {k: v.copy() if isinstance(v, dict) else v
+                       for k, v in DEFAULT_CONFIG.items()}
+
+        # 2) overlay everything that came from the file
+        for section, data in cfg_file.items():
+            if (isinstance(data, dict)
+                    and isinstance(self.config.get(section), dict)):
+                self.config[section].update(data)   # deep-merge dicts
+            else:
+                self.config[section] = data         # new or non-dict section
+
+        # logger is ready now
+        self._setup_logger(self.config["files"]["logger_fname"])
+        self.logger.info("configuration loaded (file + defaults)")
+        
+    # def load_config(self):
+    #     """Loads the configuration file and merges it with defaults."""
+    #     config_from_file = {}
+        
+    #     if os.path.exists(self.config_file):
+    #         try:
+    #             config_from_file = toml.load(self.config_file)
+    #         except Exception as e:
+    #             # Initialize the logger even if config loading fails
+    #             self._setup_logger(self.config["files"]["logger_fname"])
+                
+    #             self.logger.warning(f"error loading configuration from {self.config_file}: {e}. Using defaults.")
+    #     else:
+    #         # If the config file doesn't exist, log a warning but keep using defaults
+    #         self._setup_logger(self.config["files"]["logger_fname"])
             
-            self.logger.info(f"no configuration file '{self.config_file}' found. Using defaults.")
+    #         self.logger.info(f"no configuration file '{self.config_file}' found. Using defaults.")
 
-        # Merge loaded config into defaults (config values overwrite defaults)
-        for section, defaults in DEFAULT_CONFIG.items():
-            self.config[section] = {**defaults, **config_from_file.get(section, {})}
+    #     # Merge loaded config into defaults (config values overwrite defaults)
+    #     for section, defaults in DEFAULT_CONFIG.items():
+    #         self.config[section] = {**defaults, **config_from_file.get(section, {})}
 
-        # Set up the logger using the final merged config
-        logger_fname = self.config["files"]["logger_fname"]
-        self._setup_logger(logger_fname)
-        self.logger.info(f"configuration loaded successfully from {self.config_file if config_from_file else 'defaults'}.")
+    #     # Set up the logger using the final merged config
+    #     logger_fname = self.config["files"]["logger_fname"]
+    #     self._setup_logger(logger_fname)
+    #     self.logger.info(f"configuration loaded successfully from {self.config_file if config_from_file else 'defaults'}.")
         
     def initialize_cdns(self):
         """ Initializes CDNs for webapp display """
@@ -292,20 +327,20 @@ class SystemManager:
     def start_live(self):
         self.initialize_common_components("live")
 
-        # Initialize intefaces
+        # Initialize interfaces
         interfaces = {}
 
         for section_name, section_cfg in self.config.items():
             iface_cls = available_interfaces.get(section_name)
+            # Ignore unknown/unavailable interfaces
             if iface_cls is None:
-                self.logger.warning("Ignoring unknown interface section: %s", section_name)
                 continue
             
-            # Skip GPIO on non-Raspberry Pi targets.
+            # Skip GPIO on non-Raspberry Pi targets
             if iface_cls is GPIOInterface and self.device_type != "rpi":
                 continue
             
-            # Distinguish “one interface” vs “many sub-interfaces”.
+            # Distinguish “one interface” vs “many sub-interfaces”
             if isinstance(section_cfg, dict) and section_cfg and all(
                     isinstance(v, dict) for v in section_cfg.values()
             ):
@@ -314,10 +349,37 @@ class SystemManager:
             else:
                 # Single interface (mqtt, …)
                 interfaces[iface_cls] = section_cfg
-                        
+
+        # Initialize preprocessors
+        preprocessors = {}
+
+        for section_name, section_cfg in self.config.items():
+            proc_cls = available_processors.get(section_name)
+            if proc_cls is None:
+                continue
+
+            if proc_cls is UnitConversion:
+                # translate TOML to kwargs with our helper
+                kwargs = parse_uc_table(section_cfg)
+                
+                # allow more than one instance (rare, but keeps the API uniform)
+                preprocessors.setdefault(proc_cls, []).append(kwargs)
+                continue
+            
+            # Distinguish “one interface” vs “many sub-interfaces”.
+            if isinstance(section_cfg, dict) and section_cfg and all(
+                    isinstance(v, dict) for v in section_cfg.values()
+            ):
+                # Many sub-interfaces (serial, gpio, …)
+                preprocessors[proc_cls] = list(section_cfg.values())
+            else:
+                # Single interface (mqtt, …)
+                preprocessors[proc_cls] = section_cfg
+                
         # Initialize Communicator
         try:
             self.communicator = Communicator(interfaces=interfaces,
+                                             preprocessors=preprocessors,
                                              max_values=self.config["communicator"]["max_values"],
                                              trim_fraction=self.config["communicator"]["trim_fraction"])
         except Exception as e:
