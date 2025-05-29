@@ -653,7 +653,7 @@ class Communicator:
 
                 try:
                     instances_to_add[class_name] = proc_cls(**kw)
-                    self.logger.info(f"initialized {class_name} with kwargs: {kw}")
+                    self.logger.info(f"initialized preprocessor {class_name} with kwargs: {kw}")
                 except Exception as e:
                     self.logger.critical(f"failed to initialize {class_name}: {e}")
                     raise RuntimeError(f"failed to initialize {class_name}: {e}")

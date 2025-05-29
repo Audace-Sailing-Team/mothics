@@ -163,4 +163,3 @@ def gps_track():
             })
 
     return jsonify({"track": track_data})
-
