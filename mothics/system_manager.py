@@ -371,11 +371,11 @@ class SystemManager:
                     isinstance(v, dict) for v in section_cfg.values()
             ):
                 # Many sub-interfaces (serial, gpio, …)
-                preprocessors[proc_cls] = list(section_cfg.values())
+                preprocessors[proc_cls] = section_cfg # list(section_cfg.values())
             else:
                 # Single interface (mqtt, …)
                 preprocessors[proc_cls] = section_cfg
-                
+
         # Initialize Communicator
         try:
             self.communicator = Communicator(interfaces=interfaces,
