@@ -1,62 +1,5 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mothics Dashboard</title>
-
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap.min.css') }}">
-    <script src="{{ url_for('static', filename='bootstrap.bundle.min.js') }}"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-   
-    <!-- Bokeh Scripts -->
-    <script src="{{ url_for('static', filename='bokeh-3.6.2.min.js')}}"></script>
-    <script src="{{ url_for('static', filename='bokeh-widgets-3.6.2.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='bokeh-tables-3.6.2.min.js') }}"></script>
-
-    <!-- Leaflet Scripts -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='leaflet.css') }}">
-    <script src="{{ url_for('static', filename='leaflet.js') }}"></script>
-
-    <!-- Favicon -->
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
-</head>
-<body>
-  <!-- Header and Navigation -->
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
-  <div class="container-fluid">
-    <!-- Title -->
-    <a class="navbar-brand" href="/">
-      <img src="{{ url_for('static', filename='logo.png') }}" alt="AST logo" height="30">
-      Mothics
-    </a>
-    
-    <!-- Toggler Button for Small Screens -->
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-
-    <!-- Navbar Links -->
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
-        <li class="nav-item">
-          <a class="nav-link active" aria-current="page" href="/">Home</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/logs">Logs</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/settings">Settings</a>
-        </li>
-	<li class="nav-item">
-          <a class="nav-link" href="/tracks">Tracks</a>
-        </li>
-      </ul>
-    </div>
-  </div>
-</nav>
-
+{% extends "base.html" %}
+{% block content %}
     <!-- Main Content Block -->
     <div class="container mt-4">
     <h1 class="mb-4" align="center">Dashboard</h1>
@@ -148,15 +91,6 @@
         {{ div | safe }}
       </div>
     </div>
-
-    <!-- Footer -->
-    <footer class="bg-light text-center text-muted py-3 border-top">
-      <div class="container">
-	<small>&copy; {{ current_year or 2025 }} - Audace Sailing Team </small>
-      </div>
-    </footer>
-    
-</div>
 
 <!-- Dashboard update -->
 <script>
@@ -636,5 +570,4 @@ trackSlider.addEventListener("input", () => {
   // Make it globally available
   window.convertSpeedFromKmh = convertSpeedFromKmh;
 </script>
-</body>
-</html>
+{% endblock %}
