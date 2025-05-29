@@ -24,7 +24,7 @@ Example entry:
 
 Field descriptions:
 
- - `type`: type expected from user input; one of "string", "float", "int", "bool"
+ - `type`: type expected from user input; one of "string", "float", "int", "bool", "button", "taglist", "kvtable"
  - `tab`: tab name shown in the UI where the field will appear
  - `label`: human-readable label shown above the form input
  - `placeholder`: optional string shown as a hint inside the input box
@@ -246,43 +246,71 @@ SETTINGS_REGISTRY = {
         "validate": lambda v: v in ["continuous", "on-demand"],
         "config_path": ("saving", "default_mode"),
         "log_success": "Saving mode set to {value}"
-    }
-}
-
-
-# SETTINGS_REGISTRY = {
-#     # ========== Aggregator Settings ==========
-#     "aggregator_interval": {
-#         "type": "float",
-#         "tab": "Data aggregation",
-#         "label": "Aggregator refresh interval (s)",
-#         "placeholder": "Enter value in seconds...",
-#         "validate": lambda v: v > 0,
-#         "setter_name": "aggregator_refresh_rate",
-#         "config_path": ("aggregator", "interval"),
-#         "log_success": "Aggregator interval set to {value} seconds."
-#     },
-
-#     # ========== WebApp Settings ==========
-#     "auto_refresh_table": {
-#         "type": "float",
-#         "tab": "Webapp",
-#         "label": "Dashboard refresh interval",
-#         "placeholder": "Enter value in seconds...",
-#         "validate": lambda v: v > 0,
-#         "real_time_setter": lambda v, mgr: mgr.webapp.app.config.__setitem__('AUTO_REFRESH_TABLE', v * 1000),
-#         "config_path": ("webapp", "data_refresh"),
-#         "log_success": "Auto-refresh set to {value} s"
-#     },
+    },
+    # ============== IMU ================
+    "yaw_offset": {
+        "type": "float",
+        "tab": "Calibration",
+        "label": "Yaw offset (°)",
+        "placeholder": "0 → no change",
+        "validate": lambda v: -180.0 <= v <= 180.0,
+        "real_time_setter": (
+            lambda v, mgr:
+            mgr.communicator
+            .preprocessors["AngleOffset_default"]      # ← class name or instance name
+            .set_offset("rm1/imu/yaw", v)
+        ),
+        "config_path": ("angle_offset", "rm1/imu/yaw"),
+        "log_success": "Yaw offset set to {value}°"
+    },
     
-#     "plot_mode": {
-#         "type": "string",
-#         "tab": "Webapp",
-#         "label": "Current plot mode",
-#         "validate": lambda v: v in ["Static", "Real-time"],
-#         "choices": ["Static", "Real-time"],
-#         "real_time_setter": lambda v, mgr: mgr.webapp.app.config.__setitem__('PLOT_MODE', v),
-#         "config_path": ("webapp", "plot_mode"),
-#         "log_success": "Plot mode changed to {value}"
-#     }
-# }
+    "pitch_offset": {
+        "type": "float",
+        "tab": "Calibration",
+        "label": "Pitch offset (°)",
+        "placeholder": "0 → no change",
+        "validate": lambda v: -90.0 <= v <= 90.0,
+        "real_time_setter": (
+            lambda v, mgr:
+            mgr.communicator
+            .preprocessors["AngleOffset_default"]
+            .set_offset("rm1/imu/pitch", v)
+        ),
+        "config_path": ("angle_offset", "rm1/imu/pitch"),
+        "log_success": "Pitch offset set to {value}°"
+    },
+    
+    "roll_offset": {
+        "type": "float",
+        "tab": "Calibration",
+        "label": "Roll offset (°)",
+        "placeholder": "0 → no change",
+        "validate": lambda v: -180.0 <= v <= 180.0,
+        "real_time_setter": (
+            lambda v, mgr:
+            mgr.communicator
+            .preprocessors["AngleOffset_default"]
+            .set_offset("rm1/imu/roll", v)
+        ),
+        "config_path": ("angle_offset", "rm1/imu/roll"),
+        "log_success": "Roll offset set to {value}°"
+    },
+    "zero_imu_now": {
+        "type": "button",
+        "tab": "Calibration",
+        "label": "Zero yaw / pitch / roll (use latest data)",
+        "real_time_setter": (
+            lambda v, mgr: mgr.communicator.preprocessors["AngleOffset_default"].calibrate()
+        ),
+        "log_success": "IMU angles zeroed"
+    },
+    "reset_imu_offset": {
+        "type": "button",
+        "tab": "Calibration",
+        "label": "Reset all IMU offsets to 0",
+        "real_time_setter": (
+            lambda v, mgr: mgr.communicator.preprocessors["AngleOffset_default"].reset_offsets()
+        ),
+        "log_success": "IMU offsets cleared"
+    },
+}

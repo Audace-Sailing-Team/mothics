@@ -5,7 +5,7 @@
                 <div class="data-card">
                     <h4>{{ field.replace("_", " ").title() }}</h4>
                     {% if data is mapping %}
-                    <p class="value">{{ data.value }}</p>
+                    <p class="value">{{ data.value | round(5)}}</p>
                     <p class="timestamp">Sampling rate: {{ data.sample_rate }}</p>
                     <p class="timestamp">Last sampled: {{ row["timestamp"] | replace("T", " ") | truncate(22) }}</p>
                     {% else %}

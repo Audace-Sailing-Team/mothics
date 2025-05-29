@@ -22,7 +22,7 @@ from typing import Optional, List, Dict, Any
 
 from .aggregator import Aggregator
 from .comm_interface import MQTTInterface, SerialInterface, GPIOInterface, Communicator, available_interfaces
-from .preprocessors import UnitConversion, available_processors
+from .preprocessors import UnitConversion, AngleOffset, available_processors
 from .webapp import WebApp
 from .helpers import setup_logger, tipify, check_cdn_availability, download_cdn, check_internet_connectivity, download_tiles, list_required_tiles, get_device_platform, parse_uc_table
 from .track import Track
@@ -352,7 +352,7 @@ class SystemManager:
 
         # Initialize preprocessors
         preprocessors = {}
-
+        
         for section_name, section_cfg in self.config.items():
             proc_cls = available_processors.get(section_name)
             if proc_cls is None:
@@ -376,6 +376,10 @@ class SystemManager:
                 # Single interface (mqtt, …)
                 preprocessors[proc_cls] = section_cfg
 
+        # Initialize angle offsetter regardless
+        if AngleOffset not in preprocessors.keys():
+            preprocessors[AngleOffset] = {"name": "default"}
+        
         # Initialize Communicator
         try:
             self.communicator = Communicator(interfaces=interfaces,

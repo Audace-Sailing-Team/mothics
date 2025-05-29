@@ -53,7 +53,35 @@
 	    <option value="true">True</option>
 	    <option value="false">False</option>
 	  </select>
+
+	  {% elif field.type == 'taglist' %}
+          <input type="hidden" name="{{ key }}" id="tag-{{ sid }}"
+                 value="{{ current[key] | join(',') if current[key] is iterable and not current[key] is string else '' }}">
 	  
+          {% elif field.type == 'kvtable' %}
+          <table class="table table-sm" id="tbl-{{ sid }}">
+            <thead><tr><th>Key</th><th>Alias</th><th></th></tr></thead>
+            <tbody>
+              {% for k, v in (current[key] or {}).items() %}
+              <tr>
+                <td><input class="form-control form-control-sm" value="{{ k }}"></td>
+                <td><input class="form-control form-control-sm" value="{{ v }}"></td>
+                <td><button class="btn btn-sm btn-danger">×</button></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-add-row="{{ sid }}">Add row</button>
+          <input type="hidden" name="{{ key }}" id="hidden-{{ sid }}">
+
+	  {% elif field.type == 'button' %}
+	  <button type="submit"
+		  name="{{ key }}"
+		  value="1"
+		  class="btn btn-outline-secondary">
+	    {{ field.get('label', key) }}
+	  </button>
+
 	  {% else %}
 	  <input type="text"
 		 class="form-control"

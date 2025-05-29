@@ -125,7 +125,7 @@
             if (!isNaN(raw)) vEl.textContent = convertSpeedFromKmh(raw, u).toFixed(2) + ' ' + u;
           }
         });
-
+	  
         // ---- remote unit status ----
         const statusHtml = await fetch('/api/get_status').then(r => r.text());
         document.getElementById('status-container').innerHTML = statusHtml;

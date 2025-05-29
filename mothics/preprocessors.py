@@ -45,7 +45,6 @@ class UnitConversion(BaseProcessor):
         super().__init__(name)
         self.conversions   = conversions
         self._last_done    = {}        # {topic: newest timestamp processed}
-        self.logger.info("Preprocessor initialized.")
         
     def apply(self, data):
         for topic, samples in list(data.items()):
@@ -90,95 +89,108 @@ class UnitConversion(BaseProcessor):
 
 class AngleOffset(BaseProcessor):
     """
-    Calibrate Euler angles by adding a static offset once per sample.
-    It works with either layout:
-
-    - three distinct scalar topics, e.g.
-        imu/yaw, imu/pitch, imu/roll: value is a single float
-
-    - one combined topic, e.g.
-        imu/euler: value is (roll, pitch, yaw)
+    Calibrate Euler angles by adding a static offset once per **new** sample.
+    Handles either 3-tuple topic (roll, pitch, yaw) or three scalar topics.
     """
 
     def __init__(self, offsets=None, *, name=None):
+        super().__init__(name or "AngleOffset")
+        if offsets is None:
+            offsets = {
+            'rm1/imu/yaw':   0.0,
+            'rm1/imu/pitch': 0.0,
+            'rm1/imu/roll':  0.0,
+            }
+        self.offsets      = offsets
+        self._last_ts     = {}   # topic → newest timestamp processed
+        self._latest_raw  = {}   # topic → last **raw** value seen
+
+    def set_offset(self, topic, offset):
+        """Set/replace an offset at runtime."""
+        self.offsets[topic] = offset
+        self.logger.info("offset[%s] = %s", topic, offset)
+
+    def calibrate(self, topics=None):
         """
-        offsets : dict
-         - key   = topic **or** quantity name ('yaw' / 'pitch' / 'roll')
-         - value = scalar: offset for that scalar topic, 
-                           or (dR, dP, dY) for a 3-tuple topic
+        Treat the *latest raw angles already seen* as the new zero.
+        If `topics` is None, use all topics for which we have raw data.
         """
-        if name is None:
-            name = "AngleOffset"
-        else:
-            name = "AngleOffset" + '_'+ name            
-        super().__init__(name)
-        self.offsets    = offsets or {}
-        self._last_done = {}              # {topic: newest timestamp processed}
-        self.logger.info("Preprocessor initialized.")
+        topics = topics or self.offsets.keys()
         
-    def set_offset(self, key, offset):
-        """Change/insert an offset on the fly (key = topic or quantity)."""
-        self.offsets[key] = offset
+        for topic in topics:
+            raw_val = self._latest_raw.get(topic)
+            if raw_val is None:
+                continue                       # no data received yet
 
-    def zero_now(self, key, current):
-        """
-        Treat *current* reading as zero.
-         - key      = topic or quantity
-         - current  = float  (scalar topic)
-                or (roll, pitch, yaw)  (tuple topic)
-        """
-        if isinstance(current, (tuple, list)):
-            self.offsets[key] = tuple(-x for x in current)
-        else:
-            self.offsets[key] = -current
+            if isinstance(raw_val, (tuple, list)):
+                self.offsets[topic] = tuple(-x for x in raw_val)
+            else:
+                self.offsets[topic] = -raw_val
+        self.logger.info("IMU zeroed for topics: %s", ", ".join(topics))
 
+    def reset_offsets(self):
+        """
+        Set the offset of the given topics back to **zero**.
+        If `topics` is None, reset every topic for which an offset exists.
+        """
+        topics = self.offsets.keys()
+        for topic in topics:
+            raw = self._latest_raw.get(topic)
+            if isinstance(raw, (tuple, list)):
+                self.offsets[topic] = (0.0, 0.0, 0.0)
+            else:
+                self.offsets[topic] = 0.0
+        self.logger.info("Offsets reset for: %s", ", ".join(topics))
+        
     @staticmethod
     def _split(topic):
         try:
-            mod, sen, qty = topic.split("/")
-            return mod, sen, qty
+            return topic.split("/", 2)           # (module, sensor, qty)
         except ValueError:
-            return None, None, topic     # tolerate malformed topic
+            return (None, None, topic)
 
     def apply(self, data):
         for topic, samples in list(data.items()):
             _, _, qty = self._split(topic)
 
-            # look up offset by full topic OR by quantity name
             offset = self.offsets.get(topic)
             if offset is None:
                 offset = self.offsets.get(qty)
+
+            # Continue if topic has no offset
             if offset is None:
                 continue
+            
+            last_ts = self._last_ts.get(topic)
 
-            last_ts = self._last_done.get(topic)
-
-            # 1. scalar topic
+            # scalar topic
             if not isinstance(offset, (tuple, list)):
                 for ts_val in samples:
                     (ts, val), = ts_val.items()
+                    self._latest_raw[topic] = val          # remember raw
                     if last_ts is not None and ts <= last_ts:
-                        continue
+                        continue                           # already done
                     ts_val[ts] = val + offset
                     last_ts = ts
-                self._last_done[topic] = last_ts
+                self._last_ts[topic] = last_ts
                 continue
 
-            # 2. tuple topic
+            # tuple topic
             dR, dP, dY = offset
             for ts_val in samples:
                 (ts, vec), = ts_val.items()
+                self._latest_raw[topic] = vec              # remember raw
                 if last_ts is not None and ts <= last_ts:
                     continue
                 try:
                     r, p, y = vec
                     ts_val[ts] = (r + dR, p + dP, y + dY)
                 except Exception:
-                    pass                               # leave value as-is
+                    pass
                 last_ts = ts
-            self._last_done[topic] = last_ts
+            self._last_ts[topic] = last_ts
 
-        return data    
+        return data
 
     
 class KalmanFilter(BaseProcessor):
