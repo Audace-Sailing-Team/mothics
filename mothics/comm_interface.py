@@ -610,18 +610,17 @@ class Communicator:
         ValueError   If *processors* is neither a class nor a dict.
         RuntimeError If any processor fails to initialise.
         """
-        # -------- normalise input ----------------------------------------
+        # Normalise input
         if isinstance(processors, type):
             processors = {processors: {}}
         elif not isinstance(processors, dict):
             raise ValueError("processors must be a class or dict of {class: kwargs}")
 
-        # -------- build all instances first, then merge ------------------
+        # Build all instances first, then merge
         instances_to_add = {}        # avoid mutating self.preprocessors while iterating
 
         for proc_cls, cfg in processors.items():
-
-            # -- many sub-instances (list of kwargs) ----------------------
+            # many sub-instances (list of kwargs)
             if isinstance(cfg, list):
                 for kw in cfg:
                     class_name = proc_cls.__name__
@@ -640,7 +639,7 @@ class Communicator:
                         self.logger.critical(f"failed to initialize {class_name}: {e}")
                         raise RuntimeError(f"failed to initialize {class_name}: {e}")
 
-            # -- single instance ------------------------------------------
+            # single instance
             else:
                 kw = cfg if isinstance(cfg, dict) else {}
                 class_name = proc_cls.__name__
@@ -659,7 +658,7 @@ class Communicator:
                     self.logger.critical(f"failed to initialize {class_name}: {e}")
                     raise RuntimeError(f"failed to initialize {class_name}: {e}")
 
-        # -------- finally merge into the live dict -----------------------
+        # merge into the live dict
         self.preprocessors.update(instances_to_add)
 
     def add_interfaces(self, interfaces):
@@ -827,6 +826,8 @@ class Communicator:
 
         # Preprocess each data item
         for processor in self.preprocessors.values():
+            if not getattr(processor, "enabled", True):
+                continue
             merged_data = processor.apply(merged_data)
 
         # Sort data by timestamp for each topic
