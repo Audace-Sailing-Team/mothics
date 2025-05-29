@@ -1,50 +1,55 @@
 {% extends "base.html" %}
 {% block content %}
-    <!-- Main Content Block -->
-    <div class="container mt-4">
+  <!-- Dashboard ---------------------------------------------------- -->
+  <style>
+    /* compact helpers for the Leaflet extras we add below */
+    button.leaflet-bar { background:#fff; border:none; padding:6px 8px; cursor:pointer; }
+    .legend-title   { font-weight:600; padding:4px 6px 2px; }
+    .legend-entries { padding:2px 6px 4px; }
+    .legend-row     { display:flex; align-items:center; gap:4px; font-size:0.8rem; }
+    .legend-color   { width:14px; height:14px; display:inline-block; border-radius:2px; }
+  </style>
+
+  <div class="container mt-4">
     <h1 class="mb-4" align="center">Dashboard</h1>
 
+    <!-- ---------------------- Remote Unit Status ------------------ -->
     <div class="dashboard-container">
-      <!-- Remote Unit Status -->
       <div class="status-section">
-        <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#status-container"> Remote Unit Status <span class="arrow">&#9660;</span>
+        <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#status-container">
+          Remote Unit Status <span class="arrow">&#9660;</span>
         </div>
-            <div id="status-container" class="collapse show">
-              <!-- Status will be updated here -->
-            </div>
+        <div id="status-container" class="collapse show"></div>
       </div>
-      
-      <!-- Latest Data -->
+
+      <!-- ------------------------- Latest Data --------------------- -->
       <div class="status-section">
-	<div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#table-container"> Latest Data <span class="arrow">&#9660;</span>
-	</div>
+        <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#table-container">
+          Latest Data <span class="arrow">&#9660;</span>
+        </div>
 
-	<!-- Dropdown for Card Selection -->
-	<div class="dropdown">
-	  <button class="btn btn-secondary dropdown-toggle" type="button" id="cardDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-	    Select Metrics
-	  </button>
-	  <ul class="dropdown-menu" aria-labelledby="cardDropdown" id="cardSelectionMenu">
-	    <!-- Options will be dynamically filled -->
-	  </ul>
-	</div>
+        <!-- Dropdown for Card Selection -->
+        <div class="dropdown">
+          <button class="btn btn-secondary dropdown-toggle" type="button" id="cardDropdown"
+                  data-bs-toggle="dropdown" aria-expanded="false">Select Metrics</button>
+          <ul class="dropdown-menu" aria-labelledby="cardDropdown" id="cardSelectionMenu"></ul>
+        </div>
 
-	<!-- Data Cards Container -->
-	<div id="table-container">
-	  <!-- Cards will be dynamically inserted here -->
-	</div>	
+        <!-- Data Cards -->
+        <div id="table-container"></div>
       </div>
     </div>
 
-    <!-- Sampling Control Buttons and Indicator -->
+    <!-- --------------------------- Controls ----------------------- -->
     <div class="status-section">
-      <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#control-container"> Controls <span class="arrow">&#9660;</span>
+      <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#control-container">
+        Controls <span class="arrow">&#9660;</span>
       </div>
       <div id="control-container" class="collapse show">
         <div class="row mb-3">
           <div class="col-auto">
             <button id="startSamplingBtn" class="btn btn-success">Start Sampling</button>
-            <button id="stopSamplingBtn" class="btn btn-danger">Stop Sampling</button>
+            <button id="stopSamplingBtn"  class="btn btn-danger">Stop Sampling</button>
           </div>
           <div class="col-auto">
             <span id="samplingStatusIndicator" class="badge bg-secondary">Not Sampling</span>
@@ -52,522 +57,316 @@
         </div>
       </div>
     </div>
-      
-    <!-- Leaflet GPS Map -->
+
+    <!-- -------------------------- GPS MAP ------------------------- -->
     <div class="status-section">
       <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#leaflet-map-container">
-	GPS Map <span class="arrow">&#9660;</span>
+        GPS Map <span class="arrow">&#9660;</span>
       </div>
 
       <div id="leaflet-map-container" class="collapse show">
+        <!-- sliders -->
+        <div class="gps-sliders-container">
+          <div class="gps-slider">
+            <label for="gpsRefreshSlider" class="form-label small">Refresh&nbsp;Rate&nbsp;(seconds)</label>
+            <input type="range" class="form-range" min="0.1" max="10" step="0.1" value="1" id="gpsRefreshSlider">
+            <span class="form-text" id="gpsRefreshValue">1&nbsp;s</span>
+          </div>
+          <div class="gps-slider">
+            <label for="gpsTrackSlider" class="form-label small">Track&nbsp;Duration&nbsp;(minutes)</label>
+            <input type="range" class="form-range" min="1" max="30" step="1" value="10" id="gpsTrackSlider">
+            <span class="form-text" id="gpsTrackValue">10&nbsp;min</span>
+          </div>
+        </div>
 
-	<!-- Sliders ABOVE the map -->
-	<div class="gps-sliders-container">
-	  <div class="gps-slider">
-	    <label for="gpsRefreshSlider" class="form-label small">Refresh Rate (seconds)</label>
-	    <input type="range" class="form-range" min="0.1" max="10" step="0.1" value="1" id="gpsRefreshSlider">
-	    <span class="form-text" id="gpsRefreshValue">1&nbsp;s</span>
-	  </div>
-	  <div class="gps-slider">
-	    <label for="gpsTrackSlider" class="form-label small">Track Duration (minutes)</label>
-	    <input type="range" class="form-range" min="1" max="30" step="1" value="10" id="gpsTrackSlider">
-	    <span class="form-text" id="gpsTrackValue">10&nbsp;min</span>
-	  </div>
-	</div>
-	
-	<!-- Isolated map container -->
-	<div class="plot-container w-100" style="position: relative;">
-	  <div id="leaflet-map" class="w-100"></div>
-	  <div id="gps-flag">GPS unavailable</div>
-	</div>
+        <!-- actual map -->
+        <div class="plot-container w-100" style="position:relative;">
+          <div id="leaflet-map" class="w-100"></div>
+          <div id="gps-flag">GPS unavailable</div>
+        </div>
       </div>
     </div>
-        
-    <!-- Time Evolution -->
+    
+    <!-- ----------------------- Time Evolution ---------------------- -->
     <div class="plot-container my-4" id="plot-container">
-      <h2> Time Evolution </h2>
+      <h2>Time Evolution</h2>
       <div class="plot-container-inner my-4" id="plot-container-inner">
         {{ script | safe }}
-        {{ div | safe }}
+        {{ div    | safe }}
       </div>
     </div>
+  </div>
 
-<!-- Dashboard update -->
-<script>
-    const auto_refresh = {{ auto_refresh }};
-    let selectedMetrics = new Set(JSON.parse(localStorage.getItem("selectedMetrics")) || []);
+  <!-- ============================================================= -->
+  <!-- Dashboard JS -->
+  <!-- ============================================================= -->
+  <script>
+    /* ---------- generic dashboard update ------------------------- */
+    const auto_refresh  = {{ auto_refresh }};
+    let   selectedMetrics = new Set(JSON.parse(localStorage.getItem("selectedMetrics")) || []);
 
-    // Function to update the dashboard dynamically
     async function updateDashboard() {
-        try {
-            // Fetch and update the latest data cards
-            const tableResponse = await fetch('/api/get_table');
-            const tableHtml = await tableResponse.text();
-            document.getElementById('table-container').innerHTML = tableHtml;
+      try {
+        // ---- latest data cards ----
+        const tableHtml  = await fetch('/api/get_table').then(r => r.text());
+        document.getElementById('table-container').innerHTML = tableHtml;
 
-            // Populate dropdown if it's empty
-            if (document.getElementById("cardSelectionMenu").children.length === 0) {
-                populateDropdown();
-            }
+        // dropdown population only once (until refresh wipes it)
+        if (!document.getElementById('cardSelectionMenu').children.length) populateDropdown();
 
-	    // === Unit Conversion: Apply per-user speed units ===
-	    const prefs = JSON.parse(localStorage.getItem("mothicsLocalPrefs") || "{}");
-	    const displayUnit = prefs.prefSpeedUnits || "km/h";
-	    
-	    // Patch speed metrics in cards
-	    document.querySelectorAll('.data-card').forEach(card => {
-		const label = card.querySelector("h4")?.textContent?.toLowerCase();
-		if (label && label.includes("speed")) {
-		    const valElem = card.querySelector(".value");
-		    if (valElem) {
-			const raw = parseFloat(valElem.textContent);
-			if (!isNaN(raw)) {
-			    const converted = convertSpeedFromKmh(raw, displayUnit);
-			    valElem.textContent = converted.toFixed(2) + " " + displayUnit;
-			}
-		    }
-		}
-	    });
-	    
-            // Fetch and update the remote unit status
-            const statusResponse = await fetch('/api/get_status');
-            const statusHtml = await statusResponse.text();
-            document.getElementById('status-container').innerHTML = statusHtml;
+        // unit‑aware speed patch on every refresh
+        const prefs = JSON.parse(localStorage.getItem('mothicsLocalPrefs') || '{}');
+        const u     = prefs.prefSpeedUnits || 'km/h';
+        document.querySelectorAll('.data-card').forEach(card => {
+          const title = card.querySelector('h4')?.textContent.toLowerCase();
+          if (title?.includes('speed')) {
+            const vEl = card.querySelector('.value');
+            const raw = parseFloat(vEl?.textContent);
+            if (!isNaN(raw)) vEl.textContent = convertSpeedFromKmh(raw, u).toFixed(2) + ' ' + u;
+          }
+        });
 
-            // Update the sampling status indicator
-            const samplingResponse = await fetch('/sampling_status');
-            const samplingData = await samplingResponse.json();
-            const indicator = document.getElementById('samplingStatusIndicator');
-            indicator.textContent = samplingData.save_mode === 'continuous' ? 'Continuous Sampling Active' : 'Not Sampling';
-            indicator.className = samplingData.save_mode === 'continuous' ? 'badge bg-success' : 'badge bg-secondary';
+        // ---- remote unit status ----
+        const statusHtml = await fetch('/api/get_status').then(r => r.text());
+        document.getElementById('status-container').innerHTML = statusHtml;
 
-        } catch (error) {
-            console.error("Error updating dashboard:", error);
-        }
+        // ---- sampling indicator ----
+        const sampling   = await fetch('/sampling_status').then(r => r.json());
+        const badge      = document.getElementById('samplingStatusIndicator');
+        const running    = sampling.save_mode === 'continuous';
+        badge.textContent = running ? 'Continuous Sampling Active' : 'Not Sampling';
+        badge.className   = running ? 'badge bg-success' : 'badge bg-secondary';
+      } catch (err) {
+        console.error('Dashboard update failed:', err);
+      }
     }
 
+    /* ---------- metric dropdown logic ---------------------------- */
     async function populateDropdown() {
-        try {
-            let tableContainer = document.getElementById("table-container");
-            let observer = new MutationObserver(mutations => {
-                mutations.forEach(mutation => {
-                    if (mutation.addedNodes.length > 0) {
-                        fillDropdown();
-                    }
-                });
-            });
-
-            observer.observe(tableContainer, { childList: true, subtree: true });
-
-        } catch (error) {
-            console.error("Error populating dropdown:", error);
-        }
+      const tableContainer = document.getElementById('table-container');
+      const obs = new MutationObserver(muts => muts.forEach(m => m.addedNodes.length && fillDropdown()));
+      obs.observe(tableContainer, { childList:true, subtree:true });
     }
 
     function fillDropdown() {
-        let metrics = new Set();
-        document.querySelectorAll('.data-card h4').forEach(title => {
-            metrics.add(title.textContent.trim());
-        });
+      const metrics = new Set();
+      document.querySelectorAll('.data-card h4').forEach(h4 => metrics.add(h4.textContent.trim()));
 
-        let dropdownMenu = document.getElementById("cardSelectionMenu");
-        dropdownMenu.innerHTML = ""; 
+      const menu = document.getElementById('cardSelectionMenu');
+      menu.innerHTML = '';
 
-	// Add "Select All" button
-	let selectAllItem = document.createElement("li");
-	selectAllItem.innerHTML = `<button id="selectAllBtn" class="dropdown-item">Select All</button>`;
-	dropdownMenu.appendChild(selectAllItem);
-	
-	// Add "Unselect All" button
-	let unselectAllItem = document.createElement("li");
-	unselectAllItem.innerHTML = `<button id="unselectAllBtn" class="dropdown-item">Unselect All</button>`;
-	dropdownMenu.appendChild(unselectAllItem);
+      // select / unselect all helpers
+      menu.insertAdjacentHTML('beforeend', '<li><button id="selectAllBtn"   class="dropdown-item">Select All</button></li>');
+      menu.insertAdjacentHTML('beforeend', '<li><button id="unselectAllBtn" class="dropdown-item">Unselect All</button></li>');
 
-        metrics.forEach(metric => {
-            let isChecked = selectedMetrics.has(metric);
-            let listItem = document.createElement("li");
-            listItem.innerHTML = `<label class="dropdown-item">
-                <input type="checkbox" value="${metric}" ${isChecked ? "checked" : ""}> ${metric}
-            </label>`;
-            dropdownMenu.appendChild(listItem);
-        });
+      metrics.forEach(m => {
+        const checked = selectedMetrics.has(m) ? 'checked' : '';
+        menu.insertAdjacentHTML('beforeend',
+          `<li><label class="dropdown-item"><input type="checkbox" value="${m}" ${checked}> ${m}</label></li>`);
+      });
 
-        // Handle checkbox changes and persist selection
-        dropdownMenu.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-            checkbox.addEventListener('change', function () {
-                if (this.checked) {
-                    selectedMetrics.add(this.value);
-                } else {
-                    selectedMetrics.delete(this.value);
-                }
-                localStorage.setItem("selectedMetrics", JSON.stringify([...selectedMetrics]));
-                updateDashboard();
-            });
-        });
+      // per‑metric checkbox handling
+      menu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', e => {
+        e.target.checked ? selectedMetrics.add(e.target.value) : selectedMetrics.delete(e.target.value);
+        localStorage.setItem('selectedMetrics', JSON.stringify([...selectedMetrics]));
+        updateDashboard();
+      }));
 
-        // Select All Button
-        document.getElementById('selectAllBtn').addEventListener('click', function () {
-            selectedMetrics = new Set(metrics);
-            localStorage.setItem("selectedMetrics", JSON.stringify([...selectedMetrics]));
-            dropdownMenu.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-                checkbox.checked = true;
-            });
-            updateDashboard();
-        });
-
-	// Unselect All Button
-	document.getElementById('unselectAllBtn').addEventListener('click', function () {
-	    selectedMetrics.clear();
-	    localStorage.setItem("selectedMetrics", JSON.stringify([...selectedMetrics]));
-	    dropdownMenu.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-		checkbox.checked = false;
-	    });
-	    updateDashboard();
-	});
+      // batch buttons
+      menu.querySelector('#selectAllBtn').addEventListener('click', () => {
+        selectedMetrics = new Set(metrics);
+        localStorage.setItem('selectedMetrics', JSON.stringify([...selectedMetrics]));
+        menu.querySelectorAll('input').forEach(cb => cb.checked = true);
+        updateDashboard();
+      });
+      menu.querySelector('#unselectAllBtn').addEventListener('click', () => {
+        selectedMetrics.clear();
+        localStorage.setItem('selectedMetrics', JSON.stringify([...selectedMetrics]));
+        menu.querySelectorAll('input').forEach(cb => cb.checked = false);
+        updateDashboard();
+      });
     }
 
-    // Button handlers for starting and stopping sampling
-    document.getElementById('startSamplingBtn').addEventListener('click', async () => {
-        try {
-            const response = await fetch('/start_save', { method: 'POST' });
-            console.log(await response.json().message);
-            updateDashboard();
-        } catch (error) {
-            console.error("Error starting sampling:", error);
-        }
-    });
+    /* ---------- sampling start / stop buttons -------------------- */
+    document.getElementById('startSamplingBtn').addEventListener('click', () => fetch('/start_save', {method:'POST'}).then(updateDashboard));
+    document.getElementById('stopSamplingBtn') .addEventListener('click', () => fetch('/end_save',   {method:'POST'}).then(updateDashboard));
 
-    document.getElementById('stopSamplingBtn').addEventListener('click', async () => {
-        try {
-            const response = await fetch('/end_save', { method: 'POST' });
-            console.log(await response.json().message);
-            updateDashboard();
-        } catch (error) {
-            console.error("Error stopping sampling:", error);
-        }
-    });
-
-    // Automatically refresh the dashboard at the specified interval
+    // kick‑off refresh loop
     setInterval(updateDashboard, auto_refresh);
     updateDashboard();
     populateDropdown();
-</script>
+  </script>
 
-<script>
-let leafletMap;
-let gpsMarker;
-let gpsFlag = document.getElementById("gps-flag");
+  <!-- ============================================================= -->
+  <!-- GPS MAP + TRACKING JS                                         -->
+  <!-- ============================================================= -->
+  <script>
+    /* ---------- globals & helpers -------------------------------- */
+    let leafletMap, gpsMarker;
+    let gpsAutoFollow = true;
+    let gpsHistory    = [];
+    let gpsSegments   = [];
+    let refreshMs     = 1000;             // live poll interval
+    let durationMs    = 10 * 60 * 1000;   // track retention
 
-let gpsAutoFollow = true;
-let gpsHistory = [];
-let gpsSegments = [];
+    let  trackColorKey   = 'speed';       // what metric to color by
+    let  colorThresholds = [1, 5, 15];
+    let  colorPalette    = ['#3366cc', '#66cc66', '#ffcc00', '#cc3333'];
 
-let refreshMs = 1000;
-let durationMs = 600000;
+    const gpsFlag = document.getElementById('gps-flag');
+    const refreshSlider = document.getElementById('gpsRefreshSlider');
+    const trackSlider   = document.getElementById('gpsTrackSlider');
 
-let trackColorKey = "speed"; // default
-let colorThresholds = [1, 5, 15];
-let colorPalette = ["#3366cc", "#66cc66", "#ffcc00", "#cc3333"];
-
-function getColorForTrack(value) {
-  for (let i = 0; i < colorThresholds.length; i++) {
-    if (value < colorThresholds[i]) return colorPalette[i];
-  }
-  return colorPalette[colorPalette.length - 1];
-}
-
-function drawTrack() {
-  gpsSegments.forEach(segment => leafletMap.removeLayer(segment));
-  gpsSegments = [];
-
-  if (gpsHistory.length < 2) return;
-
-  for (let i = 1; i < gpsHistory.length; i++) {
-    const prev = gpsHistory[i - 1];
-    const curr = gpsHistory[i];
-
-    // Check for missing or non-numeric lat/lon
-    if (
-	!Number.isFinite(prev.lat) ||
-	    !Number.isFinite(prev.lon) ||
-	    !Number.isFinite(curr.lat) ||
-	    !Number.isFinite(curr.lon)
-    ) {
-	continue;
-    }
-      
-    const latlngs = [[prev.lat, prev.lon], [curr.lat, curr.lon]];
-    let val = curr[trackColorKey] ?? prev[trackColorKey];
-
-    // Apply user-preferred unit conversion if the track color key is "speed"
-    if (trackColorKey === "speed") {
-	const prefs = JSON.parse(localStorage.getItem("mothicsLocalPrefs") || "{}");
-	const userUnit = prefs.prefSpeedUnits || "km/h";
-	val = convertSpeedFromKmh(val, userUnit);
+    function getColorForTrack(v) {
+      for (let i=0;i<colorThresholds.length;i++) if (v < colorThresholds[i]) return colorPalette[i];
+      return colorPalette[colorPalette.length-1];
     }
 
-    const color = (val != null && isFinite(val)) ? getColorForTrack(val) : "#3388ff";
+    function drawTrack() {
+      gpsSegments.forEach(seg => leafletMap.removeLayer(seg));
+      gpsSegments.length = 0;
+      if (gpsHistory.length < 2) return;
 
-    const seg = L.polyline(latlngs, {
-      color,
-      weight: 3,
-      opacity: 0.8
-    }).addTo(leafletMap);
+      const prefs = JSON.parse(localStorage.getItem('mothicsLocalPrefs') || '{}');
+      const unit  = prefs.prefSpeedUnits || 'km/h';
 
-    gpsSegments.push(seg);
-  }
-}
+      for (let i=1;i<gpsHistory.length;i++) {
+        const prev = gpsHistory[i-1];
+        const curr = gpsHistory[i];
+        if (!Number.isFinite(prev.lat)||!Number.isFinite(prev.lon)||!Number.isFinite(curr.lat)||!Number.isFinite(curr.lon)) continue;
 
-function resetTrack() {
-  gpsSegments.forEach(segment => leafletMap.removeLayer(segment));
-  gpsSegments = [];
-  gpsHistory = [];
-  localStorage.removeItem("gpsHistoryCache"); // only if you persist it
-}
-  
-function updateGPS() {
-  fetch("/api/gps_info")
-    .then(res => res.ok ? res.json() : null)
-    .then(cfg => {
-      if (!cfg || !cfg.gps_available || !cfg.latest_position) {
-        gpsFlag.style.display = "block";
-        return;
-      }
+        const val = trackColorKey==='speed'
+          ? convertSpeedFromKmh(curr[trackColorKey] ?? prev[trackColorKey], unit)
+          : (curr[trackColorKey] ?? prev[trackColorKey]);
 
-	const { lat, lon } = cfg.latest_position;
-	const prefs = JSON.parse(localStorage.getItem("mothicsLocalPrefs") || "{}");
-	const gpsUnit = prefs.prefSpeedUnits || "km/h";
-	
-	if (typeof cfg.latest_position.speed === "number") {
-	    cfg.latest_position.speed = convertSpeedFromKmh(cfg.latest_position.speed, gpsUnit);
-	}
-	
-	const now = Date.now();
-
-	gpsFlag.style.display = "none";
-
-      if (!gpsMarker) {
-        gpsMarker = L.circleMarker([lat, lon], {
-          radius: 8,
-          color: "blue",
-          fillColor: "#3399ff",
-          fillOpacity: 0.8
+        const seg = L.polyline([[prev.lat,prev.lon],[curr.lat,curr.lon]], {
+          color: isFinite(val) ? getColorForTrack(val) : '#3388ff', weight:3, opacity:0.8
         }).addTo(leafletMap);
-      } else {
-        gpsMarker.setLatLng([lat, lon]);
+        gpsSegments.push(seg);
+      }
+    }
+
+    function resetTrack() {
+      gpsSegments.forEach(seg => leafletMap.removeLayer(seg));
+      gpsSegments.length = 0;
+      gpsHistory.length  = 0;
+    }
+
+    /* ---------- live GPS fetch ----------------------------------- */
+    function updateGPS() {
+      fetch('/api/gps_info')
+        .then(r => r.ok ? r.json() : null)
+        .then(cfg => {
+          if (!cfg || !cfg.gps_available || !cfg.latest_position) { gpsFlag.style.display='block'; return; }
+          gpsFlag.style.display='none';
+
+          const {lat,lon} = cfg.latest_position;
+          if (!gpsMarker) gpsMarker = L.circleMarker([lat,lon], {radius:8,color:'blue',fillColor:'#3399ff',fillOpacity:0.8}).addTo(leafletMap);
+          else gpsMarker.setLatLng([lat,lon]);
+
+          const now = Date.now();
+          gpsHistory.push({time:now, ...cfg.latest_position});
+          gpsHistory = gpsHistory.filter(p => now - p.time <= durationMs);
+
+          drawTrack();
+          if (gpsAutoFollow) leafletMap.panTo([lat,lon]);
+        })
+        .catch(() => gpsFlag.style.display='block');
+    }
+
+    /* ---------- initial map bootstrap ---------------------------- */
+    fetch('/api/gps_info').then(r => r.ok ? r.json() : null).then(cfg => {
+      if (!cfg) return;
+
+      const {min,max} = cfg.zoom;
+      const latest     = cfg.latest_position;
+      const center     = (latest && Number.isFinite(latest.lat)&&Number.isFinite(latest.lon))
+                       ? [latest.lat,latest.lon] : [45.6598,13.7967];
+
+      // accept server‑side track‑color configuration
+      if (cfg.track_coloring) {
+        trackColorKey   = cfg.track_coloring.key        ?? trackColorKey;
+        colorThresholds = cfg.track_coloring.thresholds ?? colorThresholds;
+        colorPalette    = cfg.track_coloring.colors     ?? colorPalette;
       }
 
-      // Record all fields for flexibility
-      const point = {
-        time: now,
-        lat,
-        lon
-      };
+      leafletMap = L.map('leaflet-map', {minZoom:min, maxZoom:max, center, zoom:min+3});
+      L.tileLayer('/tiles/{z}/{x}/{y}.png', {minZoom:min,maxZoom:max,tileSize:256,attribution:'Local tiles'}).addTo(leafletMap);
 
-      if (cfg.latest_position) {
-        for (const [key, value] of Object.entries(cfg.latest_position)) {
-          if (key !== "lat" && key !== "lon") {
-            point[key] = value;
+      leafletMap.whenReady(() => {
+        /* ------- custom zoom/full controls (⤢ ⤡ ◎) ----------- */
+        const ZoomFull = L.Control.extend({
+          options:{position:'topleft'},
+          onAdd(){
+            const div = L.DomUtil.create('div','leaflet-bar leaflet-control');
+            div.innerHTML = `
+              <a href="#" id="zoom-full-in"  title="Zoom&nbsp;to&nbsp;max">⤢</a>
+              <a href="#" id="zoom-full-out" title="Zoom&nbsp;to&nbsp;min">⤡</a>
+              <a href="#" id="zoom-reset"    title="Recenter">◎</a>`;
+            L.DomEvent.disableClickPropagation(div);
+            return div;
           }
+        });
+        leafletMap.addControl(new ZoomFull());
+        setTimeout(()=>{
+          document.getElementById('zoom-full-in') .addEventListener('click',e=>{e.preventDefault(); leafletMap.setZoom(leafletMap.getMaxZoom());});
+          document.getElementById('zoom-full-out').addEventListener('click',e=>{e.preventDefault(); leafletMap.setZoom(leafletMap.getMinZoom());});
+          document.getElementById('zoom-reset')  .addEventListener('click',e=>{e.preventDefault(); gpsAutoFollow=true; if (gpsMarker) leafletMap.panTo(gpsMarker.getLatLng());});
+        },0);
+
+        /* ------- track clear button (✖) ----------------------- */
+        const resetBtn = L.control({position:'topright'});
+        resetBtn.onAdd = () => {
+          const btn = L.DomUtil.create('button','leaflet-bar');
+          btn.innerHTML='✖'; btn.title='Clear Track';
+          btn.onclick=resetTrack; return btn;
+        };
+        resetBtn.addTo(leafletMap);
+
+        /* ------- dynamic legend -------------------------------- */
+        const legendCtl = L.control({position:'bottomright'});
+        legendCtl.onAdd = () => L.DomUtil.create('div','leaflet-control leaflet-bar track-legend');
+        legendCtl.addTo(leafletMap);
+
+        function updateLegend(){
+          const container = legendCtl.getContainer();
+          const prefs = JSON.parse(localStorage.getItem('mothicsLocalPrefs')||'{}');
+          const unit  = trackColorKey==='speed' ? (prefs.prefSpeedUnits || 'km/h') : '';
+          let html = `<div class="legend-title">Color: ${trackColorKey}</div>`;
+          colorThresholds.forEach((thr,i)=> html += `<div class="legend-row"><span class="legend-color" style="background:${colorPalette[i]}"></span><span>< ${thr} ${unit}</span></div>`);
+          html += `<div class="legend-row"><span class="legend-color" style="background:${colorPalette.at(-1)}"></span><span>≥ ${colorThresholds.at(-1)} ${unit}</span></div>`;
+          container.innerHTML = html;
         }
-      }
+        updateLegend();
 
-      gpsHistory.push(point);
-      gpsHistory = gpsHistory.filter(p => now - p.time <= durationMs);
-      drawTrack();
+        leafletMap.on('movestart', ()=> gpsAutoFollow=false);
+        updateGPS();
 
-      if (gpsAutoFollow) {
-        leafletMap.panTo([lat, lon]);
-      }
-    })
-    .catch(() => {
-      gpsFlag.style.display = "block";
-    });
-}
-
-let gpsTimer;
-
-fetch("/api/gps_info")
-  .then(res => res.ok ? res.json() : null)
-  .then(config => {
-    if (!config) return;
-
-    const { min, max } = config.zoom;
-
-    const latest = config.latest_position;
-    let center = [45.6598006, 13.7967686];
-
-    if (
-      latest &&
-      typeof latest.lat === "number" &&
-      typeof latest.lon === "number" &&
-      isFinite(latest.lat) &&
-      isFinite(latest.lon)
-    ) {
-      center = [latest.lat, latest.lon];
-    }
-
-    // Accept dynamic coloring config
-    if (config.track_coloring) {
-	trackColorKey = config.track_coloring.key ?? "speed";
-	colorThresholds = config.track_coloring.thresholds ?? colorThresholds;
-	colorPalette = config.track_coloring.colors ?? colorPalette;
-	trackColorUnits = config.track_coloring.units ?? "";
-    }
-
-    // Map init
-    leafletMap = L.map("leaflet-map", {
-      minZoom: min,
-      maxZoom: max,
-      center,
-      zoom: min + 3
+        // load backlog & start polling
+        fetch('/api/gps_track').then(r=>r.ok?r.json():null).then(trk=>{
+          if (trk?.track) {
+            gpsHistory = trk.track.map(p=>({time:new Date(p.timestamp).getTime(), lat:p.lat, lon:p.lon, [trackColorKey]:p.value}));
+            drawTrack();
+          }
+        });
+        setInterval(updateGPS, refreshMs);
+      });
     });
 
-    L.tileLayer("/tiles/{z}/{x}/{y}.png", {
-      minZoom: min,
-      maxZoom: max,
-      tileSize: 256,
-      attribution: "Local tiles"
-    }).addTo(leafletMap);
-
-    leafletMap.whenReady(() => {
-      const recenterBtn = L.control({ position: 'topright' });
-      recenterBtn.onAdd = function () {
-        const btn = L.DomUtil.create('button', 'leaflet-bar');
-        btn.innerHTML = '⟳';
-        btn.style.padding = '4px 8px';
-        btn.style.cursor = 'pointer';
-        btn.title = 'Recenter GPS';
-        btn.onclick = () => gpsAutoFollow = true;
-        return btn;
-      };
-      const resetBtn = L.control({ position: 'topright' });
-      resetBtn.onAdd = function () {
-      const btn = L.DomUtil.create('button', 'leaflet-bar');
-	  btn.innerHTML = '✖'; // or "Reset"
-	  btn.title = 'Clear Track';
-	  btn.style.padding = '4px 8px';
-	  btn.style.cursor = 'pointer';
-	  btn.onclick = () => resetTrack();
-	  return btn;
-      };
-
-      const legendControl = L.control({ position: "bottomright" });
-	
-      legendControl.onAdd = function () {
-	  const div = L.DomUtil.create("div", "leaflet-control leaflet-bar track-legend");
-	  updateLegendHTML(div);
-	  return div;
-      };
-	
-      legendControl.addTo(leafletMap);
-	
-function updateLegendHTML(container) {
-  const title = document.createElement("div");
-  title.className = "legend-title";
-  title.textContent = `Color: ${trackColorKey}`;
-
-  const entries = document.createElement("div");
-  entries.className = "legend-entries";
-
-  const prefs = JSON.parse(localStorage.getItem("mothicsLocalPrefs") || "{}");
-  const displayUnit = trackColorKey === "speed"
-	? (prefs.prefSpeedUnits || "km/h")
-	: (trackColorUnits || "");
-    
-  for (let i = 0; i < colorThresholds.length; i++) {
-    const row = document.createElement("div");
-    row.className = "legend-row";
-
-    const swatch = document.createElement("span");
-    swatch.className = "legend-color";
-    swatch.style.backgroundColor = colorPalette[i];
-
-    const label = document.createElement("span");
-      
-    const labelText = `< ${colorThresholds[i]} ${displayUnit}`;
-      label.textContent = labelText;
-  
-    row.appendChild(swatch);
-    row.appendChild(label);
-    entries.appendChild(row);
-  }
-
-  // Final color: ≥ highest threshold
-  const row = document.createElement("div");
-  row.className = "legend-row";
-  const swatch = document.createElement("span");
-  swatch.className = "legend-color";
-  swatch.style.backgroundColor = colorPalette[colorPalette.length - 1];
-  const label = document.createElement("span");
-  label.textContent = `≥ ${colorThresholds[colorThresholds.length - 1]} ${displayUnit}`;
-  row.appendChild(swatch);
-  row.appendChild(label);
-  entries.appendChild(row);
-
-  container.innerHTML = ""; // clear previous
-  container.appendChild(title);
-  container.appendChild(entries);
-}
-
-	
-      recenterBtn.addTo(leafletMap);
-      resetBtn.addTo(leafletMap);
-	
-      leafletMap.on("movestart", () => gpsAutoFollow = false);
-
-      updateGPS();
-
-      // Fetch backend GPS track history
-      fetch("/api/gps_track")
-	    .then(res => res.ok ? res.json() : null)
-	    .then(trackPayload => {
-		if (!trackPayload || !Array.isArray(trackPayload.track)) return;
-		
-		const prefs = JSON.parse(localStorage.getItem("mothicsLocalPrefs") || "{}");
-		const userUnit = prefs.prefSpeedUnits || "km/h";
-		
-		// Convert the server-supplied 'value' if it's "speed"
-		gpsHistory = trackPayload.track.map(p => ({
-		    time: new Date(p.timestamp).getTime(),
-		    lat: p.lat,
-		    lon: p.lon,
-		    [trackColorKey]: (trackColorKey === "speed" && typeof p.value === "number")
-			? convertSpeedFromKmh(p.value, userUnit)
-			: p.value
-		}));
-		
-		// Render the history on the map
-		drawTrack();
-	    });
-	
-	
-	gpsTimer = setInterval(updateGPS, refreshMs);
+    /* ---------- sliders ------------------------------------------ */
+    refreshSlider.addEventListener('input', e => {
+      const v = parseFloat(e.target.value); refreshMs = v*1000;
+      document.getElementById('gpsRefreshValue').textContent = `${v.toFixed(1)} s`;
     });
-  });
-  
-const refreshSlider = document.getElementById("gpsRefreshSlider");
-const trackSlider = document.getElementById("gpsTrackSlider");
+    trackSlider.addEventListener('input', e => {
+      const v = parseInt(e.target.value,10); durationMs = v*60*1000;
+      document.getElementById('gpsTrackValue').textContent = `${v} min`;
+    });
+  </script>
 
-refreshSlider.addEventListener("input", () => {
-  const val = parseFloat(refreshSlider.value);
-  document.getElementById("gpsRefreshValue").textContent = `${val.toFixed(1)}s`;
-  refreshMs = val * 1000;
-  clearInterval(gpsTimer);
-  gpsTimer = setInterval(updateGPS, refreshMs);
-});
-
-trackSlider.addEventListener("input", () => {
-  const val = parseInt(trackSlider.value);
-  document.getElementById("gpsTrackValue").textContent = `${val} min`;
-  durationMs = val * 60 * 1000;
-});
-</script>
-
-<script type="module">
-  import { convertSpeedFromKmh } from "{{ url_for('static', filename='local_preferences.js') }}";
-
-  // Make it globally available
-  window.convertSpeedFromKmh = convertSpeedFromKmh;
-</script>
+  <!-- Convert‑speed helper (module) -->
+  <script type="module">
+    import { convertSpeedFromKmh } from "{{ url_for('static', filename='local_preferences.js') }}";
+    window.convertSpeedFromKmh = convertSpeedFromKmh;
+  </script>
 {% endblock %}
