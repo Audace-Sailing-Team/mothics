@@ -6,14 +6,11 @@
                     <h4>{{ field.replace("_", " ").title() }}</h4>
                     {% if data is mapping %}
                     <p class="value">
-		      {% set v = data.value %}
-		      {% if v is number %}
-		      {{ v | round(5) }}
-		      {% elif v is not none %}
-		      {{ v }}
-		      {% else %}
-		      None
-		      {% endif %}
+		      {% if data.value is number %}
+                      {{ data.value | round(5)}}
+                      {% else %}
+                      {{ data.value }}
+                      {% endif %}
 		    </p>
                     <p class="timestamp">Sampling rate: {{ data.sample_rate }}</p>
                     <p class="timestamp">Last sampled: {{ row["timestamp"] | replace("T", " ") | truncate(22) }}</p>
