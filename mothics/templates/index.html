@@ -1,372 +1,766 @@
 {% extends "base.html" %}
 {% block content %}
-  <!-- Dashboard ---------------------------------------------------- -->
-  <style>
-    /* compact helpers for the Leaflet extras we add below */
-    button.leaflet-bar { background:#fff; border:none; padding:6px 8px; cursor:pointer; }
-    .legend-title   { font-weight:600; padding:4px 6px 2px; }
-    .legend-entries { padding:2px 6px 4px; }
-    .legend-row     { display:flex; align-items:center; gap:4px; font-size:0.8rem; }
-    .legend-color   { width:14px; height:14px; display:inline-block; border-radius:2px; }
-  </style>
+<!-- =========================================================== -->
+<!--                      Dashboard                              -->
+<!-- =========================================================== -->
+<style>
+  /* Leaflet helper buttons */
+  button.leaflet-bar { background: #fff; border: none; padding: 6px 8px; cursor: pointer; }
+  .legend-title   { font-weight: 600; padding: 4px 6px 2px; }
+  .legend-row     { display: flex; align-items: center; gap: 4px; font-size: 0.8rem; }
+  .legend-color   { width: 14px; height: 14px; display: inline-block; border-radius: 2px; }
 
-  <div class="container mt-4">
-    <h1 class="mb-4" align="center">Dashboard</h1>
+  /* Responsive Plotly container */
+  #plotly-container { width: 100% !important; height: 100%; min-height: 300px; }
+  .plot-wrapper { position: relative; width: 100%; aspect-ratio: 16 / 9; }
+</style>
 
-    <!-- ---------------------- Remote Unit Status ------------------ -->
-    <div class="dashboard-container">
-      <div class="status-section">
-        <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#status-container">
-          Remote Unit Status <span class="arrow">&#9660;</span>
-        </div>
-        <div id="status-container" class="collapse show"></div>
-      </div>
+<div class="container mt-4">
+  <h1 class="mb-4 text-center">Dashboard</h1>
 
-      <!-- ------------------------- Latest Data --------------------- -->
-      <div class="status-section">
-        <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#table-container">
-          Latest Data <span class="arrow">&#9660;</span>
-        </div>
-
-        <!-- Dropdown for Card Selection -->
-        <div class="dropdown">
-          <button class="btn btn-secondary dropdown-toggle" type="button" id="cardDropdown"
-                  data-bs-toggle="dropdown" aria-expanded="false">Select Metrics</button>
-          <ul class="dropdown-menu" aria-labelledby="cardDropdown" id="cardSelectionMenu"></ul>
-        </div>
-
-        <!-- Data Cards -->
-        <div id="table-container"></div>
-      </div>
-    </div>
-
-    <!-- --------------------------- Controls ----------------------- -->
+  <!-- ===== Remote Unit Status ===== -->
+  <div class="dashboard-container">
     <div class="status-section">
-      <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#control-container">
-        Controls <span class="arrow">&#9660;</span>
+      <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#status-container">
+        Remote Unit Status <span class="arrow">&#9660;</span>
       </div>
-      <div id="control-container" class="collapse show">
-        <div class="row mb-3">
-          <div class="col-auto">
-            <button id="startSamplingBtn" class="btn btn-success">Start Sampling</button>
-            <button id="stopSamplingBtn"  class="btn btn-danger">Stop Sampling</button>
-          </div>
-          <div class="col-auto">
-            <span id="samplingStatusIndicator" class="badge bg-secondary">Not Sampling</span>
-          </div>
-        </div>
-      </div>
+      <div id="status-container" class="collapse show"></div>
     </div>
 
-    <!-- -------------------------- GPS MAP ------------------------- -->
+    <!-- ===== Latest Data ===== -->
     <div class="status-section">
-      <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#leaflet-map-container">
-        GPS Map <span class="arrow">&#9660;</span>
+      <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#table-container">
+        Latest Data <span class="arrow">&#9660;</span>
       </div>
 
-      <div id="leaflet-map-container" class="collapse show">
-        <!-- sliders -->
-        <div class="gps-sliders-container">
-          <div class="gps-slider">
-            <label for="gpsRefreshSlider" class="form-label small">Refresh&nbsp;Rate&nbsp;(seconds)</label>
-            <input type="range" class="form-range" min="0.1" max="10" step="0.1" value="1" id="gpsRefreshSlider">
-            <span class="form-text" id="gpsRefreshValue">1&nbsp;s</span>
-          </div>
-          <div class="gps-slider">
-            <label for="gpsTrackSlider" class="form-label small">Track&nbsp;Duration&nbsp;(minutes)</label>
-            <input type="range" class="form-range" min="1" max="30" step="1" value="10" id="gpsTrackSlider">
-            <span class="form-text" id="gpsTrackValue">10&nbsp;min</span>
-          </div>
-        </div>
-
-        <!-- actual map -->
-        <div class="plot-container w-100" style="position:relative;">
-          <div id="leaflet-map" class="w-100"></div>
-          <div id="gps-flag">GPS unavailable</div>
-        </div>
+      <!-- Metric picker dropdown -->
+      <div class="dropdown mb-2">
+        <button
+          class="btn btn-secondary dropdown-toggle"
+          type="button"
+          id="cardDropdown"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
+        >
+          Select Metrics
+        </button>
+        <!-- data-bs-auto-close="outside" keeps dropdown open while clicking checkboxes -->
+        <ul class="dropdown-menu" aria-labelledby="cardDropdown" id="cardSelectionMenu" data-bs-auto-close="outside"></ul>
       </div>
+
+      <!-- Data cards will be injected here -->
+      <div id="table-container"></div>
     </div>
-    
-    <!-- ----------------------- Time Evolution ---------------------- -->
-    <div class="plot-container my-4" id="plot-container">
-      <h2>Time Evolution</h2>
-      <div class="plot-container-inner my-4" id="plot-container-inner">
-        {{ script | safe }}
-        {{ div    | safe }}
+  </div>
+
+  <!-- ===== Controls ===== -->
+  <div class="status-section">
+    <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#control-container">
+      Controls <span class="arrow">&#9660;</span>
+    </div>
+    <div id="control-container" class="collapse show">
+      <div class="row mb-3 align-items-center">
+        <div class="col-auto">
+          <button id="startSamplingBtn" class="btn btn-success">Start Sampling</button>
+          <button id="stopSamplingBtn"  class="btn btn-danger">Stop Sampling</button>
+        </div>
+        <div class="col-auto">
+          <span id="samplingStatusIndicator" class="badge bg-secondary">Not Sampling</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- ============================================================= -->
-  <!-- Dashboard JS -->
-  <!-- ============================================================= -->
-  <script>
-    /* ---------- generic dashboard update ------------------------- */
-    const auto_refresh  = {{ auto_refresh }};
-    let   selectedMetrics = new Set(JSON.parse(localStorage.getItem("selectedMetrics")) || []);
+  <!-- ===== GPS Map ===== -->
+  <div class="status-section">
+    <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#leaflet-map-container">
+      GPS Map <span class="arrow">&#9660;</span>
+    </div>
+    <div id="leaflet-map-container" class="collapse show">
+      <!-- Sliders -->
+      <div class="d-flex flex-wrap gap-3 mb-2">
+        <div>
+          <label for="gpsRefreshSlider" class="form-label small">Refresh Rate (s)</label>
+          <input
+            type="range"
+            class="form-range"
+            min="0.1"
+            max="10"
+            step="0.1"
+            value="1"
+            id="gpsRefreshSlider"
+          >
+          <span id="gpsRefreshValue" class="form-text">1 s</span>
+        </div>
+        <div>
+          <label for="gpsTrackSlider" class="form-label small">Track Duration (min)</label>
+          <input
+            type="range"
+            class="form-range"
+            min="1"
+            max="30"
+            step="1"
+            value="10"
+            id="gpsTrackSlider"
+          >
+          <span id="gpsTrackValue" class="form-text">10 min</span>
+        </div>
+      </div>
 
-    async function updateDashboard() {
-      try {
-        // ---- latest data cards ----
-        const tableHtml  = await fetch('/api/get_table').then(r => r.text());
-        document.getElementById('table-container').innerHTML = tableHtml;
+      <!-- Map container -->
+      <div class="position-relative w-100" style="height:60vh;">
+        <div id="leaflet-map" class="w-100 h-100"></div>
+        <div id="gps-flag">GPS unavailable</div>
+      </div>
+    </div>
+  </div>
 
-        // dropdown population only once (until refresh wipes it)
-        if (!document.getElementById('cardSelectionMenu').children.length) populateDropdown();
+  <!-- ===== Time-series Plot ===== -->
+  <div class="plot-container my-4">
+    <h2>Time Evolution</h2>
 
-        // unit‑aware speed patch on every refresh
-        const prefs = JSON.parse(localStorage.getItem('mothicsLocalPrefs') || '{}');
-        const u     = prefs.prefSpeedUnits || 'km/h';
-        document.querySelectorAll('.data-card').forEach(card => {
-          const title = card.querySelector('h4')?.textContent.toLowerCase();
-          if (title?.includes('speed')) {
-            const vEl = card.querySelector('.value');
-            const raw = parseFloat(vEl?.textContent);
-            if (!isNaN(raw)) vEl.textContent = convertSpeedFromKmh(raw, u).toFixed(2) + ' ' + u;
-          }
-        });
-	  
-        // ---- remote unit status ----
-        const statusHtml = await fetch('/api/get_status').then(r => r.text());
-        document.getElementById('status-container').innerHTML = statusHtml;
+    <!-- Variable selector dropdown -->
+    <div class="dropdown mb-2">
+      <button
+        class="btn btn-sm btn-outline-primary dropdown-toggle"
+        id="varPickerBtn"
+        data-bs-toggle="dropdown"
+        aria-expanded="false"
+      >
+        Variables
+      </button>
+      <ul
+        id="variableSelector"
+        class="dropdown-menu p-2"
+        style="max-height:220px; overflow-y:auto; min-width:240px;"
+      ></ul>
+    </div>
 
-        // ---- sampling indicator ----
-        const sampling   = await fetch('/sampling_status').then(r => r.json());
-        const badge      = document.getElementById('samplingStatusIndicator');
-        const running    = sampling.save_mode === 'continuous';
-        badge.textContent = running ? 'Continuous Sampling Active' : 'Not Sampling';
-        badge.className   = running ? 'badge bg-success' : 'badge bg-secondary';
-      } catch (err) {
-        console.error('Dashboard update failed:', err);
-      }
+    <!-- Time‐Window slider + “Show All” checkbox + Pause button -->
+    <div class="mb-3 d-flex flex-wrap align-items-center gap-3">
+      <div>
+	<div>
+	<label for="plotRefreshSlider" class="form-label small">Plot Refresh Rate</label>
+	<input
+          type="range"
+          class="form-range"
+          min="0.1"
+          max="5"
+          step="0.1"
+          value="1"
+          id="plotRefreshSlider"
+	  style="width:200px;"
+	  >
+	<span id="plotRefreshValue" class="form-text">1 s</span>
+      </div>
+      <div>
+        <label for="timeWindowSlider" class="form-label small">Time Window</label>
+        <input
+          type="range"
+          class="form-range"
+          min="1"
+          max="60"
+          step="1"
+          value="5"
+          id="timeWindowSlider"
+          style="width:200px;"
+        >
+        <span id="timeWindowValue" class="form-text">Last 5 min</span>
+      </div>
+      </div>
+      <div>
+      <div class="form-check align-self-end">
+        <input class="form-check-input" type="checkbox" id="showAllCheckbox">
+        <label class="form-check-label small" for="showAllCheckbox">Show All</label>
+      </div>
+      <button id="pausePlotBtn" class="btn btn-secondary btn-sm">Pause Plot</button>
+    </div>
+    </div>
+    <!-- Responsive plot wrapper -->
+    <div class="plot-wrapper">
+      <div id="plotly-container" class="w-100"></div>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================================== -->
+<!--          Consolidated JavaScript (ES-module)                -->
+<!-- =========================================================== -->
+<script type="module">
+  import { convertSpeedFromKmh } from "{{ url_for('static', filename='local_preferences.js') }}";
+
+  // ——— Globals & localStorage prefs ———
+  const unitPrefs           = JSON.parse(localStorage.getItem('mothicsLocalPrefs') || '{}');
+  const auto_refresh        = {{ auto_refresh }};
+  let   selectedMetrics     = new Set(JSON.parse(localStorage.getItem('selectedMetrics') || '[]'));
+  let   hasStoredMetrics    = localStorage.getItem("selectedMetrics") !== null;
+  let   leafletMap, gpsMarker;
+  let   gpsAutoFollow       = true;
+  let   gpsHistory          = [];
+  let   gpsSegments         = [];
+  let   refreshMs           = 1000;            // ms between GPS polls
+  let   durationMs          = 10 * 60 * 1000;  // 10 minutes retention
+  let   trackColorKey       = 'speed';
+  let   colorThresholds     = [1, 5, 15];
+  let   colorPalette        = ['#3366cc', '#66cc66', '#ffcc00', '#cc3333'];
+
+  // Plot refresh globals
+  let   plotRefreshMs       = 1000;   // default 1 second
+  let   plotTimerId         = null;
+  let   isPlotPaused        = false;
+
+  // Time‐window globals
+  let   timeWindowMinutes   = 5;      // default show last 5 min
+  let   showAll             = false;
+
+  // DOM references
+  const tableContainer      = document.getElementById('table-container');
+  const cardSelectionMenu   = document.getElementById('cardSelectionMenu');
+  const statusContainer     = document.getElementById('status-container');
+  const samplingBadge       = document.getElementById('samplingStatusIndicator');
+  const startBtn            = document.getElementById('startSamplingBtn');
+  const stopBtn             = document.getElementById('stopSamplingBtn');
+  const gpsFlag             = document.getElementById('gps-flag');
+  const refreshSlider       = document.getElementById('gpsRefreshSlider');
+  const trackSlider         = document.getElementById('gpsTrackSlider');
+  const plotRefreshSlider   = document.getElementById('plotRefreshSlider');
+  const plotRefreshValue    = document.getElementById('plotRefreshValue');
+  const timeWindowSlider    = document.getElementById('timeWindowSlider');
+  const timeWindowValue     = document.getElementById('timeWindowValue');
+  const showAllCheckbox     = document.getElementById('showAllCheckbox');
+  const pausePlotBtn        = document.getElementById('pausePlotBtn');
+  const variableSelector    = document.getElementById('variableSelector');
+  const plotContainer       = document.getElementById('plotly-container');
+
+  // ——— UTILITY: convert a raw value v for key → display units ———
+  function convertValue(v, key) {
+    if (v == null) return null;
+    if (key.toLowerCase().includes('speed')) {
+      const unit = unitPrefs.prefSpeedUnits || 'km/h';
+      return convertSpeedFromKmh(v, unit);
     }
+    return v;
+  }
 
-    /* ---------- metric dropdown logic ---------------------------- */
-    async function populateDropdown() {
-      const tableContainer = document.getElementById('table-container');
-      const obs = new MutationObserver(muts => muts.forEach(m => m.addedNodes.length && fillDropdown()));
-      obs.observe(tableContainer, { childList:true, subtree:true });
-    }
+  // ——————————————————————————————————————————————————————
+  //             TIME-SERIES PLOT + VARIABLE DROPDOWN
+  // ——————————————————————————————————————————————————————
 
-    function fillDropdown() {
-      const metrics = new Set();
-      document.querySelectorAll('.data-card h4').forEach(h4 => metrics.add(h4.textContent.trim()));
+  // Build the variable checkboxes and auto‐select first two on load
+  async function initVarSelector() {
+    try {
+      const res  = await fetch('/api/track_plot_data');
+      const data = await res.json();
+      if (!data.vars) return;
 
-      const menu = document.getElementById('cardSelectionMenu');
-      menu.innerHTML = '';
+      variableSelector.innerHTML = '';
+      const aliases = data.aliases || {};
+      const keys    = Object.keys(data.vars);
 
-      // select / unselect all helpers
-      menu.insertAdjacentHTML('beforeend', '<li><button id="selectAllBtn"   class="dropdown-item">Select All</button></li>');
-      menu.insertAdjacentHTML('beforeend', '<li><button id="unselectAllBtn" class="dropdown-item">Unselect All</button></li>');
+      // Insert “Select All” / “Unselect All” at top
+      variableSelector.insertAdjacentHTML(
+        'beforeend',
+        `<li>
+           <button class="dropdown-item" id="selAllVarsBtn">Select All</button>
+         </li>
+         <li>
+           <button class="dropdown-item" id="unselAllVarsBtn">Unselect All</button>
+         </li>
+         <li><hr class="dropdown-divider"></li>`
+      );
 
-      metrics.forEach(m => {
-        const checked = selectedMetrics.has(m) ? 'checked' : '';
-        menu.insertAdjacentHTML('beforeend',
-          `<li><label class="dropdown-item"><input type="checkbox" value="${m}" ${checked}> ${m}</label></li>`);
+      // Now one <li> for each variable
+      keys.forEach(key => {
+        variableSelector.insertAdjacentHTML(
+          'beforeend',
+          `<li>
+             <label class="dropdown-item">
+               <input type="checkbox" value="${key}"> ${aliases[key] || key}
+             </label>
+           </li>`
+        );
       });
 
-      // per‑metric checkbox handling
-      menu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', e => {
-        e.target.checked ? selectedMetrics.add(e.target.value) : selectedMetrics.delete(e.target.value);
-        localStorage.setItem('selectedMetrics', JSON.stringify([...selectedMetrics]));
-        updateDashboard();
+      // Auto‐select the first two variables (if they exist)
+      for (let i = 0; i < Math.min(2, keys.length); i++) {
+        const cb = variableSelector.querySelector(`input[value="${keys[i]}"]`);
+        if (cb) cb.checked = true;
+      }
+
+      // “Select All” click handler
+      variableSelector
+        .querySelector('#selAllVarsBtn')
+        .addEventListener('click', () => {
+          variableSelector.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+          updatePlot();
+        });
+
+      // “Unselect All” click handler
+      variableSelector
+        .querySelector('#unselAllVarsBtn')
+        .addEventListener('click', () => {
+          variableSelector.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+          updatePlot();
+        });
+
+      // Redraw plot when any variable checkbox toggles
+      variableSelector.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => updatePlot());
+      });
+    } catch (err) {
+      console.error('initVarSelector error:', err);
+    }
+  }
+
+  // Read which vars are checked
+  function getSelectedVars() {
+    return Array.from(variableSelector.querySelectorAll('input:checked')).map(i => i.value);
+  }
+
+  // Fetch data for selected vars, apply time‐window filtering, and draw Plotly
+  async function updatePlot() {
+    const vars = getSelectedVars();
+    if (vars.length === 0) {
+      Plotly.purge(plotContainer);
+      return;
+    }
+
+    const qs = new URLSearchParams();
+    qs.set('vars', vars.join(','));
+
+    try {
+      const res  = await fetch(`/api/track_plot_data?${qs}`);
+      const data = await res.json();
+      if (!data?.timestamps || !data.vars) return;
+
+      // If “Show All” is unchecked, filter to last N minutes
+      let timestamps = data.timestamps.map(ts => new Date(ts));
+      let varsByName = data.vars;
+      if (!showAll) {
+        const latest   = timestamps[timestamps.length - 1];
+        const cutoff   = new Date(latest.getTime() - timeWindowMinutes * 60000);
+        let startIdx   = timestamps.findIndex(d => d >= cutoff);
+        if (startIdx === -1) startIdx = 0;
+        timestamps = timestamps.slice(startIdx);
+        Object.keys(varsByName).forEach(key => {
+          varsByName[key] = varsByName[key].slice(startIdx);
+        });
+      }
+
+      // Convert back to ISO strings for Plotly’s x axis
+      const xVals = timestamps.map(d => d.toISOString());
+      const aliases = data.aliases || {};
+
+      const traces = Object.entries(varsByName).map(([key, values]) => ({
+        x   : xVals,
+        y   : values.map(v => convertValue(v, key)),
+        mode: 'lines+markers',
+        name: aliases[key] || key,
+        type: 'scattergl'
       }));
 
-      // batch buttons
-      menu.querySelector('#selectAllBtn').addEventListener('click', () => {
+      const layout = {
+        autosize: true,
+        margin   : { t: 40, r: 10, l: 20, b: 50 },
+        xaxis    : { title: 'Time' },
+        yaxis    : { title: 'Value' },
+        legend   : { orientation: 'h' },
+        template : localStorage.getItem('darkMode') === 'on'
+                   ? 'plotly_dark'
+                   : 'plotly_white'
+      };
+
+      // Notice useResizeHandler: true so Plotly listens for window resize
+      Plotly.newPlot(plotContainer, traces, layout, { responsive: true, useResizeHandler: true });
+    } catch (err) {
+      console.error('updatePlot error:', err);
+    }
+  }
+
+  // ——————————————————————————————————————————————————————
+  //             LATEST‐DATA CARDS & CONTROLS
+  // ——————————————————————————————————————————————————————
+
+  async function updateDashboard() {
+    try {
+      // 1) Refresh data cards
+      const tableHtml = await fetch('/api/get_table').then(r => r.text());
+      tableContainer.innerHTML = tableHtml;
+
+      // 2) After injecting cards, filter them by selectedMetrics
+      filterCardsBySelection();
+
+      // 3) (Re)build “Select Metrics” dropdown each time
+      buildMetricDropdown();
+
+      // 4) Convert any “speed” card values to preferred units
+      const u = unitPrefs.prefSpeedUnits || 'km/h';
+      document.querySelectorAll('.data-card').forEach(card => {
+        const title = card.querySelector('h4')?.textContent.toLowerCase();
+        if (title?.includes('speed')) {
+          const vEl = card.querySelector('.value');
+          const raw = parseFloat(vEl?.textContent);
+          if (!isNaN(raw)) {
+            vEl.textContent = convertSpeedFromKmh(raw, u).toFixed(2) + ' ' + u;
+          }
+        }
+      });
+
+      // 5) Refresh remote‐status HTML
+      const statusHtml = await fetch('/api/get_status').then(r => r.text());
+      statusContainer.innerHTML = statusHtml;
+
+      // 6) Refresh sampling indicator badge
+      const sampling = await fetch('/sampling_status').then(r => r.json());
+      const running  = sampling.save_mode === 'continuous';
+      samplingBadge.textContent = running ? 'Continuous Sampling Active' : 'Not Sampling';
+      samplingBadge.className   = running ? 'badge bg-success' : 'badge bg-secondary';
+    } catch (err) {
+      console.error('updateDashboard error:', err);
+    }
+  }
+
+  // Hide/show each .data-card based strictly on selectedMetrics
+  function filterCardsBySelection() {
+    document.querySelectorAll('.data-card').forEach(card => {
+      const title = card.querySelector('h4')?.textContent.trim();
+      if (selectedMetrics.has(title)) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+
+  function buildMetricDropdown() {
+    // Collect all metric‐names from the newly injected cards
+    const metrics = new Set();
+    document.querySelectorAll('.data-card h4').forEach(h4 => {
+      metrics.add(h4.textContent.trim());
+    });
+
+    // If user never had a stored value, default to “all”
+    if (!hasStoredMetrics) {
+      selectedMetrics = new Set(metrics);
+      localStorage.setItem("selectedMetrics", JSON.stringify([...selectedMetrics]));
+      hasStoredMetrics = true;
+    }
+
+    // Insert “Select All” / “Unselect All”
+    cardSelectionMenu.innerHTML = `
+      <li><button class="dropdown-item" id="selectMetricsAllBtn">Select All</button></li>
+      <li><button class="dropdown-item" id="unselectMetricsAllBtn">Unselect All</button></li>
+      <li><hr class="dropdown-divider"></li>
+    `;
+
+    // Now one <li> for each metric
+    metrics.forEach(m => {
+      const checked = selectedMetrics.has(m) ? 'checked' : '';
+      cardSelectionMenu.insertAdjacentHTML(
+        'beforeend',
+        `<li>
+           <label class="dropdown-item">
+             <input type="checkbox" value="${m}" ${checked}> ${m}
+           </label>
+         </li>`
+      );
+    });
+
+    // Hook each metric checkbox → filterCardsBySelection
+    cardSelectionMenu.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', e => {
+        if (e.target.checked) selectedMetrics.add(e.target.value);
+        else                  selectedMetrics.delete(e.target.value);
+        localStorage.setItem('selectedMetrics', JSON.stringify([...selectedMetrics]));
+        filterCardsBySelection();
+      });
+    });
+
+    // “Select All” button
+    cardSelectionMenu
+      .querySelector('#selectMetricsAllBtn')
+      .addEventListener('click', () => {
         selectedMetrics = new Set(metrics);
         localStorage.setItem('selectedMetrics', JSON.stringify([...selectedMetrics]));
-        menu.querySelectorAll('input').forEach(cb => cb.checked = true);
-        updateDashboard();
+        cardSelectionMenu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+        filterCardsBySelection();
       });
-      menu.querySelector('#unselectAllBtn').addEventListener('click', () => {
+
+    // “Unselect All” button
+    cardSelectionMenu
+      .querySelector('#unselectMetricsAllBtn')
+      .addEventListener('click', () => {
         selectedMetrics.clear();
         localStorage.setItem('selectedMetrics', JSON.stringify([...selectedMetrics]));
-        menu.querySelectorAll('input').forEach(cb => cb.checked = false);
-        updateDashboard();
+        cardSelectionMenu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+        filterCardsBySelection();
       });
+  }
+
+  // Sampling buttons
+  startBtn.addEventListener('click', () => {
+    fetch('/start_save', { method: 'POST' }).then(updateDashboard);
+  });
+  stopBtn.addEventListener('click', () => {
+    fetch('/end_save',   { method: 'POST' }).then(updateDashboard);
+  });
+
+  // ——————————————————————————————————————————————————————
+  //                     GPS MAP (Leaflet)
+  // ——————————————————————————————————————————————————————
+
+  function getColorForTrack(v) {
+    for (let i = 0; i < colorThresholds.length; i++) {
+      if (v < colorThresholds[i]) return colorPalette[i];
     }
+    return colorPalette[colorPalette.length - 1];
+  }
 
-    /* ---------- sampling start / stop buttons -------------------- */
-    document.getElementById('startSamplingBtn').addEventListener('click', () => fetch('/start_save', {method:'POST'}).then(updateDashboard));
-    document.getElementById('stopSamplingBtn') .addEventListener('click', () => fetch('/end_save',   {method:'POST'}).then(updateDashboard));
+  function drawTrack() {
+    // Remove old segments
+    gpsSegments.forEach(seg => leafletMap.removeLayer(seg));
+    gpsSegments.length = 0;
 
-    // kick‑off refresh loop
-    setInterval(updateDashboard, auto_refresh);
-    updateDashboard();
-    populateDropdown();
-  </script>
+    if (gpsHistory.length < 2) return;
 
-  <!-- ============================================================= -->
-  <!-- GPS MAP + TRACKING JS                                         -->
-  <!-- ============================================================= -->
-  <script>
-    /* ---------- globals & helpers -------------------------------- */
-    let leafletMap, gpsMarker;
-    let gpsAutoFollow = true;
-    let gpsHistory    = [];
-    let gpsSegments   = [];
-    let refreshMs     = 1000;             // live poll interval
-    let durationMs    = 10 * 60 * 1000;   // track retention
+    const unit = unitPrefs.prefSpeedUnits || 'km/h';
+    for (let i = 1; i < gpsHistory.length; i++) {
+      const prev = gpsHistory[i - 1];
+      const curr = gpsHistory[i];
+      if (![prev.lat, prev.lon, curr.lat, curr.lon].every(Number.isFinite)) continue;
 
-    let  trackColorKey   = 'speed';       // what metric to color by
-    let  colorThresholds = [1, 5, 15];
-    let  colorPalette    = ['#3366cc', '#66cc66', '#ffcc00', '#cc3333'];
+      const rawVal = (trackColorKey === 'speed')
+        ? convertSpeedFromKmh(curr[trackColorKey] ?? prev[trackColorKey], unit)
+        : (curr[trackColorKey] ?? prev[trackColorKey]);
 
-    const gpsFlag = document.getElementById('gps-flag');
-    const refreshSlider = document.getElementById('gpsRefreshSlider');
-    const trackSlider   = document.getElementById('gpsTrackSlider');
-
-    function getColorForTrack(v) {
-      for (let i=0;i<colorThresholds.length;i++) if (v < colorThresholds[i]) return colorPalette[i];
-      return colorPalette[colorPalette.length-1];
-    }
-
-    function drawTrack() {
-      gpsSegments.forEach(seg => leafletMap.removeLayer(seg));
-      gpsSegments.length = 0;
-      if (gpsHistory.length < 2) return;
-
-      const prefs = JSON.parse(localStorage.getItem('mothicsLocalPrefs') || '{}');
-      const unit  = prefs.prefSpeedUnits || 'km/h';
-
-      for (let i=1;i<gpsHistory.length;i++) {
-        const prev = gpsHistory[i-1];
-        const curr = gpsHistory[i];
-        if (!Number.isFinite(prev.lat)||!Number.isFinite(prev.lon)||!Number.isFinite(curr.lat)||!Number.isFinite(curr.lon)) continue;
-
-        const val = trackColorKey==='speed'
-          ? convertSpeedFromKmh(curr[trackColorKey] ?? prev[trackColorKey], unit)
-          : (curr[trackColorKey] ?? prev[trackColorKey]);
-
-        const seg = L.polyline([[prev.lat,prev.lon],[curr.lat,curr.lon]], {
-          color: isFinite(val) ? getColorForTrack(val) : '#3388ff', weight:3, opacity:0.8
-        }).addTo(leafletMap);
-        gpsSegments.push(seg);
-      }
-    }
-
-    function resetTrack() {
-      gpsSegments.forEach(seg => leafletMap.removeLayer(seg));
-      gpsSegments.length = 0;
-      gpsHistory.length  = 0;
-    }
-
-    /* ---------- live GPS fetch ----------------------------------- */
-    function updateGPS() {
-      fetch('/api/gps_info')
-        .then(r => r.ok ? r.json() : null)
-        .then(cfg => {
-          if (!cfg || !cfg.gps_available || !cfg.latest_position) { gpsFlag.style.display='block'; return; }
-          gpsFlag.style.display='none';
-
-          const {lat,lon} = cfg.latest_position;
-          if (!gpsMarker) gpsMarker = L.circleMarker([lat,lon], {radius:8,color:'blue',fillColor:'#3399ff',fillOpacity:0.8}).addTo(leafletMap);
-          else gpsMarker.setLatLng([lat,lon]);
-
-          const now = Date.now();
-          gpsHistory.push({time:now, ...cfg.latest_position});
-          gpsHistory = gpsHistory.filter(p => now - p.time <= durationMs);
-
-          drawTrack();
-          if (gpsAutoFollow) leafletMap.panTo([lat,lon]);
-        })
-        .catch(() => gpsFlag.style.display='block');
-    }
-
-    /* ---------- initial map bootstrap ---------------------------- */
-    fetch('/api/gps_info').then(r => r.ok ? r.json() : null).then(cfg => {
-      if (!cfg) return;
-
-      const {min,max} = cfg.zoom;
-      const latest     = cfg.latest_position;
-      const center     = (latest && Number.isFinite(latest.lat)&&Number.isFinite(latest.lon))
-                       ? [latest.lat,latest.lon] : [45.6598,13.7967];
-
-      // accept server‑side track‑color configuration
-      if (cfg.track_coloring) {
-        trackColorKey   = cfg.track_coloring.key        ?? trackColorKey;
-        colorThresholds = cfg.track_coloring.thresholds ?? colorThresholds;
-        colorPalette    = cfg.track_coloring.colors     ?? colorPalette;
-      }
-
-      leafletMap = L.map('leaflet-map', {minZoom:min, maxZoom:max, center, zoom:min+3});
-      L.tileLayer('/tiles/{z}/{x}/{y}.png', {minZoom:min,maxZoom:max,tileSize:256,attribution:'Local tiles'}).addTo(leafletMap);
-
-      leafletMap.whenReady(() => {
-        /* ------- custom zoom/full controls (⤢ ⤡ ◎) ----------- */
-        const ZoomFull = L.Control.extend({
-          options:{position:'topleft'},
-          onAdd(){
-            const div = L.DomUtil.create('div','leaflet-bar leaflet-control');
-            div.innerHTML = `
-              <a href="#" id="zoom-full-in"  title="Zoom&nbsp;to&nbsp;max">⤢</a>
-              <a href="#" id="zoom-full-out" title="Zoom&nbsp;to&nbsp;min">⤡</a>
-              <a href="#" id="zoom-reset"    title="Recenter">◎</a>`;
-            L.DomEvent.disableClickPropagation(div);
-            return div;
-          }
-        });
-        leafletMap.addControl(new ZoomFull());
-        setTimeout(()=>{
-          document.getElementById('zoom-full-in') .addEventListener('click',e=>{e.preventDefault(); leafletMap.setZoom(leafletMap.getMaxZoom());});
-          document.getElementById('zoom-full-out').addEventListener('click',e=>{e.preventDefault(); leafletMap.setZoom(leafletMap.getMinZoom());});
-          document.getElementById('zoom-reset')  .addEventListener('click',e=>{e.preventDefault(); gpsAutoFollow=true; if (gpsMarker) leafletMap.panTo(gpsMarker.getLatLng());});
-        },0);
-
-        /* ------- track clear button (✖) ----------------------- */
-        const resetBtn = L.control({position:'topright'});
-        resetBtn.onAdd = () => {
-          const btn = L.DomUtil.create('button','leaflet-bar');
-          btn.innerHTML='✖'; btn.title='Clear Track';
-          btn.onclick=resetTrack; return btn;
-        };
-        resetBtn.addTo(leafletMap);
-
-        /* ------- dynamic legend -------------------------------- */
-        const legendCtl = L.control({position:'bottomright'});
-        legendCtl.onAdd = () => L.DomUtil.create('div','leaflet-control leaflet-bar track-legend');
-        legendCtl.addTo(leafletMap);
-
-        function updateLegend(){
-          const container = legendCtl.getContainer();
-          const prefs = JSON.parse(localStorage.getItem('mothicsLocalPrefs')||'{}');
-          const unit  = trackColorKey==='speed' ? (prefs.prefSpeedUnits || 'km/h') : '';
-          let html = `<div class="legend-title">Color: ${trackColorKey}</div>`;
-          colorThresholds.forEach((thr,i)=> html += `<div class="legend-row"><span class="legend-color" style="background:${colorPalette[i]}"></span><span>< ${thr} ${unit}</span></div>`);
-          html += `<div class="legend-row"><span class="legend-color" style="background:${colorPalette.at(-1)}"></span><span>≥ ${colorThresholds.at(-1)} ${unit}</span></div>`;
-          container.innerHTML = html;
+      const seg = L.polyline(
+        [[prev.lat, prev.lon], [curr.lat, curr.lon]],
+        {
+          color : isFinite(rawVal) ? getColorForTrack(rawVal) : '#3388ff',
+          weight: 3,
+          opacity: 0.8
         }
-        updateLegend();
+      ).addTo(leafletMap);
+      gpsSegments.push(seg);
+    }
+  }
 
-        leafletMap.on('movestart', ()=> gpsAutoFollow=false);
-        updateGPS();
+  function resetTrack() {
+    gpsSegments.forEach(seg => leafletMap.removeLayer(seg));
+    gpsSegments.length = 0;
+    gpsHistory.length  = 0;
+  }
 
-        // load backlog & start polling
-        fetch('/api/gps_track').then(r=>r.ok?r.json():null).then(trk=>{
-          if (trk?.track) {
-            gpsHistory = trk.track.map(p=>({time:new Date(p.timestamp).getTime(), lat:p.lat, lon:p.lon, [trackColorKey]:p.value}));
-            drawTrack();
-          }
-        });
-        setInterval(updateGPS, refreshMs);
+  function updateLegend(legendCtl) {
+    const container = legendCtl.getContainer();
+    const unit = (trackColorKey === 'speed') ? (unitPrefs.prefSpeedUnits || 'km/h') : '';
+    let html = `<div class="legend-title">Color: ${trackColorKey}</div>`;
+    colorThresholds.forEach((thr, i) => {
+      html += `
+        <div class="legend-row">
+          <span class="legend-color" style="background: ${colorPalette[i]}"></span>
+          <span>&lt; ${thr} ${unit}</span>
+        </div>`;
+    });
+    html += `
+      <div class="legend-row">
+        <span class="legend-color" style="background: ${colorPalette.at(-1)}"></span>
+        <span>&ge; ${colorThresholds.at(-1)} ${unit}</span>
+      </div>`;
+    container.innerHTML = html;
+  }
+
+  // Periodically fetch live GPS info
+  async function updateGPS() {
+    try {
+      const cfg = await fetch('/api/gps_info').then(r => r.ok ? r.json() : null);
+      if (!cfg || !cfg.gps_available || !cfg.latest_position) {
+        gpsFlag.style.display = 'block';
+        return;
+      }
+      gpsFlag.style.display = 'none';
+
+      const { lat, lon } = cfg.latest_position;
+      if (!gpsMarker) {
+        gpsMarker = L.circleMarker([lat, lon], {
+          radius: 8, color: 'blue', fillColor: '#3399ff', fillOpacity: 0.8
+        }).addTo(leafletMap);
+      } else {
+        gpsMarker.setLatLng([lat, lon]);
+      }
+
+      const now = Date.now();
+      gpsHistory.push({ time: now, ...cfg.latest_position });
+      gpsHistory = gpsHistory.filter(p => now - p.time <= durationMs);
+
+      drawTrack();
+      if (gpsAutoFollow) leafletMap.panTo([lat, lon]);
+    } catch {
+      gpsFlag.style.display = 'block';
+    }
+  }
+
+  // Bootstrap Leaflet map and load backlog once
+  async function initLeafletMap() {
+    const cfg = await fetch('/api/gps_info').then(r => r.ok ? r.json() : null);
+    if (!cfg) return;
+
+    const { min, max } = cfg.zoom;
+    const latest       = cfg.latest_position;
+    const center = (latest && [latest.lat, latest.lon].every(Number.isFinite))
+                 ? [latest.lat, latest.lon]
+                 : [45.6598, 13.7967];
+
+    if (cfg.track_coloring) {
+      trackColorKey   = cfg.track_coloring.key        ?? trackColorKey;
+      colorThresholds = cfg.track_coloring.thresholds ?? colorThresholds;
+      colorPalette    = cfg.track_coloring.colors     ?? colorPalette;
+    }
+
+    leafletMap = L.map('leaflet-map', { minZoom: min, maxZoom: max, center, zoom: min + 3 });
+    L.tileLayer('/tiles/{z}/{x}/{y}.png', {
+      minZoom: min, maxZoom: max, tileSize: 256, attribution: 'Local tiles'
+    }).addTo(leafletMap);
+
+    leafletMap.whenReady(() => {
+      // Custom zoom/full controls
+      const ZoomFull = L.Control.extend({
+        options: { position: 'topleft' },
+        onAdd() {
+          const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+          div.innerHTML = `
+            <a href="#" id="zoom-full-in"  title="Zoom to max">⤢</a>
+            <a href="#" id="zoom-full-out" title="Zoom to min">⤡</a>
+            <a href="#" id="zoom-reset"    title="Recenter">◎</a>`;
+          L.DomEvent.disableClickPropagation(div);
+          return div;
+        }
       });
+      leafletMap.addControl(new ZoomFull());
+
+      setTimeout(() => {
+        document.getElementById('zoom-full-in').addEventListener('click', e => {
+          e.preventDefault();
+          leafletMap.setZoom(leafletMap.getMaxZoom());
+        });
+        document.getElementById('zoom-full-out').addEventListener('click', e => {
+          e.preventDefault();
+          leafletMap.setZoom(leafletMap.getMinZoom());
+        });
+        document.getElementById('zoom-reset').addEventListener('click', e => {
+          e.preventDefault();
+          gpsAutoFollow = true;
+          if (gpsMarker) leafletMap.panTo(gpsMarker.getLatLng());
+        });
+      }, 0);
+
+      // “Clear Track” button (✖)
+      const resetBtn = L.control({ position: 'topright' });
+      resetBtn.onAdd = () => {
+        const btn = L.DomUtil.create('button', 'leaflet-bar');
+        btn.innerHTML = '✖';
+        btn.title     = 'Clear Track';
+        btn.onclick   = resetTrack;
+        return btn;
+      };
+      resetBtn.addTo(leafletMap);
+
+      // Legend box
+      const legendCtl = L.control({ position: 'bottomright' });
+      legendCtl.onAdd = () => L.DomUtil.create('div', 'leaflet-control leaflet-bar track-legend');
+      legendCtl.addTo(leafletMap);
+      updateLegend(legendCtl);
+
+      leafletMap.on('movestart', () => gpsAutoFollow = false);
+
+      // Start periodic GPS updates
+      setInterval(updateGPS, refreshMs);
     });
 
-    /* ---------- sliders ------------------------------------------ */
-    refreshSlider.addEventListener('input', e => {
-      const v = parseFloat(e.target.value); refreshMs = v*1000;
-      document.getElementById('gpsRefreshValue').textContent = `${v.toFixed(1)} s`;
-    });
-    trackSlider.addEventListener('input', e => {
-      const v = parseInt(e.target.value,10); durationMs = v*60*1000;
-      document.getElementById('gpsTrackValue').textContent = `${v} min`;
-    });
-  </script>
+    // Load backlog of GPS points once
+    const trk = await fetch('/api/gps_track').then(r => r.ok ? r.json() : null);
+    if (trk?.track) {
+      gpsHistory = trk.track.map(p => ({
+        time: new Date(p.timestamp).getTime(),
+        lat : p.lat,
+        lon : p.lon,
+        [trackColorKey]: p.value
+      }));
+      drawTrack();
+    }
 
-  <!-- Convert‑speed helper (module) -->
-  <script type="module">
-    import { convertSpeedFromKmh } from "{{ url_for('static', filename='local_preferences.js') }}";
-    window.convertSpeedFromKmh = convertSpeedFromKmh;
-  </script>
+    // One immediate GPS update
+    updateGPS();
+  }
+
+  // Slider → adjust GPS refreshMs or durationMs
+  refreshSlider.addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    refreshMs = v * 1000;
+    document.getElementById('gpsRefreshValue').textContent = `${v.toFixed(1)} s`;
+  });
+  trackSlider.addEventListener('input', e => {
+    const v = parseInt(e.target.value, 10);
+    durationMs = v * 60 * 1000;
+    document.getElementById('gpsTrackValue').textContent = `${v} min`;
+  });
+
+  // Slider → adjust Plot refresh rate
+  plotRefreshSlider.addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    plotRefreshMs = v * 1000;
+    plotRefreshValue.textContent = `${v.toFixed(1)} s`;
+
+    // If plot is running, restart at new interval
+    if (!isPlotPaused) {
+      clearInterval(plotTimerId);
+      plotTimerId = setInterval(updatePlot, plotRefreshMs);
+    }
+  });
+
+  // Slider → adjust time window
+  timeWindowSlider.addEventListener('input', e => {
+    timeWindowMinutes = parseInt(e.target.value, 10);
+    timeWindowValue.textContent = `Last ${timeWindowMinutes} min`;
+    if (!showAll) updatePlot();
+  });
+
+  // Checkbox → Show All or use slider window
+  showAllCheckbox.addEventListener('change', () => {
+    showAll = showAllCheckbox.checked;
+    timeWindowSlider.disabled = showAll;
+    updatePlot();
+  });
+
+  // Pause/Resume button
+  pausePlotBtn.addEventListener('click', () => {
+    if (isPlotPaused) {
+      // Resume
+      isPlotPaused = false;
+      pausePlotBtn.textContent = 'Pause Plot';
+      plotTimerId = setInterval(updatePlot, plotRefreshMs);
+    } else {
+      // Pause
+      isPlotPaused = true;
+      pausePlotBtn.textContent = 'Resume Plot';
+      clearInterval(plotTimerId);
+    }
+  });
+
+  // ——— ONCE DOM CONTENT IS READY ———
+  window.addEventListener('DOMContentLoaded', () => {
+    // 1) Build variable selector, then draw initial plot
+    initVarSelector().then(() => updatePlot());
+
+    // 2) Load dashboard cards/status and refresh at interval
+    updateDashboard();
+    setInterval(updateDashboard, auto_refresh);
+
+    // 3) Initialize Leaflet map and GPS logic
+    initLeafletMap();
+
+    // 4) Kick off the plot‐refresh interval
+    plotTimerId = setInterval(updatePlot, plotRefreshMs);
+  });
+</script>
 {% endblock %}
