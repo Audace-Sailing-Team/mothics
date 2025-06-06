@@ -1,7 +1,6 @@
 import os
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, jsonify, request, Response, current_app, abort, send_file
-from bokeh.embed import server_document
 from ..helpers import compute_status, get_tile_zoom_levels
 
 monitor_bp = Blueprint('monitor', __name__)

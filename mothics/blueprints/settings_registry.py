@@ -66,16 +66,6 @@ SETTINGS_REGISTRY = {
         "config_path": ("webapp", "data_refresh"),
         "log_success": "Auto-refresh rate set to {value} s"
     },
-    "plot_mode": {
-        "type": "string",
-        "tab": "Webapp",
-        "label": "Plotting mode",
-        "choices": ["static", "real-time"],
-        "validate": lambda v: v in ["static", "real-time"],
-        "real_time_setter": lambda v, mgr: mgr.webapp.app.config.__setitem__('PLOT_MODE', v),
-        "config_path": ("webapp", "plot_mode"),
-        "log_success": "Plot mode changed to {value}"
-    },
     "timeout_offline": {
         "type": "int",
         "tab": "Webapp",
