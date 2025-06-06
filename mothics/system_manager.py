@@ -439,23 +439,14 @@ class SystemManager:
         elif mode == "replay":
             self.start_replay()
         else:
-            self.logger.error(f"no valid mode found for restart, got: {mode}")
-            
-        # Restart bokeh server if webapp is available
-        if self.webapp is not None and self.webapp.bokeh_thread is not None:
-            self.webapp.restart_bokeh_server()
+            self.logger.error(f"no valid mode found for restart, got: {mode}")    
 
     def get_status(self):
-        if self.webapp:
-            bokeh_status = self.webapp.bokeh_thread
-        else:
-            bokeh_status = False
         return {
             "mode": self.mode,
             "communicator": "running" if self.communicator else "stopped",
             "aggregator": "running" if self.aggregator else "stopped",
             "webapp": "running" if self.webapp else "stopped",
-            "bokeh server": "running" if bokeh_status else "stopped",
             "track": "active" if self.track else "not active",
             "database": "available" if self.database else "not initialized",
         }
