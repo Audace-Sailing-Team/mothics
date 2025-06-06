@@ -2,7 +2,6 @@ import os
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, jsonify, request, Response, current_app, abort, send_file
 from bokeh.embed import server_document
-from ..bokeh_plots import PlotDispatcher
 from ..helpers import compute_status, get_tile_zoom_levels
 
 monitor_bp = Blueprint('monitor', __name__)
@@ -10,10 +9,9 @@ monitor_bp = Blueprint('monitor', __name__)
 
 @monitor_bp.route("/")
 def index():
-    dispatcher = PlotDispatcher(current_app.config)
-    script, div = dispatcher.render()
     auto_refresh = current_app.config['AUTO_REFRESH_TABLE']
-    return render_template("index.html", script=script, div=div, auto_refresh=auto_refresh)
+    return render_template("index.html", auto_refresh=auto_refresh)
+
 
 @monitor_bp.route("/api/get_table")
 def get_table():
@@ -58,6 +56,7 @@ def get_table():
     # The template expects table_data as a list of rows
     return render_template("table.html", table_data=[filtered_row])
 
+
 @monitor_bp.route("/api/get_status")
 def get_status():
     database = current_app.config['GETTERS']['database']()
@@ -73,6 +72,7 @@ def get_status():
         status_data = {rm_thesaurus.get(rm, rm): status for rm, status in status_data.items()}
     return render_template("status.html", status_data=status_data)
 
+
 @monitor_bp.route('/tiles/<int:z>/<int:x>/<int:y>.png')
 def serve_tile(z, x, y):
     path = os.path.join(current_app.root_path, 'static', 'tiles', str(z), str(x), f"{y}.png")
@@ -81,9 +81,11 @@ def serve_tile(z, x, y):
     else:
         abort(404)
 
+        
 @monitor_bp.route("/gps_map")
 def gps_map():
     return render_template("gps_map.html")
+
 
 @monitor_bp.route("/api/gps_info")
 def gps_info():
@@ -127,6 +129,7 @@ def gps_info():
         }
     })
 
+
 @monitor_bp.route("/api/gps_track")
 def gps_track():
     db = current_app.config['GETTERS']['database']()
@@ -163,3 +166,38 @@ def gps_track():
             })
 
     return jsonify({"track": track_data})
+
+@monitor_bp.route("/api/track_plot_data")
+def track_plot_data():
+    track = current_app.config['GETTERS']['database']()
+    if not track:
+        return jsonify({"error": "No track loaded"}), 400
+
+    # ——— gather points & all distinct variable names ———
+    points      = list(track.data_points)
+    all_keys    = {k for p in points for k in p.input_data.keys()}
+    hidden      = set(current_app.config.get("HIDDEN_DATA_PLOTS", []))
+    thesaurus   = current_app.config.get("DATA_THESAURUS", {})
+    filter_set  = set(request.args.get("vars", "").split(",")) if request.args.get("vars") else None
+
+    # ——— build zero-filled (or None-filled) matrix up front ———
+    vars_by_name = {
+        k: [None] * len(points)      # placeholder for every timestamp
+        for k in all_keys
+        if (filter_set is None or k in filter_set) and k not in hidden
+    }
+
+    # ——— fill in the slots we actually have ———
+    for idx, dp in enumerate(points):
+        for k, raw in dp.input_data.items():
+            if k in vars_by_name:
+                try:
+                    vars_by_name[k][idx] = float(raw)
+                except (ValueError, TypeError):
+                    pass  # leave None in place
+
+    return jsonify(
+        timestamps=[p.timestamp.isoformat() for p in points],
+        vars=vars_by_name,
+        aliases={k: thesaurus.get(k, k) for k in vars_by_name}
+    )
