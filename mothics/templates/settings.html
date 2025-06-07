@@ -6,9 +6,9 @@
 {# Gather unique tabs #}
 {% set tab_list = [] %}
 {% for key, field in registry.items() %}
-    {% if field['tab'] is not none and field['tab'] not in tab_list %}
-        {% set _ = tab_list.append(field['tab']) %}
-    {% endif %}
+  {% if field.tab is not none and field.tab not in tab_list %}
+    {% set _ = tab_list.append(field.tab) %}
+  {% endif %}
 {% endfor %}
 
 <ul class="nav nav-tabs">
@@ -20,10 +20,11 @@
         {{ t }}
       </button>
     </li>
-    {% endfor %}
-
+  {% endfor %}
   <li class="nav-item">
-    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-user-prefs">
+    <button class="nav-link"
+            data-bs-toggle="tab"
+            data-bs-target="#tab-user-prefs">
       Local preferences
     </button>
   </li>
@@ -35,74 +36,171 @@
          id="tab-{{ t | replace(' ', '-') }}">
 
       <form method="post">
-        {% for key, field in registry.items() if field['tab'] == t %}
-        <div class="mb-3">
-	  <label for="{{ key }}" class="form-label">
-	    {{ field.get('label', key) }}
-	  </label>
-	  
-	  {% if field.get('choices') %}
-	  <select class="form-select" name="{{ key }}">
-	    {% for choice in field.get('choices') %}
-	    <option value="{{ choice }}">{{ choice }}</option>
-	    {% endfor %}
-	  </select>
-	  
-	  {% elif field.get('type') == 'bool' %}
-	  <select class="form-select" name="{{ key }}">
-	    <option value="true">True</option>
-	    <option value="false">False</option>
-	  </select>
+        {% for key, field in registry.items() if field.tab == t %}
+          {# Use `sid` as a stable slug for element IDs #}
+          {% set sid = key %}
+          <div class="mb-3">
+            <label for="{{ key }}" class="form-label">
+              {{ field.get('label', key) }}
+            </label>
 
-	  {% elif field.type == 'taglist' %}
-          <input type="hidden" name="{{ key }}" id="tag-{{ sid }}"
-                 value="{{ current[key] | join(',') if current[key] is iterable and not current[key] is string else '' }}">
-	  
-          {% elif field.type == 'kvtable' %}
-          <table class="table table-sm" id="tbl-{{ sid }}">
-            <thead><tr><th>Key</th><th>Alias</th><th></th></tr></thead>
-            <tbody>
-              {% for k, v in (current[key] or {}).items() %}
-              <tr>
-                <td><input class="form-control form-control-sm" value="{{ k }}"></td>
-                <td><input class="form-control form-control-sm" value="{{ v }}"></td>
-                <td><button class="btn btn-sm btn-danger">×</button></td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          <button type="button" class="btn btn-outline-secondary btn-sm" data-add-row="{{ sid }}">Add row</button>
-          <input type="hidden" name="{{ key }}" id="hidden-{{ sid }}">
+            {# Choice dropdown #}
+            {% if field.choices %}
+              <select class="form-select" name="{{ key }}">
+                {% for choice in field.choices %}
+                  <option value="{{ choice }}"
+                    {% if current[key] == choice %}selected{% endif %}>
+                    {{ choice }}
+                  </option>
+                {% endfor %}
+              </select>
 
-	  {% elif field.type == 'button' %}
-	  <button type="submit"
-		  name="{{ key }}"
-		  value="1"
-		  class="btn btn-outline-secondary">
-	    {{ field.get('label', key) }}
-	  </button>
+            {# Boolean dropdown #}
+            {% elif field.type == 'bool' %}
+              <select class="form-select" name="{{ key }}">
+                <option value="true"
+                  {% if current[key] == true %}selected{% endif %}>
+                  True
+                </option>
+                <option value="false"
+                  {% if current[key] == false %}selected{% endif %}>
+                  False
+                </option>
+              </select>
 
-	  {% else %}
-	  <input type="text"
-		 class="form-control"
-		 name="{{ key }}"
-		 placeholder="{{ field.get('placeholder', '') }}">
-	  {% endif %}
-        </div>
+	    {% elif field.type == 'taglist' %}
+	      <input
+		type="text"
+		class="form-control"
+		name="{{ key }}"
+		id="tag-{{ sid }}"
+		value='{{ (current[key] or []) | tojson }}'
+		>
+	      <div class="form-text">Enter sensor-keys as tags.</div>
+	      
+	      <script>
+		document.addEventListener('DOMContentLoaded', () => {
+		    const input = document.getElementById('tag-{{ sid }}');
+		    const tagify = new Tagify(input, {
+			duplicates: false,
+			keepInvalidTags: false,
+			originalInputValueFormat: valuesArr =>
+			JSON.stringify(valuesArr.map(item => item.value))
+		    });
+		});
+	      </script>  
+	      
+            {% elif field.type == 'kvtable' %}
+              <table class="table table-sm" id="tbl-{{ sid }}">
+                <thead>
+                  <tr><th>Key</th><th>Alias</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {% for k, v in (current[key] or {}).items() %}
+                    <tr>
+                      <td>
+                        <input class="form-control form-control-sm" value="{{ k }}">
+                      </td>
+                      <td>
+                        <input class="form-control form-control-sm" value="{{ v }}">
+                      </td>
+                      <td>
+                        <button type="button"
+                                class="btn btn-sm btn-danger">×</button>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <button type="button"
+                      class="btn btn-outline-secondary btn-sm mb-2"
+                      data-add-row="{{ sid }}">
+                Add row
+              </button>
+              <input type="hidden"
+                     name="{{ key }}"
+                     id="hidden-{{ sid }}"
+                     value='{{ current[key] | tojson }}'>
+
+              <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                  const table = document.getElementById('tbl-{{ sid }}');
+                  const hidden = document.getElementById('hidden-{{ sid }}');
+                  const addBtn = document.querySelector('[data-add-row="{{ sid }}"]');
+
+                  function sync() {
+                    const data = {};
+                    table.querySelectorAll('tbody tr').forEach(row => {
+                      const [kInp, vInp] = row.querySelectorAll('input');
+                      const k = kInp.value.trim();
+                      const v = vInp.value.trim();
+                      if (k !== '') data[k] = v;
+                    });
+                    hidden.value = JSON.stringify(data);
+                  }
+
+                  function wire(row) {
+                    row.querySelector('button').addEventListener('click', () => {
+                      row.remove();
+                      sync();
+                    });
+                    row.querySelectorAll('input').forEach(inp =>
+                      inp.addEventListener('input', sync)
+                    );
+                  }
+
+                  table.querySelectorAll('tbody tr').forEach(wire);
+
+                  addBtn.addEventListener('click', () => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                      <td><input class="form-control form-control-sm"></td>
+                      <td><input class="form-control form-control-sm"></td>
+                      <td>
+                        <button type="button" class="btn btn-sm btn-danger">×</button>
+                      </td>`;
+                    table.querySelector('tbody').appendChild(row);
+                    wire(row);
+                    sync();
+                  });
+                });
+              </script>
+
+            {# Single‐submit button #}
+            {% elif field.type == 'button' %}
+              <button type="submit"
+                      name="{{ key }}"
+                      value="1"
+                      class="btn btn-outline-secondary">
+                {{ field.get('label', key) }}
+              </button>
+
+            {# Default text input #}
+            {% else %}
+              <input type="text"
+                     class="form-control"
+                     name="{{ key }}"
+                     placeholder="{{ field.get('placeholder', '') }}"
+                     value="{{ current[key] or '' }}">
+            {% endif %}
+          </div>
         {% endfor %}
-	
-        <button type='submit' class='btn btn-primary'>Save {{ t }}</button>
+
+        <button type="submit" class="btn btn-primary">Save {{ t }}</button>
       </form>
 
     </div>
-    {% endfor %}
-    
-    <div class="tab-pane fade" id="tab-user-prefs">
-      <p class="text-muted">These settings are stored in your browser and do not affect other users.</p>
-      
-      <div id="local-user-prefs-form"></div>
-      <button class="btn btn-secondary mt-3" id="saveLocalPrefsBtn">Save preferences</button>
-    </div>
+  {% endfor %}
+
+  <div class="tab-pane fade" id="tab-user-prefs">
+    <p class="text-muted">
+      These settings are stored in your browser and do not affect other users.
+    </p>
+    <div id="local-user-prefs-form"></div>
+    <button class="btn btn-secondary mt-3" id="saveLocalPrefsBtn">
+      Save preferences
+    </button>
+  </div>
 </div>
 
 <script type="module">
@@ -115,7 +213,9 @@
   window.addEventListener('DOMContentLoaded', () => {
     buildLocalPrefsForm("local-user-prefs-form");
     loadLocalPrefsToForm();
-    document.getElementById("saveLocalPrefsBtn").addEventListener("click", saveLocalPrefsFromForm);
+    document.getElementById("saveLocalPrefsBtn")
+            .addEventListener("click", saveLocalPrefsFromForm);
   });
 </script>
+
 {% endblock %}

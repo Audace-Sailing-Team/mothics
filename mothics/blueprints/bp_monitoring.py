@@ -1,3 +1,4 @@
+import re
 import os
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, jsonify, request, Response, current_app, abort, send_file
@@ -166,34 +167,46 @@ def gps_track():
 
     return jsonify({"track": track_data})
 
+
 @monitor_bp.route("/api/track_plot_data")
 def track_plot_data():
     track = current_app.config['GETTERS']['database']()
+    _EXCLUDED_TS = re.compile(r'^rm\d+/last_timestamp$')
+    
     if not track:
         return jsonify({"error": "No track loaded"}), 400
 
-    # ——— gather points & all distinct variable names ———
-    points      = list(track.data_points)
-    all_keys    = {k for p in points for k in p.input_data.keys()}
-    hidden      = set(current_app.config.get("HIDDEN_DATA_PLOTS", []))
-    thesaurus   = current_app.config.get("DATA_THESAURUS", {})
-    filter_set  = set(request.args.get("vars", "").split(",")) if request.args.get("vars") else None
+    points     = list(track.data_points)
 
-    # ——— build zero-filled (or None-filled) matrix up front ———
+    # Build set of all keys, excluding any matching rm<digits>/last_timestamp
+    all_keys = {
+        k
+        for p in points
+        for k in p.input_data.keys()
+        if not _EXCLUDED_TS.match(k)
+    }
+
+    hidden     = set(current_app.config.get("HIDDEN_DATA_PLOTS", []))
+    thesaurus  = current_app.config.get("DATA_THESAURUS", {})
+    filter_set = (
+        set(request.args.get("vars", "").split(",")) 
+        if request.args.get("vars") else None
+    )
+
+    # Include only keys that pass both filter_set (if provided) and hidden rules
     vars_by_name = {
-        k: [None] * len(points)      # placeholder for every timestamp
+        k: [None] * len(points)
         for k in all_keys
         if (filter_set is None or k in filter_set) and k not in hidden
     }
 
-    # ——— fill in the slots we actually have ———
     for idx, dp in enumerate(points):
         for k, raw in dp.input_data.items():
             if k in vars_by_name:
                 try:
                     vars_by_name[k][idx] = float(raw)
                 except (ValueError, TypeError):
-                    pass  # leave None in place
+                    pass  # leave None
 
     return jsonify(
         timestamps=[p.timestamp.isoformat() for p in points],

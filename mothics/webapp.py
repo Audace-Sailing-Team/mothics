@@ -18,7 +18,7 @@ from .blueprints.bp_database import database_bp
 
 
 class WebApp:
-    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data_cards=None, hidden_data_plots=None, timeout_offline=60, timeout_noncomm=30, track_manager=None, track_manager_directory=None, plot_mode='real-time', gps_tiles_directory=None, track_variable='speed', track_thresholds=None, track_colors=None, track_units=None, out_dir=None, instance_dir=None, system_manager=None, track_history_minutes=None):
+    def __init__(self, getters=None, setters=None, auto_refresh_table=2, logger_fname=None, rm_thesaurus=None, data_thesaurus=None, hidden_data_cards=None, hidden_data_plots=None, timeout_offline=60, timeout_noncomm=30, track_manager=None, track_manager_directory=None, plot_mode='real-time', gps_tiles_directory=None, track_variable='speed', track_thresholds=None, track_colors=None, track_units=None, out_dir=None, instance_dir=None, system_manager=None, track_history_minutes=None, config_data=None):
         self.getters = getters or {}
         """Getter methods from other Mothics components"""
         self.setters = setters or {}
@@ -91,7 +91,8 @@ class WebApp:
             'TRACK_COLORS': self.track_colors,
             'TRACK_UNITS': self.track_units,
             'GPS_HISTORY_MINUTES': self.track_history_minutes,
-            'SYSTEM_MGR': system_manager
+            'SYSTEM_MGR': system_manager,
+            'CONFIG_DATA': config_data
         })
         
         # Setup secret key

@@ -318,7 +318,8 @@ class SystemManager:
                 track_history_minutes=self.config["webapp"]["gps"]["track_history"],
                 instance_dir=os.path.dirname(sys.modules['__main__'].__file__),
                 out_dir=self.config["files"]["output_dir"],
-                system_manager=self
+                system_manager=self,
+                config_data=self.config
             )
             # self.webapp.run()
             t = threading.Thread(target=self.webapp.serve, daemon=True, name="WaitressServer")

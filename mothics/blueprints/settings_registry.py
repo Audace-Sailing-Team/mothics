@@ -42,6 +42,38 @@ Notes
 - If a setting is missing any optional field, sensible defaults will be used in the UI.
 
 """
+from functools import wraps
+
+
+def mirror_to_config(path):
+    """
+    Decorator factory.
+    `path` is the tuple from SETTINGS_REGISTRY
+    describing where in CONFIG_DATA to write the new value.
+    """
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(value, mgr):
+            # 1) Run the live effect
+            result = fn(value, mgr)
+
+            # 2) Persist into the Flask app’s CONFIG_DATA
+            cfg = mgr.webapp.app.config["CONFIG_DATA"]
+            node = cfg
+            for key in path[:-1]:
+                node = node.setdefault(key, {})
+            node[path[-1]] = value
+
+            return result
+        return wrapper
+    return decorator
+
+# Helpers
+@mirror_to_config(("webapp", "data_thesaurus"))
+def set_data_thesaurus(v, mgr):
+    mgr.webapp.app.config['DATA_THESAURUS'] = v
+    
+
 SETTINGS_REGISTRY = {
     # ========= Aggregator =========
     "aggregator_interval": {
@@ -56,6 +88,23 @@ SETTINGS_REGISTRY = {
     },
 
     # ========= Webapp =========
+    "data_thesaurus": {
+        "type": "kvtable",
+        "tab": "Webapp",
+        "label": "Sensor values aliases",
+        "real_time_setter": set_data_thesaurus,
+        "config_path": ("webapp", "data_thesaurus"),
+        "log_success": "Data thesaurus updated."
+    },
+    "hidden_data_plots": {
+        "type": "taglist",
+        "tab": "Webapp",
+        "label": "Hidden sensor values",
+        "real_time_setter": lambda v, mgr: mgr.webapp.app.config.__setitem__('HIDDEN_DATA_PLOTS', v),
+        "config_path": ("webapp", "hidden_data_plots"),
+        "validate": lambda raw: True,
+        "log_success": "Hidden-data list updated."
+    },
     "auto_refresh_table": {
         "type": "float",
         "tab": "Webapp",
@@ -99,14 +148,14 @@ SETTINGS_REGISTRY = {
     },
 
     "gps_history_minutes": {
-    "type": "int",
-    "tab": "GPS Track",
-    "label": "GPS track history window (minutes)",
-    "placeholder": "e.g. 10",
-    "validate": lambda v: v > 0,
-    "real_time_setter": lambda v, mgr: mgr.webapp.app.config.__setitem__('GPS_HISTORY_MINUTES', v),
-    "config_path": ("webapp", "gps_history_window"),
-    "log_success": "Set GPS history window to {value} minutes."
+        "type": "int",
+        "tab": "GPS Track",
+        "label": "GPS track history window (minutes)",
+        "placeholder": "e.g. 10",
+        "validate": lambda v: v > 0,
+        "real_time_setter": lambda v, mgr: mgr.webapp.app.config.__setitem__('GPS_HISTORY_MINUTES', v),
+        "config_path": ("webapp", "gps_history_window"),
+        "log_success": "Set GPS history window to {value} minutes."
     },
 
     # ========= Database =========
@@ -285,13 +334,14 @@ SETTINGS_REGISTRY = {
         "config_path": ("angle_offset", "rm1/imu/roll"),
         "log_success": "Roll offset set to {value}°"
     },
-    "zero_imu_now": {
+    "zero_imu": {
         "type": "button",
         "tab": "Calibration",
         "label": "Zero yaw / pitch / roll (use latest data)",
         "real_time_setter": (
             lambda v, mgr: mgr.communicator.preprocessors["AngleOffset_default"].calibrate()
         ),
+        "config_path": ("angle_offset", "zero_imu"),
         "log_success": "IMU angles zeroed"
     },
     "reset_imu_offset": {
@@ -301,6 +351,7 @@ SETTINGS_REGISTRY = {
         "real_time_setter": (
             lambda v, mgr: mgr.communicator.preprocessors["AngleOffset_default"].reset_offsets()
         ),
+        "config_path": ("angle_offset", "reset_imu_offset"),
         "log_success": "IMU offsets cleared"
     },
 }
