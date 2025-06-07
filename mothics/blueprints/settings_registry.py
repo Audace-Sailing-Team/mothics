@@ -337,9 +337,9 @@ SETTINGS_REGISTRY = {
     "zero_imu": {
         "type": "button",
         "tab": "Calibration",
-        "label": "Zero yaw / pitch / roll (use latest data)",
+        "label": "Zero pitch / roll (use latest data)",
         "real_time_setter": (
-            lambda v, mgr: mgr.communicator.preprocessors["AngleOffset_default"].calibrate()
+            lambda v, mgr: mgr.communicator.preprocessors["AngleOffset_default"].calibrate(topics=['pitch', 'roll'])
         ),
         "config_path": ("angle_offset", "zero_imu"),
         "log_success": "IMU angles zeroed"

@@ -112,21 +112,48 @@ class AngleOffset(BaseProcessor):
 
     def calibrate(self, topics=None):
         """
-        Treat the *latest raw angles already seen* as the new zero.
-        If `topics` is None, use all topics for which we have raw data.
+        Make the most-recent *raw* reading of each selected topic the new zero.
+
+        Parameters
+        ----------
+        topics : iterable[str] | None
+            • full MQTT topic(s)  → "rm1/imu/yaw"
+            • OR quantity name(s) → "yaw", "pitch", "roll"
+            • None                → every topic we have cached in `_latest_raw`
         """
-        topics = topics or self.offsets.keys()
-        
+        # ---------- 1. Build the effective topic list ---------------------
+        if topics is None:
+            # default: all topics for which we have raw data
+            topics = list(self._latest_raw.keys())
+        else:
+            full_topics   = []
+            short_names   = []
+            for t in topics:
+                (full_topics if "/" in t else short_names).append(t)
+
+            # expand each short name into matching full topics
+            for qty in short_names:
+                for full in self._latest_raw.keys():
+                    if full.rsplit("/", 1)[-1] == qty:
+                        full_topics.append(full)
+
+            topics = full_topics
+
+        # ---------- 2. Apply zeroing -------------------------------------
         for topic in topics:
             raw_val = self._latest_raw.get(topic)
             if raw_val is None:
-                continue                       # no data received yet
+                continue                    # nothing received yet
 
             if isinstance(raw_val, (tuple, list)):
                 self.offsets[topic] = tuple(-x for x in raw_val)
             else:
                 self.offsets[topic] = -raw_val
-        self.logger.info("IMU zeroed for topics: %s", ", ".join(topics))
+
+        if topics:
+            self.logger.info("IMU zeroed for topics: %s", ", ".join(topics))
+        else:
+            self.logger.warning("calibrate(): no matching topics found")
 
     def reset_offsets(self):
         """
