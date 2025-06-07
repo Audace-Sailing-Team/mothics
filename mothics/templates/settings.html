@@ -28,6 +28,13 @@
       Local preferences
     </button>
   </li>
+  <li class="nav-item">
+    <button class="nav-link"
+            data-bs-toggle="tab"
+            data-bs-target="#tab-offline-assets">
+      Offline assets
+    </button>
+  </li>
 </ul>
 
 <div class="tab-content mt-3">
@@ -201,8 +208,48 @@
       Save preferences
     </button>
   </div>
+
+  <div class="tab-pane fade" id="tab-offline-assets">
+    <div class="mb-3">
+      <h5 class="mt-4">GPS map tiles download</h5>
+      <label for="tileBbox" class="form-label">Bounding Box</label>
+      <input id="tileBbox" type="text" class="form-control"
+             placeholder="lat_min, lon_min, lat_max, lon_max"
+             value="{{ current['tiles_bbox'] | join(', ') }}">
+    </div>
+    
+    <div class="mb-3">
+      <label for="tileZooms" class="form-label">Zoom levels</label>
+      <input id="tileZooms" type="text" class="form-control"
+             placeholder="e.g. 10,11,12,13,14"
+             value="{{ current['tiles_zooms'] | join(',') }}">
+    </div>
+    
+    <div class="mb-3">
+      <button class="btn btn-outline-info" id="estimateTilesBtn">Estimate size</button>
+      <button class="btn btn-outline-primary" id="downloadTilesBtn" disabled>⬇ Download tiles</button>
+    </div>
+    
+    <div id="tileEstimate" class="small text-muted"></div>
+    
+    <div class="progress mt-2" style="height: 20px; display: none;" id="tileProgressWrap">
+      <div id="tileProgressBar" class="progress-bar" role="progressbar"
+           style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+	0%
+      </div>
+    </div>
+    
+    <div class="mb-3">
+      <h5 class="mt-4">CDN download</h5>
+      <button class="btn btn-outline-primary" id="downloadCDNsBtn">⬇ Download CDN libraries</button>
+      <small class="form-text text-muted">Saves JS/CSS assets currently used</small>
+    </div>
+    
+    <div id="offlineStatus" class="mt-3 small text-muted"></div>
+  </div>
 </div>
 
+<!-- Local preferences (module) -->
 <script type="module">
   import {
     buildLocalPrefsForm,
@@ -218,4 +265,174 @@
   });
 </script>
 
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // --- Tagify for taglist fields ---
+  document.querySelectorAll('input[id^="tag-"]').forEach(el => {
+    new Tagify(el, {
+      delimiters: ',',
+      dropdown: { enabled: 0 },
+      originalInputValueFormat: valuesArr => JSON.stringify(valuesArr.map(v => v.value))
+    });
+  });
+
+  // --- KV‐table rows & sync on submit ---
+  document.querySelectorAll('table[id^="tbl-"]').forEach(tbl => {
+    const sid = tbl.id.replace('tbl-', '');
+    const hidden = document.getElementById('hidden-' + sid);
+
+    // Add new row
+    document.querySelector(`[data-add-row="${sid}"]`)?.addEventListener('click', () => {
+      tbl.tBodies[0].insertAdjacentHTML('beforeend', `
+        <tr>
+          <td><input class="form-control form-control-sm"></td>
+          <td><input class="form-control form-control-sm"></td>
+          <td><button class="btn btn-sm btn-danger">×</button></td>
+        </tr>`);
+    });
+
+    // Remove row on × click
+    tbl.addEventListener('click', e => {
+      if (e.target.matches('button')) {
+        e.target.closest('tr').remove();
+      }
+    });
+
+    // On form submit, serialize into hidden input
+    tbl.closest('form')?.addEventListener('submit', () => {
+      const out = {};
+      tbl.querySelectorAll('tbody tr').forEach(tr => {
+        const k = tr.cells[0].firstElementChild.value.trim();
+        const v = tr.cells[1].firstElementChild.value.trim();
+        if (k) out[k] = v;
+      });
+      hidden.value = JSON.stringify(out);
+    });
+  });
+
+  // --- Save settings to file ---
+  const saveBtn = document.getElementById("saveConfigBtn");
+  const saveLabel = document.getElementById("saveStatus");
+  if (saveBtn && saveLabel) {
+    saveBtn.addEventListener("click", async () => {
+      saveBtn.disabled = true;
+      saveLabel.textContent = "Saving…";
+      try {
+        const res = await fetch("/api/write_config", { method: "POST" });
+        const data = await res.json();
+        saveLabel.textContent = res.ok
+          ? "✔ Saved"
+          : `❌ ${data.error || "Save failed"}`;
+      } catch (err) {
+        console.error(err);
+        saveLabel.textContent = "❌ Network error";
+      } finally {
+        setTimeout(() => {
+          saveLabel.textContent = "";
+          saveBtn.disabled = false;
+        }, 3000);
+      }
+    });
+  }
+
+  // --- Offline assets: Tiles estimation & download ---
+  const tileBbox     = document.getElementById("tileBbox");
+  const tileZooms    = document.getElementById("tileZooms");
+  const estimateBtn  = document.getElementById("estimateTilesBtn");
+  const downloadBtn  = document.getElementById("downloadTilesBtn");
+  const estimateLabel= document.getElementById("tileEstimate");
+  const progressWrap = document.getElementById("tileProgressWrap");
+  const progressBar  = document.getElementById("tileProgressBar");
+
+  if (estimateBtn && tileBbox && tileZooms && estimateLabel && downloadBtn) {
+    estimateBtn.addEventListener("click", async () => {
+      estimateLabel.textContent = "";
+      downloadBtn.disabled = true;
+      try {
+        const params = new URLSearchParams({
+          bbox:  tileBbox.value.trim(),
+          zooms: tileZooms.value.trim()
+        });
+        const res = await fetch(`/api/estimate_tiles?${params.toString()}`);
+        const data = await res.json();
+        if (res.ok) {
+          estimateLabel.textContent = `${data.count} tiles estimated (${data.size_mb} MB)`;
+          downloadBtn.disabled = false;
+        } else {
+          estimateLabel.textContent = `❌ ${data.error || "Invalid input"}`;
+        }
+      } catch {
+        estimateLabel.textContent = "❌ Network error during estimation";
+      }
+    });
+
+    downloadBtn.addEventListener("click", async () => {
+      const bbox  = tileBbox.value.trim();
+      const zooms = tileZooms.value.trim();
+      if (!bbox || !zooms) {
+        estimateLabel.textContent = "❌ Please provide both bbox and zooms";
+        return;
+      }
+
+      estimateLabel.textContent = "⏳ Downloading tiles…";
+      progressWrap.style.display = "block";
+      progressBar.style.width = "0%";
+      progressBar.setAttribute("aria-valuenow", "0");
+      progressBar.textContent = "0%";
+
+      let poll = setInterval(() => {
+        const curr = parseFloat(progressBar.getAttribute("aria-valuenow"));
+        const next = Math.min(curr + Math.random() * 10 + 5, 95);
+        progressBar.style.width = `${next.toFixed(0)}%`;
+        progressBar.setAttribute("aria-valuenow", next.toFixed(0));
+        progressBar.textContent = `${next.toFixed(0)}%`;
+      }, 300);
+
+      try {
+        // Pass parameters in query string, not JSON body
+        const params = new URLSearchParams({ bbox, zooms });
+        const res = await fetch(`/api/download_tiles?${params.toString()}`, {
+          method: "POST"
+        });
+        const data = await res.json();
+        clearInterval(poll);
+
+        if (res.ok) {
+          progressBar.style.width = "100%";
+          progressBar.setAttribute("aria-valuenow", "100");
+          progressBar.textContent = "100%";
+          estimateLabel.textContent = `✔ ${data.saved} tiles downloaded.`;
+        } else {
+          estimateLabel.textContent = `❌ ${data.error || "Download failed"}`;
+        }
+      } catch {
+        clearInterval(poll);
+        estimateLabel.textContent = "❌ Network/server error during download";
+      } finally {
+        setTimeout(() => {
+          progressWrap.style.display = "none";
+        }, 1500);
+      }
+    });
+  }
+
+  // --- Offline assets: CDN download ---
+  const cdnBtn    = document.getElementById("downloadCDNsBtn");
+  const cdnStatus = document.getElementById("offlineStatus");
+  if (cdnBtn && cdnStatus) {
+    cdnBtn.addEventListener("click", async () => {
+      cdnStatus.textContent = "Downloading CDN files…";
+      try {
+        const res = await fetch("/api/download_cdns", { method: "POST" });
+        const data = await res.json();
+        cdnStatus.textContent = res.ok
+          ? `✔ ${data.saved} files downloaded`
+          : `❌ ${data.error || "Download failed"}`;
+      } catch {
+        cdnStatus.textContent = "❌ Network error";
+      }
+    });
+  }
+});
+</script>
 {% endblock %}

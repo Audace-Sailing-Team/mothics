@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, jsonify, request, current_app
 import json
 from .settings_registry import SETTINGS_REGISTRY
-from ..helpers import list_required_tiles, download_tiles
+from ..helpers import tipify, list_required_tiles, download_tiles, check_cdn_availability, download_cdn, check_internet_connectivity
 
 settings_bp = Blueprint("settings", __name__)
 
@@ -104,3 +104,106 @@ def settings():
         current=current_vals,
         registry=SETTINGS_REGISTRY
     )
+
+@settings_bp.route("/api/estimate_tiles")
+def estimate_tiles():
+    bbox = request.args.get("bbox", "")
+    zooms = request.args.get("zooms", "")
+
+    try:
+        lat_min, lon_min, lat_max, lon_max = map(float, bbox.split(","))
+        zoom_levels = list(map(int, zooms.split(",")))
+        tiles = list_required_tiles((lat_min, lat_max), (lon_min, lon_max), zoom_levels)
+        count = len(tiles)
+        size_mb = count * 20 / 1024  # 20 kB per tile, rough average
+        return jsonify({"count": count, "size_mb": round(size_mb, 1)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@settings_bp.route("/api/download_tiles", methods=["POST"])
+def download_tiles_api():
+    """
+    Download map tiles for a given bbox & zoom levels.
+    Logs the count of tiles requested and saved, and returns JSON:
+      { "requested": <total_tiles>, "saved": <tiles_actually_saved> }
+    """
+    bbox = request.args.get("bbox", "")
+    zooms = request.args.get("zooms", "")
+
+    try:
+        # 1) Parse inputs
+        lat_min, lon_min, lat_max, lon_max = map(float, bbox.split(","))
+        zoom_levels = list(map(int, zooms.split(",")))
+
+        # 2) Compute which tiles we need
+        tiles = list_required_tiles(
+            lat_range=(lat_min, lat_max),
+            lon_range=(lon_min, lon_max),
+            zoom_levels=zoom_levels
+        )
+        total = len(tiles)
+        tile_dir = current_app.config["CONFIG_DATA"]["files"]["tile_dir"]
+
+        current_app.logger.info(
+            f"Requesting download of {total} tiles to '{tile_dir}'"
+        )
+
+        # 3) Perform the download
+        saved = download_tiles(
+            lat_range=(lat_min, lat_max),
+            lon_range=(lon_min, lon_max),
+            zoom_levels=zoom_levels,
+            output_dir=tile_dir
+        )
+
+        # 4) Log the result
+        current_app.logger.info(
+            f"Tile download complete: {saved} of {total} tiles saved to '{tile_dir}'"
+        )
+
+        # 5) Return counts
+        return jsonify({"requested": total, "saved": saved})
+
+    except ValueError as ve:
+        current_app.logger.error(f"Invalid parameters for download_tiles: {ve}")
+        return jsonify({"error": "Invalid bbox or zooms format"}), 400
+
+    except Exception as e:
+        current_app.logger.error(f"Error during tile download: {e}")
+        return jsonify({"error": str(e)}), 500
+    
+    
+@settings_bp.route("/api/download_cdns", methods=["POST"])
+def download_cdns_api():
+    """
+    Download any missing CDN files configured under [webapp].cdns → files/{cdn_dir}.
+    Returns JSON: { "saved": <number_of_new_files> } or { "error": "<msg>" }.
+    """
+    # 1) Read URLs & output directory from our in-memory config
+    cfg      = current_app.config["CONFIG_DATA"]
+    cdn_urls = cfg.get("webapp", {}).get("cdns") or []
+    cdn_dir  = cfg.get("files", {}).get("cdn_dir")
+
+    if not cdn_urls:
+        # Nothing to download
+        return jsonify({"saved": 0})
+
+    # 2) Determine which files are missing
+    missing_before = check_cdn_availability(urls=cdn_urls, outdir=cdn_dir)
+    if not missing_before:
+        # All already present
+        return jsonify({"saved": 0})
+
+    # 3) Must have internet
+    if not check_internet_connectivity():
+        return jsonify({"error": "Internet connectivity unavailable"}), 500
+
+    # 4) Download & then re-check what’s still missing
+    before_set = set(missing_before)
+    download_cdn(urls=cdn_urls, outdir=cdn_dir)
+    missing_after = set(check_cdn_availability(urls=cdn_urls, outdir=cdn_dir))
+
+    # 5) Count how many files appeared
+    saved = len(before_set - missing_after)
+    return jsonify({"saved": saved})
