@@ -72,6 +72,10 @@ def mirror_to_config(path):
 @mirror_to_config(("webapp", "data_thesaurus"))
 def set_data_thesaurus(v, mgr):
     mgr.webapp.app.config['DATA_THESAURUS'] = v
+
+@mirror_to_config(("webapp", "identifier"))    
+def set_identifier(v, mgr):
+    mgr.webapp.app.config['IDENTIFIER'] = v
     
 
 SETTINGS_REGISTRY = {
@@ -88,6 +92,15 @@ SETTINGS_REGISTRY = {
     },
 
     # ========= Webapp =========
+    "identifier": {
+        "type": "string",
+        "tab": "Webapp",
+        "label": "Device name or identifier",
+        "real_time_setter": set_identifier,
+        "config_path": ("webapp", "identifier"),
+        "log_success": "Identifier set."
+    },
+
     "data_thesaurus": {
         "type": "kvtable",
         "tab": "Webapp",

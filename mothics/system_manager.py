@@ -72,6 +72,7 @@ DEFAULT_CONFIG = {
         "tile_dir": "mothics/static/tiles"
     },
     "webapp": {
+        "identifier": "",
         "data_refresh": 2,
         "timeout_offline": 60,
         "timeout_noncomm": 30,
@@ -153,34 +154,7 @@ class SystemManager:
         # logger is ready now
         self._setup_logger(self.config["files"]["logger_fname"])
         self.logger.info("configuration loaded (file + defaults)")
-        
-    # def load_config(self):
-    #     """Loads the configuration file and merges it with defaults."""
-    #     config_from_file = {}
-        
-    #     if os.path.exists(self.config_file):
-    #         try:
-    #             config_from_file = toml.load(self.config_file)
-    #         except Exception as e:
-    #             # Initialize the logger even if config loading fails
-    #             self._setup_logger(self.config["files"]["logger_fname"])
                 
-    #             self.logger.warning(f"error loading configuration from {self.config_file}: {e}. Using defaults.")
-    #     else:
-    #         # If the config file doesn't exist, log a warning but keep using defaults
-    #         self._setup_logger(self.config["files"]["logger_fname"])
-            
-    #         self.logger.info(f"no configuration file '{self.config_file}' found. Using defaults.")
-
-    #     # Merge loaded config into defaults (config values overwrite defaults)
-    #     for section, defaults in DEFAULT_CONFIG.items():
-    #         self.config[section] = {**defaults, **config_from_file.get(section, {})}
-
-    #     # Set up the logger using the final merged config
-    #     logger_fname = self.config["files"]["logger_fname"]
-    #     self._setup_logger(logger_fname)
-    #     self.logger.info(f"configuration loaded successfully from {self.config_file if config_from_file else 'defaults'}.")
-        
     def initialize_cdns(self):
         """ Initializes CDNs for webapp display """
         # Get CDN URLs from configuration
@@ -319,7 +293,8 @@ class SystemManager:
                 instance_dir=os.path.dirname(sys.modules['__main__'].__file__),
                 out_dir=self.config["files"]["output_dir"],
                 system_manager=self,
-                config_data=self.config
+                config_data=self.config,
+                identifier=self.config["webapp"]["identifier"]
             )
             # self.webapp.run()
             t = threading.Thread(target=self.webapp.serve, daemon=True, name="WaitressServer")
