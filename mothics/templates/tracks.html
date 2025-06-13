@@ -52,7 +52,7 @@
               <thead>
                 <tr>
                   <th>Index</th>
-                  {% for column in ['filename', 'track_datetime', 'checkpoint', 'track_duration', 'datapoint_count', 'remote_units', 'exports'] %}
+                  {% for column in ['filename', 'track_datetime', 'checkpoint', 'track_duration', 'remote_units', 'exports'] %}
                     <th>
                       <a href="{{ url_for('database.tracks_view', 
                                           sort_by=column, 
@@ -86,7 +86,6 @@
                         N/A
                       {% endif %}
                     </td>
-                    <td>{{ track.datapoint_count or "N/A" }}</td>
                     <td>
                       {% if track.remote_units %}
                         {% set thesaurized_units = [] %}

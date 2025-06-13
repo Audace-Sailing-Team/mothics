@@ -245,14 +245,21 @@ class MetadataExtractor:
             self.logger.warning(f"Error reading {filepath.name}: {e}")
             return metadata
 
+        # extractors = [
+        #     self.extract_track_datetime,
+        #     self.extract_track_duration,
+        #     self.extract_datapoint_count,
+        #     self.extract_remote_units,
+        #     self.extract_additional_metadata,
+        # ]
+
         extractors = [
             self.extract_track_datetime,
             self.extract_track_duration,
-            self.extract_datapoint_count,
             self.extract_remote_units,
-            self.extract_additional_metadata,
         ]
 
+        
         for extractor in extractors:
             try:
                 metadata.update(extractor(filepath, data))
@@ -310,7 +317,10 @@ class Database:
         self.logger.info("-------------Database-------------")
 
         # Load tracks (scan directory and load)
-        self.load_tracks()
+        if Path(self.directory, self.db_fname).exists():
+            self.load_tracks_incrementally()
+        else:
+            self.load_tracks()
 
     def validate_json(self, filepath: Path):
         """
