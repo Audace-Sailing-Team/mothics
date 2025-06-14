@@ -153,7 +153,7 @@ class SerialInterface(BaseInterface):
             RuntimeError: If the serial connection fails to open.
         """
         try:
-            self.serial_conn = serial.Serial(self.port, self.baudrate, timeout=1)
+            self.serial_conn = serial.Serial(self.port, self.baudrate, timeout=1, exclusive=True)
             self.logger.info(f"connected to {self.port} at {self.baudrate} baud.")
             self.connected = True
         except serial.SerialException as e:
