@@ -388,6 +388,7 @@ class SystemManager:
                                              trim_fraction=self.config["communicator"]["trim_fraction"])
         except Exception as e:
             self.logger.critical(f"error in initializing communicator, got {e}")
+            raise RuntimeError(f"error in initializing communicator, got {e}")
 
         self.communicator.connect()
 

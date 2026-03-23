@@ -1,4 +1,6 @@
 [serial]
+[serial.GPS]
+name = "GPS"
 port = "/dev/ttyACM0"
 baudrate = 9600
 # Topics can be a single string or a comma‐separated list

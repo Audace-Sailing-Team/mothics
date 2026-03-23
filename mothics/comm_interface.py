@@ -685,8 +685,11 @@ class Communicator:
         elif not isinstance(interfaces, dict):
             raise ValueError("interfaces must be a class or dict of {class: kwargs}")
             
-        # Initialize each interface            
+        # Initialize each interface
         for interface_class, kwargs in interfaces.items():
+
+            # If it's a list of sub-interfaces (e.g. multiple Serial interfaces),
+            # initialize them one by one
             if isinstance(kwargs, list):
                 for kwarg in kwargs:
                     class_name = interface_class.__name__
@@ -702,6 +705,25 @@ class Communicator:
                     except Exception as e:
                         self.logger.critical(f"failed to initialize {class_name}: {e}")
                         raise RuntimeError(f"failed to initialize {class_name}: {e}")
+
+            # If it's just a single interface:
+            elif isinstance(kwargs, dict):
+                kwarg = kwargs
+                class_name = interface_class.__name__
+                if 'name' in kwarg:
+                    if kwarg['name'] is not None:   # nested if because non-existence of 'name' causes typeError
+                        class_name = interface_class.__name__ + '_' + kwarg['name']
+                if class_name in self.interfaces:
+                    self.logger.warning(f"interface {class_name} already exists, skipping")
+                    continue
+
+                try:
+                    self.interfaces[class_name] = interface_class(**kwarg)
+                    self.logger.info(f"initialized {class_name} with kwargs: {kwarg}")
+                except Exception as e:
+                    self.logger.critical(f"failed to initialize {class_name}: {e}")
+                    raise RuntimeError(f"failed to initialize {class_name}: {e}")
+
     
     def remove_interface(self, interface_class):
         """
