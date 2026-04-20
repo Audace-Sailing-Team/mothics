@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#i!/usr/bin/env python3
 import copy
 import requests
 import psutil
@@ -31,10 +31,12 @@ from .database import Database
 
 # Default configuration values to be used if `config.toml` cannot be found
 DEFAULT_CONFIG = {
-    "serial": {
+    # "serial": {
+    # },
+    "gps": {
         "port1": {
-            "name": "Fallback",
-            "port": "/dev/ttyACM0",
+            "name": "UART_GPS",
+            "port": "/dev/ttyS0",
             "baudrate": 9600,
             "topics": "rm2/wind/speed"
         }
@@ -43,8 +45,8 @@ DEFAULT_CONFIG = {
         "hostname": "test.mosquitto.org",
         "topics": ["rm1/gps/lat", "rm1/gps/long"]
     },
-    "gpio": {
-    },
+#    "gpio": {
+#    },
     "communicator": {
         "max_values": 1e3,
         "trim_fraction": 0.5
@@ -85,7 +87,7 @@ DEFAULT_CONFIG = {
         "gps": {
             "lat_range": [45.5, 45.8],
             "lon_range": [13.5, 14.0],
-            "zoom_levels": [13, 14, 15],
+            "zoom_levels": [13],
             "track_variable":'speed',
             "track_thresholds": None,
             "track_colors": None,
@@ -184,6 +186,7 @@ class SystemManager:
     def initialize_cdns(self):
         """ Initializes CDNs for webapp display """
         # Get CDN URLs from configuration
+        print(self.config["webapp"])
         cdn_urls = self.config["webapp"]["cdns"]
         
         if not cdn_urls:
