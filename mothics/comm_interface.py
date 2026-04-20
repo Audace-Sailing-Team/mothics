@@ -29,6 +29,7 @@ import os
 import logging
 import time
 import serial
+import pynmea2
 from datetime import datetime, timedelta
 import paho.mqtt.client as mqtt
 from paho.mqtt import MQTTException
@@ -272,6 +273,66 @@ class SerialInterface(BaseInterface):
         message = json.dumps({"topic": topic, "payload": payload})
         self.serial_conn.write(message.encode('utf-8'))
         self.logger.info(f"published to serial: {message}")
+
+
+class GPSInterface(SerialInterface):
+    """
+    Interfaccia UART per GPS NMEA.
+    Eredita tutto da SerialInterface, cambia solo il run loop.
+    """
+
+    def _run_loop(self):
+        """
+        Legge stringhe NMEA dalla seriale, le parse-a e invia topic/value
+        al Communicator tramite on_message_callback().
+        """
+        if not self.serial_conn or not self.serial_conn.is_open:
+            raise RuntimeError("Serial connection is not open.")
+
+        while self.running:
+            try:
+                line = self.serial_conn.readline().decode('utf-8', errors='replace').strip()
+                if not line:
+                    continue
+
+                self.logger.debug(f"received NMEA: {line}")
+
+                # Solo stringhe NMEA
+                if not line.startswith("$"):
+                    continue
+
+                try:
+                    msg = pynmea2.parse(line)
+                except pynmea2.ParseError:
+                    self.logger.warning(f"invalid NMEA: {line}")
+                    continue
+
+                # Timestamp
+                ts = datetime.now().timestamp()
+
+                # GGA → lat/lon + satelliti
+                if msg.sentence_type == "GGA":
+                    lat = msg.latitude
+                    lon = msg.longitude
+                    sats = msg.num_sats
+
+                    self.on_message_callback("gps/position/lat", lat)
+                    self.on_message_callback("gps/position/lon", lon)
+                    self.on_message_callback("gps/status/sats", sats)
+
+                # RMC → lat/lon + validità
+                elif msg.sentence_type == "RMC":
+                    lat = msg.latitude
+                    lon = msg.longitude
+                    valid = msg.status
+
+                    self.on_message_callback("gps/position/lat", lat)
+                    self.on_message_callback("gps/position/lon", lon)
+                    self.on_message_callback("gps/status/valid", valid)
+
+            except Exception as e:
+                self.logger.warning(f"error processing NMEA: {e} - raw: {line}")
+                continue
 
 
 class MQTTInterface(BaseInterface):
@@ -532,7 +593,7 @@ class GPIOInterface(BaseInterface):
         
 
 # Communicator
-available_interfaces = {'serial': SerialInterface, 'mqtt': MQTTInterface, 'gpio': GPIOInterface}
+available_interfaces = {'serial': SerialInterface, 'mqtt': MQTTInterface, 'gpio': GPIOInterface, 'gps': GPSInterface}
 
 
 class Communicator:
