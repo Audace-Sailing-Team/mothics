@@ -41,6 +41,49 @@ DEFAULT_CONFIG = {
             "topics": "rm2/wind/speed"
         }
     },
+    "i2c": [
+
+        # --- IMU BNO08x ---
+        {
+            "name": "bno08x",
+            "type": "bno08x",
+            "address": 0x4A,
+            "bus": 1,
+            "poll_interval": 0.05,
+            "topics": [
+                "rm3/imubno/accel_x", "rm3/imubno/accel_y", "rm3/imubno/accel_z",
+                "rm3/imubno/gyro_x",  "rm3/imubno/gyro_y",  "rm3/imubno/gyro_z",
+                "rm3/imubno/mag_x",   "rm3/imubno/mag_y",   "rm3/imubno/mag_z"
+            ]
+        },
+
+        # --- Barometro DPS310 ---
+        {
+            "name": "dps310",
+            "type": "dps310",
+            "address": 0x77,
+            "bus": 1,
+            "poll_interval": 0.2,
+            "topics": [
+                "rm3/env/pressure",
+                "rm3/env/temperature"
+            ]
+        },
+
+        # --- MPU6050 ---
+        {
+            "name": "mpu6050",
+            "type": "mpu6050",
+            "address": 0x68,
+            "bus": 1,
+            "poll_interval": 0.05,
+            "topics": [
+                "rm3/imu6/accel_x", "rm3/imu6/accel_y", "rm3/imu6/accel_z",
+                "rm3/imu6/gyro_x",  "rm3/imu6/gyro_y",  "rm3/imu6/gyro_z",
+                "rm3/imu6/temperature"
+            ]
+        }
+    ],
     "mqtt": {
         "hostname": "test.mosquitto.org",
         "topics": ["rm1/gps/lat", "rm1/gps/long"]

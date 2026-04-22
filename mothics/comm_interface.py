@@ -30,12 +30,19 @@ import logging
 import time
 import serial
 import pynmea2
+import struct
+import math
+import board
+import busio
+from smbus2 import SMBus
 from datetime import datetime, timedelta
 import paho.mqtt.client as mqtt
 from paho.mqtt import MQTTException
-
 from .helpers import setup_logger, tipify
 from .gpio_modules import MODULE_REGISTRY
+from .i2c_modules import *
+from adafruit_dps310.basic import DPS310
+from BNO08x import BNO08x
 
 
 # Interface
@@ -590,10 +597,76 @@ class GPIOInterface(BaseInterface):
     def on_message_callback(self, topic, value):
         ts = datetime.now()
         self.raw_data.setdefault(topic, []).append({ts: value})
-        
+
+class I2CInterface(BaseInterface):
+    """
+    One I2CInterface = un modulo I2C (IMU, barometro, ecc.).
+    Wrappa una singola I2CModuleBase.
+    """
+    def __init__(self, type, name=None, **kwargs):
+        self.name = name or f"i2c-{type.lower()}"
+        self.logger = logging.getLogger(f"I2CInterface - {self.name}")
+        self.raw_data = {}
+        self.running = False
+        self.connected = False
+
+        mod_cls = i2c_module_registry.get(type.lower())
+        self.module = mod_cls(**kwargs)
+        self.logger.info(f"Loaded {mod_cls.__name__} → {self.module.topic_root}")
+
+    def connect(self):
+        self.module.setup()
+        self.connected = True
+        self._loop_start()
+
+    def disconnect(self):
+        if self.running:
+            self._loop_stop()
+        self.module.cleanup()
+        self.connected = False
+
+    def publish(self, topic, value):
+        # opzionale: se qualche modulo I2C supporta write()
+        if hasattr(self.module, "write"):
+            try:
+                if self.module.write(topic, value):
+                    return
+            except Exception:
+                pass
+        raise RuntimeError(f"[{self.name}] Module can't handle topic '{topic}'")
+
+    def _loop_start(self):
+        self.running = True
+        self.thread = threading.Thread(target=self._run_loop,
+                                       daemon=True,
+                                       name=f"i2c-poller-{self.name}")
+        self.thread.start()
+
+    def _loop_stop(self):
+        self.running = False
+        if hasattr(self, 'thread') and self.thread.is_alive():
+            self.thread.join()
+
+    def _run_loop(self):
+        while self.running:
+            now = time.time()
+            m = self.module
+            if m.last_poll is None or (now - m.last_poll.timestamp()) >= m.poll_interval:
+                try:
+                    readings = m.read()
+                    m.last_poll = datetime.now()
+                    for topic, val in readings.items():
+                        self.on_message_callback(topic, val)
+                except Exception as e:
+                    self.logger.warning(f"[{self.name}] {m.__class__.__name__} read error: {e}")
+            time.sleep(0.01)
+
+    def on_message_callback(self, topic, value):
+        ts = datetime.now()
+        self.raw_data.setdefault(topic, []).append({ts: value})
 
 # Communicator
-available_interfaces = {'serial': SerialInterface, 'mqtt': MQTTInterface, 'gpio': GPIOInterface, 'gps': GPSInterface}
+available_interfaces = {'serial': SerialInterface, 'mqtt': MQTTInterface, 'gpio': GPIOInterface, 'gps': GPSInterface, 'i2c': I2CInterface}
 
 
 class Communicator:
