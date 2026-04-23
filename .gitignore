@@ -50,6 +50,10 @@ flycheck_*.el
 
 
 ### Python ###
+
+# Track data
+data/chk
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
