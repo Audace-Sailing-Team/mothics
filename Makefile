@@ -2,7 +2,7 @@ PACKAGE = mothics
 VENV = .venv
 PYTHON = $(VENV)/bin/python
 PIP = $(VENV)/bin/pip
-ALIAS_FILE = ~/.bashrc  # Change to ~/.zshrc if using Zsh
+ALIAS_FILE = ~/.zshrc  # Change to ~/.zshrc if using Zsh
 
 .PHONY: all venv install update pep8 clean install-service
 

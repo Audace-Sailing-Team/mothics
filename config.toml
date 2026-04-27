@@ -2,23 +2,24 @@
 [gps]
     [gps.interface]
         name = "UART_GPS"
+        type = "UART_GPS"
         port = "/dev/ttyS0"
         baudrate = 9600
         # Topics can be a single string or a comma‐separated list
         topics = "rm2/wind/speed"
 
-# # --- IMU BNO08x ---
-# [[i2c]]
-# name = "bno08x"
-# type = "bno08x"
-# address = 0x4A
-# bus = 1
-# poll_interval = 0.05
-# topics = [
-#     "rm3/imubno/accel_x", "rm3/imubno/accel_y", "rm3/imubno/accel_z",
-#     "rm3/imubno/gyro_x",  "rm3/imubno/gyro_y",  "rm3/imubno/gyro_z",
-#     "rm3/imubno/mag_x",   "rm3/imubno/mag_y",   "rm3/imubno/mag_z"
-# ]
+# --- IMU BNO08x ---
+[[i2c]]
+    name = "bno08x"
+    type = "bno08x"
+    address = 0x4A
+    bus = 1
+    poll_interval = 0.05
+    topics = [
+        "rm3/imubno/accel_x", "rm3/imubno/accel_y", "rm3/imubno/accel_z",
+        "rm3/imubno/gyro_x",  "rm3/imubno/gyro_y",  "rm3/imubno/gyro_z",
+        "rm3/imubno/mag_x",   "rm3/imubno/mag_y",   "rm3/imubno/mag_z"
+    ]
 
 # # --- Barometro DPS310 ---
 # [[i2c]]
