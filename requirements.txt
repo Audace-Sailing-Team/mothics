@@ -18,3 +18,7 @@ tinydb==4.8.2
 toml==0.10.2
 waitress==3.0.2
 pynmea2==1.19.0
+smbus2==0.4.3
+adafruit-circuitpython-dps310==2.1.22
+adafruit-blinka==8.45.0
+adafruit-circuitpython-busdevice==5.2.3

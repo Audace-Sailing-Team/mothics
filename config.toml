@@ -2,7 +2,6 @@
 [gps]
     [gps.interface]
         name = "UART_GPS"
-        type = "UART_GPS"
         port = "/dev/ttyS0"
         baudrate = 9600
         # Topics can be a single string or a comma‐separated list

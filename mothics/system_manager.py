@@ -36,7 +36,6 @@ DEFAULT_CONFIG = {
     "gps": [
         {
             "name": "UART_GPS",
-            "type": "UART_GPS",
             "port": "/dev/ttyS0",
             "baudrate": 9600,
             "topics": "rm2/wind/speed"
