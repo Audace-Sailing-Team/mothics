@@ -20,6 +20,7 @@ install: venv
 	@if [ -f requirements.txt ]; then \
 		$(PIP) install -r requirements.txt; \
 	fi
+	@$(MAKE) copy-so
 
 # Update the package:
 # - Pull the latest changes from git
@@ -76,3 +77,8 @@ alias-start:
 		echo "Alias 'mothics-start' added to $(ALIAS_FILE)"; \
 	fi
 	@. $(ALIAS_FILE); echo "Alias 'mothics-start' is now available in this session."
+
+copy-so:
+	@echo "Copying BNO08x .so into virtualenv site-packages..."
+	@cp libraries/*.so $(VENV)/lib/python3.13/site-packages/
+	@echo "Done."
