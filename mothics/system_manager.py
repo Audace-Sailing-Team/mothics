@@ -55,7 +55,7 @@ DEFAULT_CONFIG = {
                 "rm3/imubno/gyro_x",  "rm3/imubno/gyro_y",  "rm3/imubno/gyro_z",
                 "rm3/imubno/mag_x",   "rm3/imubno/mag_y",   "rm3/imubno/mag_z"
             ]
-        }
+        },
     ],
 
     "mqtt": {
