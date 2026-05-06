@@ -72,13 +72,13 @@
   </div>
 
   <!-- ===== GPS Map ===== -->
-  <div class="status-section">
+  <!-- <div class="status-section">
     <div class="toggle-header" data-bs-toggle="collapse" data-bs-target="#leaflet-map-container">
       GPS Map <span class="arrow">&#9660;</span>
     </div>
-    <div id="leaflet-map-container" class="collapse show">
+    <div id="leaflet-map-container" class="collapse show"> -->
       <!-- Sliders -->
-      <div class="d-flex flex-wrap gap-3 mb-2">
+      <!-- <div class="d-flex flex-wrap gap-3 mb-2">
         <div>
           <label for="gpsRefreshSlider" class="form-label small">Refresh Rate (s)</label>
           <input
@@ -105,15 +105,15 @@
           >
           <span id="gpsTrackValue" class="form-text">10 min</span>
         </div>
-      </div>
+      </div> -->
 
       <!-- Map container -->
-      <div class="position-relative w-100" style="height:60vh;">
+      <!-- <div class="position-relative w-100" style="height:60vh;">
         <div id="leaflet-map" class="w-100 h-100"></div>
         <div id="gps-flag">GPS unavailable</div>
       </div>
     </div>
-  </div>
+  </div> -->
 
   <!-- ===== Time-series Plot ===== -->
   <div class="plot-container my-4">
@@ -221,7 +221,7 @@
   const startBtn            = document.getElementById('startSamplingBtn');
   const stopBtn             = document.getElementById('stopSamplingBtn');
   const gpsFlag             = document.getElementById('gps-flag');
-  const refreshSlider       = document.getElementById('gpsRefreshSlider');
+  // const refreshSlider       = document.getElementById('gpsRefreshSlider');
   const trackSlider         = document.getElementById('gpsTrackSlider');
   const plotRefreshSlider   = document.getElementById('plotRefreshSlider');
   const plotRefreshValue    = document.getElementById('plotRefreshValue');
@@ -509,201 +509,201 @@
   //                     GPS MAP (Leaflet)
   // ——————————————————————————————————————————————————————
 
-  function getColorForTrack(v) {
-    for (let i = 0; i < colorThresholds.length; i++) {
-      if (v < colorThresholds[i]) return colorPalette[i];
-    }
-    return colorPalette[colorPalette.length - 1];
-  }
+  // function getColorForTrack(v) {
+  //   for (let i = 0; i < colorThresholds.length; i++) {
+  //     if (v < colorThresholds[i]) return colorPalette[i];
+  //   }
+  //   return colorPalette[colorPalette.length - 1];
+  // }
 
-  function drawTrack() {
-    // Remove old segments
-    gpsSegments.forEach(seg => leafletMap.removeLayer(seg));
-    gpsSegments.length = 0;
+  // function drawTrack() {
+  //   // Remove old segments
+  //   gpsSegments.forEach(seg => leafletMap.removeLayer(seg));
+  //   gpsSegments.length = 0;
 
-    if (gpsHistory.length < 2) return;
+  //   if (gpsHistory.length < 2) return;
 
-    const unit = unitPrefs.prefSpeedUnits || 'km/h';
-    for (let i = 1; i < gpsHistory.length; i++) {
-      const prev = gpsHistory[i - 1];
-      const curr = gpsHistory[i];
-      if (![prev.lat, prev.lon, curr.lat, curr.lon].every(Number.isFinite)) continue;
+  //   const unit = unitPrefs.prefSpeedUnits || 'km/h';
+  //   for (let i = 1; i < gpsHistory.length; i++) {
+  //     const prev = gpsHistory[i - 1];
+  //     const curr = gpsHistory[i];
+  //     if (![prev.lat, prev.lon, curr.lat, curr.lon].every(Number.isFinite)) continue;
 
-      const rawVal = (trackColorKey === 'speed')
-        ? convertSpeedFromKmh(curr[trackColorKey] ?? prev[trackColorKey], unit)
-        : (curr[trackColorKey] ?? prev[trackColorKey]);
+  //     const rawVal = (trackColorKey === 'speed')
+  //       ? convertSpeedFromKmh(curr[trackColorKey] ?? prev[trackColorKey], unit)
+  //       : (curr[trackColorKey] ?? prev[trackColorKey]);
 
-      const seg = L.polyline(
-        [[prev.lat, prev.lon], [curr.lat, curr.lon]],
-        {
-          color : isFinite(rawVal) ? getColorForTrack(rawVal) : '#3388ff',
-          weight: 3,
-          opacity: 0.8
-        }
-      ).addTo(leafletMap);
-      gpsSegments.push(seg);
-    }
-  }
+  //     const seg = L.polyline(
+  //       [[prev.lat, prev.lon], [curr.lat, curr.lon]],
+  //       {
+  //         color : isFinite(rawVal) ? getColorForTrack(rawVal) : '#3388ff',
+  //         weight: 3,
+  //         opacity: 0.8
+  //       }
+  //     ).addTo(leafletMap);
+  //     gpsSegments.push(seg);
+  //   }
+  // }
 
-  function resetTrack() {
-    gpsSegments.forEach(seg => leafletMap.removeLayer(seg));
-    gpsSegments.length = 0;
-    gpsHistory.length  = 0;
-  }
+  // function resetTrack() {
+  //   gpsSegments.forEach(seg => leafletMap.removeLayer(seg));
+  //   gpsSegments.length = 0;
+  //   gpsHistory.length  = 0;
+  // }
 
-  function updateLegend(legendCtl) {
-    const container = legendCtl.getContainer();
-    const unit = (trackColorKey === 'speed') ? (unitPrefs.prefSpeedUnits || 'km/h') : '';
-    let html = `<div class="legend-title">Color: ${trackColorKey}</div>`;
-    colorThresholds.forEach((thr, i) => {
-      html += `
-        <div class="legend-row">
-          <span class="legend-color" style="background: ${colorPalette[i]}"></span>
-          <span>&lt; ${thr} ${unit}</span>
-        </div>`;
-    });
-    html += `
-      <div class="legend-row">
-        <span class="legend-color" style="background: ${colorPalette.at(-1)}"></span>
-        <span>&ge; ${colorThresholds.at(-1)} ${unit}</span>
-      </div>`;
-    container.innerHTML = html;
-  }
+  // function updateLegend(legendCtl) {
+  //   const container = legendCtl.getContainer();
+  //   const unit = (trackColorKey === 'speed') ? (unitPrefs.prefSpeedUnits || 'km/h') : '';
+  //   let html = `<div class="legend-title">Color: ${trackColorKey}</div>`;
+  //   colorThresholds.forEach((thr, i) => {
+  //     html += `
+  //       <div class="legend-row">
+  //         <span class="legend-color" style="background: ${colorPalette[i]}"></span>
+  //         <span>&lt; ${thr} ${unit}</span>
+  //       </div>`;
+  //   });
+  //   html += `
+  //     <div class="legend-row">
+  //       <span class="legend-color" style="background: ${colorPalette.at(-1)}"></span>
+  //       <span>&ge; ${colorThresholds.at(-1)} ${unit}</span>
+  //     </div>`;
+  //   container.innerHTML = html;
+  // }
 
-  // Periodically fetch live GPS info
-  async function updateGPS() {
-    try {
-      const cfg = await fetch('/api/gps_info').then(r => r.ok ? r.json() : null);
-      if (!cfg || !cfg.gps_available || !cfg.latest_position) {
-        gpsFlag.style.display = 'block';
-        return;
-      }
-      gpsFlag.style.display = 'none';
+  // // Periodically fetch live GPS info
+  // async function updateGPS() {
+  //   try {
+  //     const cfg = await fetch('/api/gps_info').then(r => r.ok ? r.json() : null);
+  //     if (!cfg || !cfg.gps_available || !cfg.latest_position) {
+  //       gpsFlag.style.display = 'block';
+  //       return;
+  //     }
+  //     gpsFlag.style.display = 'none';
 
-      const { lat, lon } = cfg.latest_position;
-      if (!gpsMarker) {
-        gpsMarker = L.circleMarker([lat, lon], {
-          radius: 8, color: 'blue', fillColor: '#3399ff', fillOpacity: 0.8
-        }).addTo(leafletMap);
-      } else {
-        gpsMarker.setLatLng([lat, lon]);
-      }
+  //     const { lat, lon } = cfg.latest_position;
+  //     if (!gpsMarker) {
+  //       gpsMarker = L.circleMarker([lat, lon], {
+  //         radius: 8, color: 'blue', fillColor: '#3399ff', fillOpacity: 0.8
+  //       }).addTo(leafletMap);
+  //     } else {
+  //       gpsMarker.setLatLng([lat, lon]);
+  //     }
 
-      const now = Date.now();
-      gpsHistory.push({ time: now, ...cfg.latest_position });
-      gpsHistory = gpsHistory.filter(p => now - p.time <= durationMs);
+  //     const now = Date.now();
+  //     gpsHistory.push({ time: now, ...cfg.latest_position });
+  //     gpsHistory = gpsHistory.filter(p => now - p.time <= durationMs);
 
-      drawTrack();
-      if (gpsAutoFollow) leafletMap.panTo([lat, lon]);
-    } catch {
-      gpsFlag.style.display = 'block';
-    }
-  }
+  //     drawTrack();
+  //     if (gpsAutoFollow) leafletMap.panTo([lat, lon]);
+  //   } catch {
+  //     gpsFlag.style.display = 'block';
+  //   }
+  // }
 
-  // Bootstrap Leaflet map and load backlog once
-  async function initLeafletMap() {
-    const cfg = await fetch('/api/gps_info').then(r => r.ok ? r.json() : null);
-    if (!cfg) return;
+  // // Bootstrap Leaflet map and load backlog once
+  // async function initLeafletMap() {
+  //   const cfg = await fetch('/api/gps_info').then(r => r.ok ? r.json() : null);
+  //   if (!cfg) return;
 
-    const { min, max } = cfg.zoom;
-    const latest       = cfg.latest_position;
-    const center = (latest && [latest.lat, latest.lon].every(Number.isFinite))
-                 ? [latest.lat, latest.lon]
-                 : [45.6598, 13.7967];
+  //   const { min, max } = cfg.zoom;
+  //   const latest       = cfg.latest_position;
+  //   const center = (latest && [latest.lat, latest.lon].every(Number.isFinite))
+  //                ? [latest.lat, latest.lon]
+  //                : [45.6598, 13.7967];
 
-    if (cfg.track_coloring) {
-      trackColorKey   = cfg.track_coloring.key        ?? trackColorKey;
-      colorThresholds = cfg.track_coloring.thresholds ?? colorThresholds;
-      colorPalette    = cfg.track_coloring.colors     ?? colorPalette;
-    }
+  //   if (cfg.track_coloring) {
+  //     trackColorKey   = cfg.track_coloring.key        ?? trackColorKey;
+  //     colorThresholds = cfg.track_coloring.thresholds ?? colorThresholds;
+  //     colorPalette    = cfg.track_coloring.colors     ?? colorPalette;
+  //   }
 
-    leafletMap = L.map('leaflet-map', { minZoom: min, maxZoom: max, center, zoom: min + 3 });
-    L.tileLayer('/tiles/{z}/{x}/{y}.png', {
-      minZoom: min, maxZoom: max, tileSize: 256, attribution: 'Local tiles'
-    }).addTo(leafletMap);
+  //   leafletMap = L.map('leaflet-map', { minZoom: min, maxZoom: max, center, zoom: min + 3 });
+  //   L.tileLayer('/tiles/{z}/{x}/{y}.png', {
+  //     minZoom: min, maxZoom: max, tileSize: 256, attribution: 'Local tiles'
+  //   }).addTo(leafletMap);
 
-    leafletMap.whenReady(() => {
-      // Custom zoom/full controls
-      const ZoomFull = L.Control.extend({
-        options: { position: 'topleft' },
-        onAdd() {
-          const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-          div.innerHTML = `
-            <a href="#" id="zoom-full-in"  title="Zoom to max">⤢</a>
-            <a href="#" id="zoom-full-out" title="Zoom to min">⤡</a>
-            <a href="#" id="zoom-reset"    title="Recenter">◎</a>`;
-          L.DomEvent.disableClickPropagation(div);
-          return div;
-        }
-      });
-      leafletMap.addControl(new ZoomFull());
+  //   leafletMap.whenReady(() => {
+  //     // Custom zoom/full controls
+  //     const ZoomFull = L.Control.extend({
+  //       options: { position: 'topleft' },
+  //       onAdd() {
+  //         const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+  //         div.innerHTML = `
+  //           <a href="#" id="zoom-full-in"  title="Zoom to max">⤢</a>
+  //           <a href="#" id="zoom-full-out" title="Zoom to min">⤡</a>
+  //           <a href="#" id="zoom-reset"    title="Recenter">◎</a>`;
+  //         L.DomEvent.disableClickPropagation(div);
+  //         return div;
+  //       }
+  //     });
+  //     leafletMap.addControl(new ZoomFull());
 
-      setTimeout(() => {
-        document.getElementById('zoom-full-in').addEventListener('click', e => {
-          e.preventDefault();
-          leafletMap.setZoom(leafletMap.getMaxZoom());
-        });
-        document.getElementById('zoom-full-out').addEventListener('click', e => {
-          e.preventDefault();
-          leafletMap.setZoom(leafletMap.getMinZoom());
-        });
-        document.getElementById('zoom-reset').addEventListener('click', e => {
-          e.preventDefault();
-          gpsAutoFollow = true;
-          if (gpsMarker) leafletMap.panTo(gpsMarker.getLatLng());
-        });
-      }, 0);
+  //     setTimeout(() => {
+  //       document.getElementById('zoom-full-in').addEventListener('click', e => {
+  //         e.preventDefault();
+  //         leafletMap.setZoom(leafletMap.getMaxZoom());
+  //       });
+  //       document.getElementById('zoom-full-out').addEventListener('click', e => {
+  //         e.preventDefault();
+  //         leafletMap.setZoom(leafletMap.getMinZoom());
+  //       });
+  //       document.getElementById('zoom-reset').addEventListener('click', e => {
+  //         e.preventDefault();
+  //         gpsAutoFollow = true;
+  //         if (gpsMarker) leafletMap.panTo(gpsMarker.getLatLng());
+  //       });
+  //     }, 0);
 
-      // “Clear Track” button (✖)
-      const resetBtn = L.control({ position: 'topright' });
-      resetBtn.onAdd = () => {
-        const btn = L.DomUtil.create('button', 'leaflet-bar');
-        btn.innerHTML = '✖';
-        btn.title     = 'Clear Track';
-        btn.onclick   = resetTrack;
-        return btn;
-      };
-      resetBtn.addTo(leafletMap);
+  //     // “Clear Track” button (✖)
+  //     const resetBtn = L.control({ position: 'topright' });
+  //     resetBtn.onAdd = () => {
+  //       const btn = L.DomUtil.create('button', 'leaflet-bar');
+  //       btn.innerHTML = '✖';
+  //       btn.title     = 'Clear Track';
+  //       btn.onclick   = resetTrack;
+  //       return btn;
+  //     };
+  //     resetBtn.addTo(leafletMap);
 
-      // Legend box
-      const legendCtl = L.control({ position: 'bottomright' });
-      legendCtl.onAdd = () => L.DomUtil.create('div', 'leaflet-control leaflet-bar track-legend');
-      legendCtl.addTo(leafletMap);
-      updateLegend(legendCtl);
+  //     // Legend box
+  //     const legendCtl = L.control({ position: 'bottomright' });
+  //     legendCtl.onAdd = () => L.DomUtil.create('div', 'leaflet-control leaflet-bar track-legend');
+  //     legendCtl.addTo(leafletMap);
+  //     updateLegend(legendCtl);
 
-      leafletMap.on('movestart', () => gpsAutoFollow = false);
+  //     leafletMap.on('movestart', () => gpsAutoFollow = false);
 
-      // Start periodic GPS updates
-      setInterval(updateGPS, refreshMs);
-    });
+  //     // Start periodic GPS updates
+  //     setInterval(updateGPS, refreshMs);
+  //   });
 
-    // Load backlog of GPS points once
-    const trk = await fetch('/api/gps_track').then(r => r.ok ? r.json() : null);
-    if (trk?.track) {
-      gpsHistory = trk.track.map(p => ({
-        time: new Date(p.timestamp).getTime(),
-        lat : p.lat,
-        lon : p.lon,
-        [trackColorKey]: p.value
-      }));
-      drawTrack();
-    }
+  //   // Load backlog of GPS points once
+  //   const trk = await fetch('/api/gps_track').then(r => r.ok ? r.json() : null);
+  //   if (trk?.track) {
+  //     gpsHistory = trk.track.map(p => ({
+  //       time: new Date(p.timestamp).getTime(),
+  //       lat : p.lat,
+  //       lon : p.lon,
+  //       [trackColorKey]: p.value
+  //     }));
+  //     drawTrack();
+  //   }
 
-    // One immediate GPS update
-    updateGPS();
-  }
+  //   // One immediate GPS update
+  //   updateGPS();
+  // }
 
   // Slider → adjust GPS refreshMs or durationMs
-  refreshSlider.addEventListener('input', e => {
-    const v = parseFloat(e.target.value);
-    refreshMs = v * 1000;
-    document.getElementById('gpsRefreshValue').textContent = `${v.toFixed(1)} s`;
-  });
-  trackSlider.addEventListener('input', e => {
-    const v = parseInt(e.target.value, 10);
-    durationMs = v * 60 * 1000;
-    document.getElementById('gpsTrackValue').textContent = `${v} min`;
-  });
+  // refreshSlider.addEventListener('input', e => {
+  //   const v = parseFloat(e.target.value);
+  //   refreshMs = v * 1000;
+  //   document.getElementById('gpsRefreshValue').textContent = `${v.toFixed(1)} s`;
+  // });
+  // trackSlider.addEventListener('input', e => {
+  //   const v = parseInt(e.target.value, 10);
+  //   durationMs = v * 60 * 1000;
+  //   document.getElementById('gpsTrackValue').textContent = `${v} min`;
+  // });
 
   // Slider → adjust Plot refresh rate
   plotRefreshSlider.addEventListener('input', e => {

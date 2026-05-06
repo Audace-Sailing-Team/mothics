@@ -301,7 +301,7 @@ class SystemManager:
             # Initialize CDNs
             self.initialize_cdns()
             # Initialize tiles
-            self.initialize_tiles()
+            # self.initialize_tiles()
             
             # Pass all getter functions
             getters = {

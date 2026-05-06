@@ -102,15 +102,15 @@ class WebApp:
         
     def setup_logging(self):
         # Silence Waitress
-        logging.getLogger("waitress").setLevel(logging.ERROR)
+        logging.getLogger("waitress").setLevel(logging.DEBUG)
         
         # Silence Tornado
         for tlog in [access_log, app_log, gen_log]:
-            tlog.setLevel(logging.ERROR)
+            tlog.setLevel(logging.DEBUG)
             tlog.propagate = False
 
         # Silence werkzeug
-        logging.getLogger("werkzeug").setLevel(logging.ERROR)
+        logging.getLogger("werkzeug").setLevel(logging.DEBUG)
 
         # Create the main logger
         self.logger = logging.getLogger("WebApp")

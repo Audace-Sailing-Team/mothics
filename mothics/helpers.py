@@ -40,7 +40,7 @@ def tipify(s):
             return s
 
     
-def setup_logger(name, level=logging.INFO, fname=None, silent=False):
+def setup_logger(name, level=logging.DEBUG, fname=None, silent=False):
     """Logger with custom prefix"""
 
     logger = logging.getLogger()
