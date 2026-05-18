@@ -1,0 +1,320 @@
+/* ===== ROOT & THEME ===== */
+:root {
+  --primary: #0078d4;
+  --primary-dark: #005fa3;
+  --success: #107c10;
+  --success-light: #e7f5ea;
+  --error: #da3b01;
+  --error-light: #fed9cc;
+  --warning: #ffb900;
+  --warning-light: #fff4ce;
+  --border: #e0e0e0;
+  --bg-light: #f8f9fa;
+  --text-dark: #1f2937;
+  --text-muted: #6b7280;
+}
+
+/* ===== LAYOUT GENERALE ===== */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  margin: 0;
+  padding: 20px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  min-height: 100vh;
+  color: var(--text-dark);
+  line-height: 1.6;
+}
+
+html, body {
+  scroll-behavior: smooth;
+}
+
+/* ===== CONTAINER ===== */
+body > h1 {
+  max-width: 1000px;
+  margin: 0 auto 30px;
+}
+
+body > .section {
+  max-width: 1000px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ===== TITOLI ===== */
+h1 {
+  text-align: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 30px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin: 0 0 15px 0;
+  border-bottom: 3px solid var(--primary);
+  padding-bottom: 8px;
+}
+
+h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 15px 0 10px 0;
+}
+
+/* ===== SEZIONI ===== */
+.section {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 25px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.section:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  transform: translateY(-2px);
+}
+
+/* ===== BOTTONI ===== */
+button {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin: 6px 8px 10px 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+button:hover {
+  background: var(--primary-dark);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+button:disabled {
+  background: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ===== TABELLE ===== */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 15px;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+table thead {
+  background: var(--bg-light);
+  border-bottom: 2px solid var(--border);
+}
+
+table th,
+table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+table th {
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+table tbody tr:hover {
+  background-color: var(--bg-light);
+}
+
+table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ===== STATUS TABLE ===== */
+.status-table {
+  width: 100%;
+  max-width: 400px;
+}
+
+.status-table td:first-child {
+  font-weight: 600;
+  color: var(--text-dark);
+  width: 40%;
+}
+
+.status-table td:last-child {
+  font-weight: 600;
+  padding: 10px 12px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+/* ===== STATUS COLORS ===== */
+.status-ok,
+span.status-ok {
+  color: white !important;
+  background-color: var(--success) !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  font-weight: 600 !important;
+  display: inline-block !important;
+}
+
+.status-bad,
+span.status-bad {
+  color: white !important;
+  background-color: var(--error) !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  font-weight: 600 !important;
+  display: inline-block !important;
+}
+
+.status-warning {
+  color: white !important;
+  background-color: var(--warning) !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  font-weight: 600 !important;
+  display: inline-block !important;
+}
+
+/* ===== PREFORMATTED BOXES ===== */
+pre {
+  background: var(--bg-light);
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  max-height: 400px;
+  overflow: auto;
+  font-size: 0.9rem;
+  font-family: 'Monaco', 'Courier New', monospace;
+  color: var(--text-dark);
+}
+
+/* ===== INPUT FIELDS ===== */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+textarea,
+select {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="email"]:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1);
+}
+
+/* ===== SCROLLBAR STYLING ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-light);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-dark);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  body {
+    padding: 10px;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  h2 {
+    font-size: 1.2rem;
+  }
+
+  button {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    display: block;
+    width: 100%;
+    margin: 6px 0;
+  }
+
+  table {
+    font-size: 0.9rem;
+  }
+
+  table th,
+  table td {
+    padding: 8px 10px;
+  }
+
+  .section {
+    padding: 15px;
+  }
+}
+
+/* ===== UTILITY CLASSES ===== */
+.text-center {
+  text-align: center;
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.mb-3 { margin-bottom: 1.5rem; }
+
+.p-1 { padding: 0.5rem; }
+.p-2 { padding: 1rem; }
+.p-3 { padding: 1.5rem; }

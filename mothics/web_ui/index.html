@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Mothics Control Panel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <h1>Mothics – Pannello base</h1>
+
+  <!-- ============================
+       STATO SISTEMA
+  ============================= -->
+  <div class="section">
+    <h2>Stato sistema</h2>
+    <button id="btnRefreshStatus">Aggiorna stato</button>
+
+    <table id="systemStatus" class="status-table">
+      <tbody>
+        <tr>
+          <td>Mode</td>
+          <td id="st_mode"></td>
+        </tr>
+        <tr>
+          <td>Communicator</td>
+          <td id="st_comm"></td>
+        </tr>
+        <tr>
+          <td>Aggregator</td>
+          <td id="st_aggr"></td>
+        </tr>
+        <tr>
+          <td>WebApp</td>
+          <td id="st_web"></td>
+        </tr>
+        <tr>
+          <td>Track</td>
+          <td id="st_track"></td>
+        </tr>
+        <tr>
+          <td>Database</td>
+          <td id="st_db"></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Stato sensori</h3>
+    <table id="sensorStatus" class="status-table">
+      <tbody>
+        <tr>
+          <td>IMU</td>
+          <td id="st_imu"></td>
+        </tr>
+        <tr>
+          <td>GPS</td>
+          <td id="st_gps"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============================
+       DATI REALTIME
+  ============================= -->
+  <div class="section">
+    <h2>Dati realtime</h2>
+    <table id="liveTable" style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr>
+          <th>Topic</th>
+          <th>Valore</th>
+        </tr>
+      </thead>
+      <tbody id="liveTableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- ============================
+       CONTROLLO
+  ============================= -->
+  <div class="section">
+    <h2>Controllo esecuzione</h2>
+    <button id="btnStartLive">Start LIVE</button>
+    <button id="btnStartReplay">Start REPLAY (track 0)</button>
+    <button id="btnStop">Stop</button>
+    <button id="btnRestart">Restart (senza reload config)</button>
+    <pre id="controlResult"></pre>
+  </div>
+
+  <!-- ============================
+       CONFIG
+  ============================= -->
+  <div class="section">
+    <h2>Configurazione</h2>
+    <button id="btnLoadConfig">Carica config</button>
+    <button id="btnSaveConfig">Salva config su file</button>
+
+    <table id="configTable">
+      <thead>
+        <tr>
+          <th>Chiave</th>
+          <th>Valore attuale</th>
+          <th>Default</th>
+          <th>Override</th>
+          <th>Modifica</th>
+        </tr>
+      </thead>
+      <tbody id="configTableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- ============================
+       TRACKS
+  ============================= -->
+  <div class="section">
+    <h2>Tracks</h2>
+    <button id="btnListTracks">Lista tracks</button>
+    <pre id="tracksBox"></pre>
+  </div>
+
+  <!-- ============================
+       LOG
+  ============================= -->
+  <div class="section">
+    <h2>Log</h2>
+    <button id="btnLoadLog">Mostra log</button>
+    <button id="btnClearLog">Cancella log</button>
+    <pre id="logBox"></pre>
+  </div>
+
+  <!-- ============================
+       SCRIPT UNICO
+  ============================= -->
+  <script type="module" src="app.js"></script>
+
+  <script>
+    /* -----------------------------
+       STATO SISTEMA
+    ------------------------------ */
+    function setStatusCell(id, value) {
+      const el = document.getElementById(id);
+      if (!el) return; // Sicurezza se l'elemento non esiste
+
+      el.textContent = value || "unknown"; // Mostra qualcosa se il valore è indefinito
+
+      el.classList.remove("status-ok", "status-bad");
+
+      // Controllo stringhe (incluso il caso vuoto o undefined)
+      if (value === "running" || value === "active" || value === "live" || value === "served (static)") {
+        el.classList.add("status-ok");
+      } else {
+        el.classList.add("status-bad");
+      }
+    }
+
+    // Creiamo una funzione riutilizzabile per il fetch dello stato
+    async function fetchStatus() {
+      try {
+        const res = await fetch("/api/status").then(r => r.json());
+        setStatusCell("st_mode", res.mode);
+        setStatusCell("st_comm", res.communicator);
+        setStatusCell("st_aggr", res.aggregator);
+        setStatusCell("st_web", res.webapp);
+        setStatusCell("st_track", res.track);
+        setStatusCell("st_db", res.database);
+      } catch (err) {
+        console.error("Errore nel recupero dello stato:", err);
+        // In caso di errore di rete, segna tutto come 'bad'
+        ["st_mode", "st_comm", "st_aggr", "st_web", "st_track", "st_db"].forEach(id => setStatusCell(id, "error"));
+      }
+    }
+
+    // Assegna la funzione al click del bottone
+    document.getElementById("btnRefreshStatus").onclick = fetchStatus;
+
+    // ESEGUI AL CARICAMENTO DELLA PAGINA
+    // In questo modo la tabella si colora subito senza dover cliccare
+    window.addEventListener("DOMContentLoaded", fetchStatus);
+
+    /* -----------------------------
+       STATO SENSORI
+    ------------------------------ */
+    const stIMU = document.getElementById("st_imu");
+    const stGPS = document.getElementById("st_gps");
+
+    function setSensorStatus(el, active) {
+      el.textContent = active ? "active" : "inactive";
+      if (active) {
+        el.classList.add("status-ok");
+        el.classList.remove("status-bad");
+      } else {
+        el.classList.add("status-bad");
+        el.classList.remove("status-ok");
+      }
+    }
+
+    // Fetch actual sensor status from API (not from topics)
+    async function fetchSensorsStatus() {
+      try {
+        const res = await fetch("/api/sensors").then(r => r.json());
+        setSensorStatus(stIMU, res.imu === "active");
+        setSensorStatus(stGPS, res.gps === "active");
+      } catch (err) {
+        console.error("Errore nel recupero stato sensori:", err);
+        setSensorStatus(stIMU, false);
+        setSensorStatus(stGPS, false);
+      }
+    }
+
+    // Fetch sensors status on page load and refresh
+    window.addEventListener("DOMContentLoaded", fetchSensorsStatus);
+    // Refresh sensors status every 5 seconds
+    setInterval(fetchSensorsStatus, 5000);
+
+    /* -----------------------------
+       TABELLA LIVE
+    ------------------------------ */
+    const tableBody = document.getElementById("liveTableBody");
+
+    function updateLiveTable(data) {
+      tableBody.innerHTML = "";
+      for (const topic in data) {
+        const entries = data[topic];
+        if (!entries || entries.length === 0) continue;
+        const last = entries[entries.length - 1];
+        const ts = Object.keys(last)[0];
+        const value = last[ts];
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${topic}</td><td>${value}</td>`;
+        tableBody.appendChild(tr);
+      }
+    }
+
+    /* -----------------------------
+       STREAM REALTIME
+    ------------------------------ */
+    const evt = new EventSource("/api/stream");
+
+    evt.onmessage = (msg) => {
+      const data = JSON.parse(msg.data);
+      updateLiveTable(data);
+    };
+  </script>
+
+</body>
+
+</html>

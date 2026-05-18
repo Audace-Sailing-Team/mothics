@@ -72,26 +72,6 @@ class DataPoint:
         """
         return {"timestamp": self.timestamp.isoformat()} | self.input_data
 
-    
-# Track export methods
-def _export_base(data_points, filename, interval=None, field_names=None):
-    """
-    Base function for exporting track data.
-
-    Use this base function to build a custom export function. It is
-    not intended to be used directly.
-
-    Args:
-        data_points (list[DataPoint]): List of data points to export.
-        filename (str): The file path where data should be written.
-        interval (optional): A slice or other index specifying the subset of
-            `data_points` to export.
-        field_names (list[str], optional): Specific names of fields to export.
-
-    Raises:
-        NotImplementedError: This function is a stub.
-    """
-    raise NotImplementedError("Base export function - not to be used directly")
 
 def export_to_json(data_points, filename, interval=None, field_names=None):
     """
@@ -294,6 +274,10 @@ class Track:
         self.export_methods = _export_methods
         """Dictionary of available export methods"""
         self.preprocessors = []
+        # Append-only file
+        self.track_file = os.path.join(self.output_dir, "track.jsonl")
+        self._file_handle = None
+
         """List of available preprocessing function for incoming data"""
         # Internal attributes not exposed as parameters
         self._replay_index = 0
@@ -304,6 +288,8 @@ class Track:
         self.checkpoint_dir = os.path.join(self.output_dir, 'chk')
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.checkpoint_dir, exist_ok=True)
+
+        self.current_file = os.path.join(self.checkpoint_dir, "current.chk.json")
 
         # Setup logger
         self.logger = logging.getLogger("Track")
@@ -447,62 +433,57 @@ class Track:
             self.logger.info('logging data')
         elif self.save_mode == 'continuous':
             self.logger.warning(f'cannot start track saving on demand; current saving mode is {self.save_mode}')
-        
+
     def end_run(self):
         """
-        Stop continuous saving and finalize the data set.
-
-        In 'on-demand' mode (the finalizing step), it saves a partial dataset
-        from `_save_interval_start` to the last data point, then cleans up
-        checkpoint files. This effectively ends a data collection session.
+        Forza un ultimo checkpoint e chiude la sessione.
+        Mantiene il file in current.chk.json senza creare duplicati.
         """
-        if self.save_mode != 'on-demand': # FLAWED current save status check
-            # Generate slice and save track
-            interval = slice(self._save_interval_start, len(self.data_points) - 1)
-            self.save(interval=interval)
-            # Cleanup checkpoint storage (except -full files)
-            chk_files_all= glob.glob(os.path.join(self.checkpoint_dir, "*.chk.json"))
-            chk_files = [f for f in chk_files_all if not re.search(r"-full\.chk\.json$", f)]
-            for f in chk_files:
-                os.remove(f)
-            # Clean up interval indices and reset mode
-            self._save_interval_start = None
-            self._last_checkpoint = None
-            self.save_mode = 'on-demand'
-            self.logger.info('data logging ended')
+        if self.save_mode == 'none':
+            self.logger.warning("save_mode è 'none'; niente da chiudere")
+            return
+
+        # ultimo checkpoint in current.chk.json
+        self._save_checkpoint(force=True)
+        self.logger.info(f"ultimi dati salvati in {self.current_file}")
+
+        # Reset stato
+        self._save_interval_start = None
+        self._last_checkpoint = None
+        self.save_mode = 'on-demand'
+
+    def _save_checkpoint(self, force: bool = False, specifier: str | None = None):
+        """
+        Salva periodicamente TUTTI i datapoint correnti in un unico file JSON.
+        Il file viene sovrascritto ogni volta (rolling file).
+        """
+        if self.save_mode != 'continuous' or self.checkpoint_interval is None:
+            return
+
+        now = datetime.now()
+        if not force and self._last_checkpoint is not None:
+            dt = (now - self._last_checkpoint).total_seconds()
+            if dt < self.checkpoint_interval:
+                return
+
+        self._last_checkpoint = now
+
+        # intervallo da salvare (se stai usando on‑demand)
+        if self._save_interval_start is not None:
+            interval = slice(self._save_interval_start, len(self.data_points))
         else:
-            self.logger.warning(f'cannot end track saving; current saving mode is {self.save_mode}')
-    
-    def _save_checkpoint(self, force=False, specifier=None):
-        """
-        Periodically save a checkpoint if in 'continuous' mode.
+            interval = slice(0, len(self.data_points))
 
-        Args:
-            force (bool, optional): If True, force a checkpoint save regardless of 
-                the time since last checkpoint.
-            specifier (str, optional): An extra string appended to the filename 
-                for identification (e.g., '-full').
-        """
-        if self.save_mode == 'continuous' and self.checkpoint_interval is not None:
-            now = datetime.now()
-            # Save a checkpoint if above time threshold (or no points are available)
-            if self._last_checkpoint is None or (now - self._last_checkpoint).total_seconds() > self.checkpoint_interval or force:
-                self._last_checkpoint = now
-                interval = slice(self._save_interval_start, len(self.data_points) - 1)
-                fname=f'{now.strftime("%Y%m%d-%H%M%S")}.chk'
-                if specifier is not None:
-                    fname=f'{now.strftime("%Y%m%d-%H%M%S")+str(specifier)}.chk'
-                self.save(interval=interval, fname=fname, output_dir=self.checkpoint_dir)
+        try:
+            # usa già la tua logica di export
+            export = self.export_methods.get("json")
+            if export is None:
+                raise RuntimeError("json export method not available")
 
-            # Remove older files from checkpoint directory
-            chk_files_all= glob.glob(os.path.join(self.checkpoint_dir, "*.chk.json"))
-            # Remove all checkpoints with the `-full` specifier
-            chk_files = [f for f in chk_files_all if not re.search(r"-full\.chk\.json$", f)]
-            chk_files.sort(key=os.path.getmtime)
-            
-            if len(chk_files) > self.max_checkpoint_files:
-                # Delete the oldest file
-                os.remove(chk_files[0])
+            export(self.data_points[interval], self.current_file)
+            self.logger.info(f"checkpoint salvato in {self.current_file}")
+        except Exception as e:
+            self.logger.critical(f"errore nel salvataggio checkpoint: {e}")
 
     def add_point(self, timestamp: datetime, data: Dict[str, Any]):
         """
@@ -539,11 +520,26 @@ class Track:
         datapoint = DataPoint(timestamp, data)
         for processor in self.preprocessors:
             datapoint = processor(datapoint)
+
+        # 🔥 APPEND-ONLY MINIMO: crea/appendi il file ad ogni datapoint
+        try:
+            with open(self.track_file, "a", buffering=1) as f:
+                line = json.dumps(datapoint.to_dict())
+                f.write(line + "\n")
+        except Exception as e:
+            self.logger.error(f"errore in append sul track file {self.track_file}: {e}")
        
         # Append the datapoint
         self.data_points.append(datapoint)
-        # Run checkpointing
+        # checkpoint periodico
         self._save_checkpoint()
+
+        # controllo RAM dopo il salvataggio
+        if len(self.data_points) > self.max_datapoints:
+            self.logger.warning(
+                "maximum number of datapoints reached; trimming old data"
+            )
+            self._remove_datapoints(fraction=self.trim_fraction)
 
     def get_latest_data(self):
         """

@@ -161,6 +161,9 @@ class DPS310Module(I2CModuleBase):
             pressure = self.sensor.pressure
             temp = self.sensor.temperature
 
+            if pressure is None or temp is None:
+                return {}
+
             values = {
                 "pressure": pressure,
                 "temperature": temp
