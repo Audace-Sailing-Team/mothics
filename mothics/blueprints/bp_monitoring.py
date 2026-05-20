@@ -72,99 +72,99 @@ def get_status():
     return render_template("status.html", status_data=status_data)
 
 
-@monitor_bp.route('/tiles/<int:z>/<int:x>/<int:y>.png')
-def serve_tile(z, x, y):
-    path = os.path.join(current_app.root_path, 'static', 'tiles', str(z), str(x), f"{y}.png")
-    if os.path.exists(path):
-        return send_file(path)
-    else:
-        abort(404)
+# @monitor_bp.route('/tiles/<int:z>/<int:x>/<int:y>.png')
+# def serve_tile(z, x, y):
+#     path = os.path.join(current_app.root_path, 'static', 'tiles', str(z), str(x), f"{y}.png")
+#     if os.path.exists(path):
+#         return send_file(path)
+#     else:
+#         abort(404)
 
         
-@monitor_bp.route("/gps_map")
-def gps_map():
-    return render_template("gps_map.html")
+# @monitor_bp.route("/gps_map")
+# def gps_map():
+#     return render_template("gps_map.html")
 
 
-@monitor_bp.route("/api/gps_info")
-def gps_info():
-    db = current_app.config['GETTERS']['database']()
-    latest = db.data_points[-1].to_dict() if db.data_points else {}
+# @monitor_bp.route("/api/gps_info")
+# def gps_info():
+#     db = current_app.config['GETTERS']['database']()
+#     latest = db.data_points[-1].to_dict() if db.data_points else {}
 
-    lat_key = next((k for k in latest if k.endswith("/gps/lat")), None)
-    lon_key = next((k for k in latest if k.endswith("/gps/long")), None)
-    spd_key = next((k for k in latest if "/gps/speed" in k), None)
+#     lat_key = next((k for k in latest if k.endswith("/gps/lat")), None)
+#     lon_key = next((k for k in latest if k.endswith("/gps/long")), None)
+#     spd_key = next((k for k in latest if "/gps/speed" in k), None)
 
-    lat = latest.get(lat_key)
-    lon = latest.get(lon_key)
-    speed = latest.get(spd_key) if spd_key else None
+#     lat = latest.get(lat_key)
+#     lon = latest.get(lon_key)
+#     speed = latest.get(spd_key) if spd_key else None
 
-    status_key = next((k for k in latest if k.endswith("/gps/status")), None)
-    gps_available = latest.get(status_key, False)
+#     status_key = next((k for k in latest if k.endswith("/gps/status")), None)
+#     gps_available = latest.get(status_key, False)
 
-    tile_dir = current_app.config['GPS_TILES_DIRECTORY']
-    track_variable = current_app.config.get('TRACK_VARIABLE', 'speed')
-    track_thresholds = current_app.config.get('TRACK_THRESHOLDS', [1, 5, 15])
-    track_colors = current_app.config.get('TRACK_COLORS', ["#3366cc", "#66cc66", "#ffcc00", "#cc3333"])
-    track_units = current_app.config.get('TRACK_UNITS', None)
-    min_zoom, max_zoom = get_tile_zoom_levels(tile_dir=tile_dir)
+#     tile_dir = current_app.config['GPS_TILES_DIRECTORY']
+#     track_variable = current_app.config.get('TRACK_VARIABLE', 'speed')
+#     track_thresholds = current_app.config.get('TRACK_THRESHOLDS', [1, 5, 15])
+#     track_colors = current_app.config.get('TRACK_COLORS', ["#3366cc", "#66cc66", "#ffcc00", "#cc3333"])
+#     track_units = current_app.config.get('TRACK_UNITS', None)
+#     min_zoom, max_zoom = get_tile_zoom_levels(tile_dir=tile_dir)
 
-    return jsonify({
-        "gps_available": gps_available,
-        "latest_position": {
-            "lat": lat,
-            "lon": lon,
-            "speed": speed
-        } if gps_available else None,
-        "zoom": {
-            "min": min_zoom,
-            "max": max_zoom
-        },
-        "track_coloring": {
-            "key": track_variable,
-            "thresholds": track_thresholds,
-            "colors": track_colors,
-            "units": track_units
-        }
-    })
+#     return jsonify({
+#         "gps_available": gps_available,
+#         "latest_position": {
+#             "lat": lat,
+#             "lon": lon,
+#             "speed": speed
+#         } if gps_available else None,
+#         "zoom": {
+#             "min": min_zoom,
+#             "max": max_zoom
+#         },
+#         "track_coloring": {
+#             "key": track_variable,
+#             "thresholds": track_thresholds,
+#             "colors": track_colors,
+#             "units": track_units
+#         }
+#     })
 
 
-@monitor_bp.route("/api/gps_track")
-def gps_track():
-    db = current_app.config['GETTERS']['database']()
-    window_minutes = current_app.config.get("GPS_HISTORY_MINUTES", 10)
-    cutoff = datetime.utcnow() - timedelta(minutes=window_minutes)
+# @monitor_bp.route("/api/gps_track")
+# def gps_track():
+#     db = current_app.config['GETTERS']['database']()
+#     window_minutes = current_app.config.get("GPS_HISTORY_MINUTES", 10)
+#     cutoff = datetime.utcnow() - timedelta(minutes=window_minutes)
 
-    # Filter all data points newer than the cutoff timestamp
-    datapoints = [
-        dp for dp in db.data_points
-        if "timestamp" in dp.to_dict() and
-        datetime.fromisoformat(dp.to_dict()["timestamp"]) >= cutoff
-    ]
+#     # Filter all data points newer than the cutoff timestamp
+#     datapoints = [
+#         dp for dp in db.data_points
+#         if "timestamp" in dp.to_dict() and
+#         datetime.fromisoformat(dp.to_dict()["timestamp"]) >= cutoff
+#     ]
     
-    track_data = []
+#     track_data = []
 
-    track_key = current_app.config.get("TRACK_VARIABLE", "speed")
-    for dp in datapoints:
-        d = dp.to_dict()
+#     track_key = current_app.config.get("TRACK_VARIABLE", "speed")
+#     for dp in datapoints:
+#         d = dp.to_dict()
 
-        lat_key = next((k for k in d if k.endswith("/gps/lat")), None)
-        lon_key = next((k for k in d if k.endswith("/gps/long")), None)
-        value_key = next((k for k in d if track_key in k and "/gps/" in k), None)
+#         lat_key = next((k for k in d if k.endswith("/gps/lat")), None)
+#         lon_key = next((k for k in d if k.endswith("/gps/long")), None)
+#         value_key = next((k for k in d if track_key in k and "/gps/" in k), None)
 
-        if lat_key and lon_key:
-            lat = d[lat_key]
-            lon = d[lon_key]
-            val = d.get(value_key)
+#         if lat_key and lon_key:
+#             lat = d[lat_key]
+#             lon = d[lon_key]
+#             val = d.get(value_key)
 
-            track_data.append({
-                "lat": lat,
-                "lon": lon,
-                "value": val,
-                "timestamp": d.get("timestamp")
-            })
+#             track_data.append({
+#                 "lat": lat,
+#                 "lon": lon,
+#                 "value": val,
+#                 "timestamp": d.get("timestamp")
+#             })
 
-    return jsonify({"track": track_data})
+#     return jsonify({"track": track_data})
 
 @monitor_bp.route("/api/track_plot_data")
 def track_plot_data():

@@ -204,7 +204,6 @@ class SystemManager:
     def initialize_cdns(self):
         """ Initializes CDNs for webapp display """
         # Get CDN URLs from configuration
-        print(self.config["webapp"])
         cdn_urls = self.config["webapp"]["cdns"]
         
         if not cdn_urls:
@@ -302,7 +301,7 @@ class SystemManager:
             # Initialize CDNs
             self.initialize_cdns()
             # Initialize tiles
-            self.initialize_tiles()
+            # self.initialize_tiles()
             
             # Pass all getter functions
             getters = {
@@ -341,12 +340,13 @@ class SystemManager:
                 out_dir=self.config["files"]["output_dir"],
                 system_manager=self
             )
-            # self.webapp.run()
+            
             t = threading.Thread(target=self.webapp.serve, daemon=True, name="WaitressServer")
             t.start()
 
     def start_live(self):
         self.initialize_common_components("live")
+        self.track.start_run()
 
         # Initialize interfaces
         interfaces = {}
@@ -424,7 +424,7 @@ class SystemManager:
         self.logger.info("live mode started")
 
     def start_replay(self, track_file=None):
-        self.initialize_common_components("replay", track_file, aggregator_config, webapp_config)
+        self.initialize_common_components("replay", track_file)
 
         # Set up aggregator
         raw_data_getter = lambda: self.track.get_current()
