@@ -23,6 +23,7 @@ from typing import Optional, List, Dict, Any
 from .aggregator import Aggregator
 from .comm_interface import MQTTInterface, SerialInterface, GPIOInterface, Communicator, available_interfaces
 from .preprocessors import UnitConversion, AngleOffset, available_processors
+from .webapp import WebApp
 from .helpers import setup_logger, tipify, check_cdn_availability, download_cdn, check_internet_connectivity, download_tiles, list_required_tiles, get_device_platform, parse_uc_table
 from .track import Track
 from .database import Database
@@ -128,15 +129,10 @@ class SystemManager:
         self.webapp = None
         self.track = None
         self.database = None
-        self.config_file_data = {}
         self.config = copy.deepcopy(DEFAULT_CONFIG)  # Always start with default settings as a failsafe
 
         self.load_config()
         self.device_type = get_device_platform()
-        
-        # Start API server automatically
-        self.api_server_running = False
-        self.initialize_api_server()
 
     def _setup_logger(self, logger_fname, level=logging.INFO):
         setup_logger('logger', fname=logger_fname, silent=False)
@@ -148,8 +144,7 @@ class SystemManager:
         cfg_file = {}
         if os.path.exists(self.config_file):
             try:
-                self.config_file_data = toml.load(self.config_file)
-                cfg_file = self.config_file_data
+                cfg_file = toml.load(self.config_file)
             except Exception as e:
                 self._setup_logger(self.config["files"]["logger_fname"])
                 self.logger.warning(
@@ -177,13 +172,6 @@ class SystemManager:
         # logger is ready now
         self._setup_logger(self.config["files"]["logger_fname"])
         self.logger.info("configuration loaded (file + defaults)")
-
-    def get_config_view(self):
-        return {
-            "merged": self.config,
-            "overrides": self.config_file_data,
-            "defaults": DEFAULT_CONFIG
-        }
         
     # def load_config(self):
     #     """Loads the configuration file and merges it with defaults."""
@@ -328,31 +316,36 @@ class SystemManager:
                 'stop_save': lambda: self.track.end_run(),
             }
 
-    def initialize_api_server(self):
-        import threading
-        from .api_server import run, set_system_manager
-
-        # Passa il SystemManager attuale al server API
-        set_system_manager(self)
-
-        t = threading.Thread(target=run, daemon=True, name="APIServer")
-        t.start()
-        self.api_server_running = True
-        self.logger.info("API server started")
-
+            # Initialize Webapp
+            self.webapp = WebApp(
+                getters=getters,
+                setters=setters,
+                auto_refresh_table=self.config["webapp"]["data_refresh"],
+                logger_fname=self.config["files"]["logger_fname"],
+                rm_thesaurus=self.config["webapp"]["rm_thesaurus"],
+                data_thesaurus=self.config["webapp"]["data_thesaurus"],
+                hidden_data_cards=self.config["webapp"]["hidden_data_cards"],
+                hidden_data_plots=self.config["webapp"]["hidden_data_plots"],
+                timeout_offline=self.config["webapp"]["timeout_offline"],
+                timeout_noncomm=self.config["webapp"]["timeout_noncomm"],
+                track_manager=self.database,
+                track_manager_directory=self.config["files"]["output_dir"],
+                gps_tiles_directory=self.config["files"]["tile_dir"],
+                track_variable=self.config["webapp"]["gps"]["track_variable"],
+                track_thresholds=self.config["webapp"]["gps"]["track_thresholds"],
+                track_colors=self.config["webapp"]["gps"]["track_colors"],
+                track_units=self.config["webapp"]["gps"]["track_units"],
+                track_history_minutes=self.config["webapp"]["gps"]["track_history"],
+                instance_dir=os.path.dirname(sys.modules['__main__'].__file__),
+                out_dir=self.config["files"]["output_dir"],
+                system_manager=self
+            )
+            # self.webapp.run()
+            t = threading.Thread(target=self.webapp.serve, daemon=True, name="WaitressServer")
+            t.start()
 
     def start_live(self):
         self.initialize_common_components("live")
-        self.track.start_run()
-
-        # Ensure any previous communicator is disconnected
-        if self.communicator:
-            try:
-                self.communicator.disconnect()
-                self.logger.warning("previous communicator was still connected, disconnected it")
-            except Exception as e:
-                self.logger.warning(f"error disconnecting previous communicator: {e}")
-            self.communicator = None
 
         # Initialize interfaces
         interfaces = {}
@@ -424,65 +417,33 @@ class SystemManager:
         self.initialize_aggregator(raw_data_getter)
 
         # Set up web app
+        self.initialize_webapp()
+
         self.mode = 'live'
         self.logger.info("live mode started")
 
     def start_replay(self, track_file=None):
-        self.initialize_common_components("replay", track_file)
-
-        # Ensure any previous communicator is disconnected (for replay, not needed, but for consistency)
-        if self.communicator:
-            try:
-                self.communicator.disconnect()
-                self.logger.warning("previous communicator was still connected, disconnected it")
-            except Exception as e:
-                self.logger.warning(f"error disconnecting previous communicator: {e}")
-            self.communicator = None
+        self.initialize_common_components("replay", track_file, aggregator_config, webapp_config)
 
         # Set up aggregator
         raw_data_getter = lambda: self.track.get_current()
         self.initialize_aggregator(raw_data_getter)
 
-        # Set up API server
-        self.initialize_api_server()
+        # Set up web app
+        self.initialize_webapp()
 
         self.mode = 'replay'
         self.logger.info("replay mode started")
 
     def stop(self):
-        """
-        Stop the system safely and save all data.
-        Returns to the state before start_live/start_replay.
-        """
         self.logger.info("stopping system")
-        
-        # 1. Stop aggregator first
         if self.aggregator:
             self.aggregator.stop()
             self.aggregator = None
-        
-        # 2. Save track data safely
-        if self.track:
-            try:
-                self.track.end_run()
-                self.logger.info("track data saved")
-            except Exception as e:
-                self.logger.error(f"error saving track data: {e}")
-            self.track = None
-        
-        # 3. Disconnect communicator
         if self.communicator:
-            try:
-                self.communicator.disconnect()
-                self.logger.info("communicator disconnected")
-            except Exception as e:
-                self.logger.error(f"error disconnecting communicator: {e}")
+            self.communicator.disconnect()
             self.communicator = None
-        
-        # 4. Reset mode to None
-        self.mode = None
-        
-        self.logger.info("system stopped safely")
+        self.logger.info("system stopped")
 
     def restart(self, mode=None, reload_config=False):
         self.logger.info("restarting system")
@@ -502,41 +463,11 @@ class SystemManager:
             self.logger.error(f"no valid mode found for restart, got: {mode}")    
 
     def get_status(self):
-        # Determina lo stato della webapp
-        if self.webapp:
-            webapp_status = "running (flask)"
-        elif getattr(self, "api_server_running", False):
-            webapp_status = "served (static)"
-        else:
-            webapp_status = "stopped"
-
         return {
             "mode": self.mode,
             "communicator": "running" if self.communicator else "stopped",
             "aggregator": "running" if self.aggregator else "stopped",
-            "webapp": webapp_status,
+            "webapp": "running" if self.webapp else "stopped",
             "track": "active" if self.track else "not active",
             "database": "available" if self.database else "not initialized",
         }
-
-    def get_sensors_status(self):
-        """Return the actual connection status of physical sensors."""
-        sensors = {
-            "gps": "not initialized",
-            "imu": "not initialized"
-        }
-        
-        if self.communicator:
-            interfaces = self.communicator.interfaces
-            
-            for name, iface in interfaces.items():
-                # Check GPS (SerialInterface has 'connected' attribute)
-                if hasattr(iface, 'connected'):
-                    sensors["gps"] = "active" if iface.connected else "inactive"
-                
-                # Check IMU (GPIOInterface has 'running' attribute for modules like BNO08x)
-                if hasattr(iface, 'running'):
-                    sensors["imu"] = "active" if iface.running else "inactive"
-        
-        return sensors
-
