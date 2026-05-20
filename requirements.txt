@@ -18,3 +18,4 @@ tinydb==4.8.2
 toml==0.10.2
 waitress==3.0.2
 pynmea2==1.19.0
+smbus2
