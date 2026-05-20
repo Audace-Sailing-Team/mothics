@@ -243,7 +243,7 @@ class Track:
                  field_names: Optional[List[str]] = None,
                  mode: Optional[str] = 'live',
                  save_mode: Optional[str] = 'continuous',
-                 checkpoint_interval: Optional[int] = 120,
+                 checkpoint_interval: Optional[int] = 5, # 120,
                  max_checkpoint_files: Optional[int] = 3,
                  trim_fraction: Optional[float] = 0.5,
                  max_datapoints: Optional[int] = 1e5,
@@ -295,6 +295,9 @@ class Track:
         """Dictionary of available export methods"""
         self.preprocessors = []
         """List of available preprocessing function for incoming data"""
+        self.track_file = None
+        """Current JSON file object""" 
+
         # Internal attributes not exposed as parameters
         self._replay_index = 0
         self._last_checkpoint = None
@@ -428,122 +431,108 @@ class Track:
         # Remove the specified range
         del self.data_points[start:end]
         self.logger.info(f"cleared {num_to_remove} data points from index {start} to {end-1}; remaining: {len(self.data_points)}")
-                
-    def start_run(self):
-        """
-        Transition the Track to continuous saving mode.
 
-        If the current `save_mode` is 'on-demand', changes it to 'continuous'
-        and trims older data as needed. This indicates that new data points
-        will be saved periodically via checkpoints.
-        """
-        if self.save_mode == 'on-demand':
-            self.save_mode = 'continuous'
-            # Save index of first frame to be saved
-            self._save_interval_start = len(self.data_points) - 1
-            # Trim "useless" data points before first frame
-            if self._save_interval_start > 0:
-                self._remove_datapoints(fraction=self.trim_fraction)
-            self.logger.info('logging data')
-        elif self.save_mode == 'continuous':
-            self.logger.warning(f'cannot start track saving on demand; current saving mode is {self.save_mode}')
-        
-    def end_run(self):
-        """
-        Stop continuous saving and finalize the data set.
-
-        In 'on-demand' mode (the finalizing step), it saves a partial dataset
-        from `_save_interval_start` to the last data point, then cleans up
-        checkpoint files. This effectively ends a data collection session.
-        """
-        if self.save_mode != 'on-demand': # FLAWED current save status check
-            # Generate slice and save track
-            interval = slice(self._save_interval_start, len(self.data_points) - 1)
-            self.save(interval=interval)
-            # Cleanup checkpoint storage (except -full files)
-            chk_files_all= glob.glob(os.path.join(self.checkpoint_dir, "*.chk.json"))
-            chk_files = [f for f in chk_files_all if not re.search(r"-full\.chk\.json$", f)]
-            for f in chk_files:
-                os.remove(f)
-            # Clean up interval indices and reset mode
-            self._save_interval_start = None
-            self._last_checkpoint = None
-            self.save_mode = 'on-demand'
-            self.logger.info('data logging ended')
-        else:
-            self.logger.warning(f'cannot end track saving; current saving mode is {self.save_mode}')
+    def start_run(self, fname=None):
+        if self.track_file is not None:
+            self.logger.warning("track logging is already active")
+            return
+    
+        self.save_mode = 'continuous'
+        self._save_interval_start = len(self.data_points)
+    
+        if fname is None:
+            fname = f'{datetime.now().strftime("%Y%m%d-%H%M%S")}.json'
+    
+        file_path = os.path.join(self.output_dir, fname)
+    
+        self.track_file = open(file_path, 'w', encoding='utf-8')
+        self.track_file.write('[\n')
+        self.track_file.flush()
+    
+        self._last_checkpoint = datetime.now()
+    
+        self.logger.info(f'logging data to {file_path}')
     
     def _save_checkpoint(self, force=False, specifier=None):
-        """
-        Periodically save a checkpoint if in 'continuous' mode.
-
-        Args:
-            force (bool, optional): If True, force a checkpoint save regardless of 
-                the time since last checkpoint.
-            specifier (str, optional): An extra string appended to the filename 
-                for identification (e.g., '-full').
-        """
-        if self.save_mode == 'continuous' and self.checkpoint_interval is not None:
-            now = datetime.now()
-            # Save a checkpoint if above time threshold (or no points are available)
-            if self._last_checkpoint is None or (now - self._last_checkpoint).total_seconds() > self.checkpoint_interval or force:
-                self._last_checkpoint = now
-                interval = slice(self._save_interval_start, len(self.data_points) - 1)
-                fname=f'{now.strftime("%Y%m%d-%H%M%S")}.chk'
-                if specifier is not None:
-                    fname=f'{now.strftime("%Y%m%d-%H%M%S")+str(specifier)}.chk'
-                self.save(interval=interval, fname=fname, output_dir=self.checkpoint_dir)
-
-            # Remove older files from checkpoint directory
-            chk_files_all= glob.glob(os.path.join(self.checkpoint_dir, "*.chk.json"))
-            # Remove all checkpoints with the `-full` specifier
-            chk_files = [f for f in chk_files_all if not re.search(r"-full\.chk\.json$", f)]
-            chk_files.sort(key=os.path.getmtime)
-            
-            if len(chk_files) > self.max_checkpoint_files:
-                # Delete the oldest file
-                os.remove(chk_files[0])
-
+        if self.save_mode != 'continuous':
+            return
+    
+        if self.track_file is None:
+            return
+    
+        if self.checkpoint_interval is None and not force:
+            return
+    
+        now = datetime.now()
+    
+        if not force:
+            elapsed = (now - self._last_checkpoint).total_seconds()
+    
+            if elapsed < self.checkpoint_interval:
+                return
+    
+        interval = slice(self._save_interval_start, len(self.data_points))
+        data_points_to_write = self.data_points[interval]
+    
+        if not data_points_to_write:
+            return
+    
+        for dp in data_points_to_write:
+            if self.track_file.tell() > 2:
+                self.track_file.write(',\n')
+    
+            dumped = json.dumps(asdict(dp), default=str, indent=4)
+            self.track_file.write('    ' + dumped.replace('\n', '\n    '))
+    
+        self.track_file.flush()
+    
+        self._save_interval_start = interval.stop
+        self._last_checkpoint = now
+    
+    def end_run(self):
+        if self.track_file is None:
+            self.logger.warning("cannot end track saving; no active track file")
+            return
+    
+        self._save_checkpoint(force=True)
+    
+        self.track_file.write('\n]\n')
+        self.track_file.flush()
+        self.track_file.close()
+        self.track_file = None
+    
+        self._save_interval_start = None
+        self._last_checkpoint = None
+        self.save_mode = 'on-demand'
+    
+        self.logger.info('data logging ended')
+    
     def add_point(self, timestamp: datetime, data: Dict[str, Any]):
         """
         Add a new data point to the Track, respecting field consistency.
-        
-        If the number of datapoints exceeds the threshold
-        `self.max_datapoints`, all points are deleted from memory
-        after saving a special checkpoint (with a `-full` specifier in
-        the file name), a full track and raising a warning. This
-        allows the user to replay the two saved tracks one after the
-        other, without overlaps.
-
-        Args:
-            timestamp (datetime): The time the measurement was taken.
-            data (dict[str, Any]): Key-value pairs of measurements for this data point.
-
-        Raises:
-            ValueError: If `field_names` is set and `data` keys differ from the expected keys.
         """
-        # Validate or establish field consistency
-        # NOTE: if no field names are passed, no checks are performed
         if self.field_names is not None and set(self.field_names) != set(data.keys()):
-            raise ValueError(f"inconsistent fields. Expected {self.field_names}, got {list(data.keys())}")
-
-        # Handle track longer than maximum number of datapoints
+            raise ValueError(
+                f"inconsistent fields. Expected {self.field_names}, got {list(data.keys())}"
+            )
+    
         if len(self.data_points) > self.max_datapoints:
-            self.logger.warning("maximum number of datapoints reached; saving a checkpoint and wiping cache")
+            self.logger.warning(
+                "maximum number of datapoints reached; saving a checkpoint and wiping cache"
+            )
             self._save_checkpoint(force=True, specifier='-full')
-            # Fraction of points to trim
-            fraction = (len(self.data_points)-1)/len(self.data_points)
+    
+            fraction = (len(self.data_points) - 1) / len(self.data_points)
             self._remove_datapoints(fraction=fraction)
-
-        # Pre-process data before generating the datapoint
+    
         datapoint = DataPoint(timestamp, data)
+    
         for processor in self.preprocessors:
             datapoint = processor(datapoint)
-       
-        # Append the datapoint
+    
         self.data_points.append(datapoint)
-        # Run checkpointing
         self._save_checkpoint()
+
 
     def get_latest_data(self):
         """

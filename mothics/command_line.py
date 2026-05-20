@@ -1100,3 +1100,7 @@ class MothicsCLI(Cmd):
     def do_reboot(self, args):
         """Safely reboots the system with user confirmation."""
         self._reboot(confirm=True)
+
+    def do_save(self, args):
+        """Starts or ends current track saving. Work in progress!"""
+        print('WIP')
