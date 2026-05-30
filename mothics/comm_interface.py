@@ -41,8 +41,7 @@ from paho.mqtt import MQTTException
 from .helpers import setup_logger, tipify
 from .gpio_modules import MODULE_REGISTRY
 from .i2c_modules import *
-from adafruit_dps310.basic import DPS310
-from BNO08x import BNO08x
+import adafruit_bno055
 
 
 # Interface
@@ -91,10 +90,110 @@ class BaseInterface:
         """
         pass
 
+class SerialBaseInterface(BaseInterface):
 
-class SerialInterface(BaseInterface):
+    def __init__(self, port, baudrate=9600, topics=None, name=None):
+        """
+        Initialize the SerialInterface.
+
+        Args:
+            port (str): The system name/path of the serial port.
+            baudrate (int, optional): The baud rate for communication.
+                Defaults to 9600.
+            topics (list[str] or str, optional): A list (or single string) of
+                topics to which this interface will subscribe. Defaults to
+                ['rm1/gps/lat', 'rm1/gps/long'].
+            name (str, optional): Optional (but strongly recommended) nickname
+                for this interface.
+
+        Raises:
+            ValueError: If `topics` is given in an unrecognized format.
+        """
+        self.port = port
+        """System name of the serial port (e.g., '/dev/ttyUSB0')"""
+        self.baudrate = baudrate
+        """Baud rate for the serial communication"""
+        self.serial_conn = None
+        """Serial connection object"""
+        self.running = False
+        """Status of the listening thread"""
+        # Topics parsing
+        if topics is None:
+            # FLAWED: no address should be explicitly specified!
+            # NOTE: topic syntax is <module>/<sensor>/<quantity>
+            topics = ['rm1/gps/lat', 'rm1/gps/long']
+
+        elif isinstance(topics, str):
+            topics = [topics]
+        self.topics = topics
+        """Client topics to subscribe to"""
+        self.name = name
+        """Name for the interface instance"""
+        self.raw_data = {k: [] for k in self.topics}
+        """Dictionary of all raw data fetched from subscribed topics. Keys are topics, values are lists of {timestamp: quantity}"""
+        self.connected = False
+        """Connection status"""
+
+        # Setup logger
+        self.logger = logging.getLogger(f"Serial-Interface - {self.name}")
+        self.logger.info("-------------Serial Interface-------------")
+
+    def _loop_start(self):
+        """
+        Start a non-blocking background thread to continuously read the serial port.
+
+        The reading loop runs in a separate daemon thread, allowing the main thread
+        to continue execution. This loop processes incoming lines, attempts to parse
+        them as JSON objects, and routes them to `on_message_callback`.
+        """
+        if not self.running:
+            self.running = True
+            self.thread = threading.Thread(target=self._run_loop, daemon=True, name=f'serial communication interface - {self.name}')
+            self.thread.start()
+            self.logger.info("started non-blocking loop.")
+
+    def _loop_stop(self):
+        """
+        Stop the non-blocking background reading loop and wait for it to exit.
+        """
+        self.running = False
+        if self.thread and self.thread.is_alive():
+            self.thread.join()
+            self.logger.info("stopped loop.")
+
+    def on_message_callback(self, topic, data):
+        """
+        Handle incoming data for a particular topic.
+
+        This method appends a dict containing the current timestamp
+        and the received data to `raw_data[topic]`. If the topic did not
+        previously exist, a new entry is created.
+
+        Args:
+            topic (str): The topic under which data was received.
+            data (Any): The decoded data for that topic.
+        """
+        if topic not in self.topics:
+            self.raw_data[topic] = []
+        timestamp = datetime.now()
+        self.raw_data[topic].append({timestamp: data})
+
+    def connect(self):
+        pass
+
+    def disconnect(self):
+        pass
+
+    def _run_loop(self):
+        pass
+
+    def publish(self):
+        pass
+
+
+class JSONInterface(SerialBaseInterface):
     """
-    Interface class for communication via USB Serial.
+    Interface class for communication via generic Serial for JSON-formatted messages.
 
     This interface continuously reads data from a specified serial
     port in a non-blocking thread and updates a `raw_data` dictionary
@@ -170,30 +269,7 @@ class SerialInterface(BaseInterface):
         
         # Start loop (non-blocking)
         self._loop_start()
-    
-    def _loop_start(self):
-        """
-        Start a non-blocking background thread to continuously read the serial port.
 
-        The reading loop runs in a separate daemon thread, allowing the main thread
-        to continue execution. This loop processes incoming lines, attempts to parse
-        them as JSON objects, and routes them to `on_message_callback`.
-        """
-        if not self.running:
-            self.running = True
-            self.thread = threading.Thread(target=self._run_loop, daemon=True, name=f'serial communication interface - {self.name}')
-            self.thread.start()
-            self.logger.info("started non-blocking loop.")
-
-    def _loop_stop(self):
-        """
-        Stop the non-blocking background reading loop and wait for it to exit.
-        """
-        self.running = False
-        if self.thread and self.thread.is_alive():
-            self.thread.join()
-            self.logger.info("stopped loop.")
-            
     def _run_loop(self):
         """
         Blocking method that continually reads the serial connection.
@@ -228,23 +304,6 @@ class SerialInterface(BaseInterface):
                 self.logger.warning(f"error processing incoming data: {e} - raw: {line}")
                 continue
 
-    def on_message_callback(self, topic, data):
-        """
-        Handle incoming data for a particular topic.
-
-        This method appends a dict containing the current timestamp
-        and the received data to `raw_data[topic]`. If the topic did not
-        previously exist, a new entry is created.
-
-        Args:
-            topic (str): The topic under which data was received.
-            data (Any): The decoded data for that topic.
-        """
-        if topic not in self.topics:
-            self.raw_data[topic] = []
-        timestamp = datetime.now()
-        self.raw_data[topic].append({timestamp: data})
-                
     def disconnect(self):
         """
         Close the serial connection and stop the reading loop.
@@ -282,10 +341,9 @@ class SerialInterface(BaseInterface):
         self.logger.info(f"published to serial: {message}")
 
 
-class GPSInterface(SerialInterface):
+class GPSInterface(SerialBaseInterface):
     """
-    Interfaccia UART per GPS NMEA.
-    Eredita tutto da SerialInterface, cambia solo il run loop.
+    Serial Interface for NMEA GPS.
     """
 
     def _run_loop(self):
@@ -323,9 +381,9 @@ class GPSInterface(SerialInterface):
                     lon = msg.longitude
                     sats = msg.num_sats
 
-                    self.on_message_callback("gps/position/lat", lat)
-                    self.on_message_callback("gps/position/lon", lon)
-                    self.on_message_callback("gps/status/sats", sats)
+                    self.on_message_callback("rm2/gps/lat", lat)
+                    self.on_message_callback("rm2/gps/lon", lon)
+                    self.on_message_callback("rm2/gps/sats", sats)
 
                 # RMC → lat/lon + validità
                 elif msg.sentence_type == "RMC":
@@ -333,13 +391,133 @@ class GPSInterface(SerialInterface):
                     lon = msg.longitude
                     valid = msg.status
 
-                    self.on_message_callback("gps/position/lat", lat)
-                    self.on_message_callback("gps/position/lon", lon)
-                    self.on_message_callback("gps/status/valid", valid)
+                    self.on_message_callback("rm2/gps/lat", lat)
+                    self.on_message_callback("rm2/gps/lon", lon)
+                    self.on_message_callback("rm2/gps/valid", valid)
 
             except Exception as e:
                 self.logger.warning(f"error processing NMEA: {e} - raw: {line}")
                 continue
+
+    def connect(self):
+        """
+        Connect to the serial port and start the listener loop.
+
+
+
+        This method attempts to open a serial connection using the
+        configured port and baud rate. If successful, it sets
+        `connected=True` and starts a non-blocking thread to read
+        incoming data.
+
+        Raises:
+            RuntimeError: If the serial connection fails to open.
+        """
+        try:
+            self.serial_conn = serial.Serial(self.port, self.baudrate, timeout=1)
+            self.logger.info(f"connected to {self.port} at {self.baudrate} baud.")
+            self.connected = True
+        except serial.SerialException as e:
+            self.logger.critical(f"failed to connect to {self.port}: {e}")
+            raise RuntimeError(f"failed to connect to {self.port}: {e}")
+
+        # Start loop (non-blocking)
+        self._loop_start()
+
+    def disconnect(self):
+        """
+        Close the serial connection and stop the reading loop.
+
+        If the loop is still running, it is gracefully shut down first.
+        Then the serial connection is closed and `connected` is set to False.
+        """
+        # Stop loop
+        if self.running:
+            self._loop_stop()
+
+        # Close connection
+        if self.serial_conn and self.serial_conn.is_open:
+            self.serial_conn.close()
+            self.logger.info("serial connection closed.")
+        self.connected = False
+
+    def publish(self):
+        raise NotImplementedError("Not supported")
+
+
+class BNO055Interface(SerialBaseInterface):
+    """
+    Serial Interface for IMU BNO055 via UART.
+    """
+
+    def _run_loop(self):
+        """
+        Legge i dati dal BNO055 tramite connessione UART e invia topic/value
+        al Communicator tramite on_message_callback().
+        """
+        if not getattr(self, 'bno', None):
+            raise RuntimeError("BNO055 sensor is not initialized.")
+
+        while self.running:
+            try:
+                ax, ay, az = self.bno.acceleration
+                gx, gy, gz = self.bno.gyro
+                roll, pitch, yaw = self.bno.euler
+
+                # Controlliamo che almeno i dati minimi non siano None
+                if ax is not None and gx is not None and roll is not None:
+                    self.on_message_callback("rm1/imu/ax", ax)
+                    self.on_message_callback("rm1/imu/ay", ay)
+                    self.on_message_callback("rm1/imu/az", az)
+                    self.on_message_callback("rm1/imu/gx", gx)
+                    self.on_message_callback("rm1/imu/gy", gy)
+                    self.on_message_callback("rm1/imu/gz", gz)
+                    self.on_message_callback("rm1/imu/roll", roll)
+                    self.on_message_callback("rm1/imu/pitch", pitch)
+                    self.on_message_callback("rm1/imu/yaw", yaw)
+
+            except Exception as e:
+                if "error: 7" in str(e):
+                    self.logger.debug(f"error reading BNO055 data: {e}")
+                else:
+                    self.logger.warning(f"error reading BNO055 data: {e}")
+
+
+    def connect(self):
+        """
+        Connect to the serial port, initialize BNO055_UART, and start the listener loop.
+
+        Raises:
+            RuntimeError: If the serial connection or BNO055 initialization fails.
+        """
+        try:
+            self.serial_conn = serial.Serial(self.port, self.baudrate, timeout=1)
+            self.bno = adafruit_bno055.BNO055_UART(self.serial_conn)
+            self.logger.info(f"connected to BNO055 on {self.port} at {self.baudrate} baud.")
+            self.connected = True
+        except Exception as e:
+            self.logger.critical(f"failed to connect to BNO055 on {self.port}: {e}")
+            raise RuntimeError(f"failed to connect to BNO055 on {self.port}: {e}")
+
+        # Start loop (non-blocking)
+        self._loop_start()
+
+    def disconnect(self):
+        """
+        Close the serial connection and stop the reading loop.
+        """
+        # Stop loop
+        if self.running:
+            self._loop_stop()
+
+        # Close connection
+        if self.serial_conn and self.serial_conn.is_open:
+            self.serial_conn.close()
+            self.logger.info("serial connection closed.")
+        self.connected = False
+
+    def publish(self):
+        raise NotImplementedError("Not supported")
 
 
 class MQTTInterface(BaseInterface):
@@ -601,7 +779,7 @@ class GPIOInterface(BaseInterface):
 class I2CInterface(BaseInterface):
     """
     One I2CInterface = un modulo I2C (IMU, barometro, ecc.).
-    Wrappa una singola I2CModuleBase.
+    Wrappa una single I2CModuleBase.
     """
     def __init__(self, type, name=None, **kwargs):
         self.name = name or f"i2c-{type.lower()}"
@@ -666,7 +844,7 @@ class I2CInterface(BaseInterface):
         self.raw_data.setdefault(topic, []).append({ts: value})
 
 # Communicator
-available_interfaces = {'serial': SerialInterface, 'mqtt': MQTTInterface, 'gpio': GPIOInterface, 'gps': GPSInterface, 'i2c': I2CInterface}
+available_interfaces = {'serial': JSONInterface, 'mqtt': MQTTInterface, 'gpio': GPIOInterface, 'gps': GPSInterface, 'imu': BNO055Interface, 'i2c': I2CInterface}
 
 
 class Communicator:

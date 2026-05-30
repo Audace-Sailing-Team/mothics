@@ -2,49 +2,26 @@
 [gps]
     [gps.interface]
         name = "UART_GPS"
-        type = "UART_GPS"
         port = "/dev/ttyS0"
         baudrate = 9600
-        # Topics can be a single string or a comma‐separated list
-        topics = "rm2/wind/speed"
+
+[imu]
+    name = "BNO055"
+    port = "/dev/ttyAMA5"
+    baudrate = 115200
 
 # --- IMU BNO08x ---
-[[i2c]]
-    name = "bno08x"
-    type = "bno08x"
-    address = 0x4A
-    bus = 1
-    poll_interval = 0.05
-    topics = [
-        "rm3/imubno/accel_x", "rm3/imubno/accel_y", "rm3/imubno/accel_z",
-        "rm3/imubno/gyro_x",  "rm3/imubno/gyro_y",  "rm3/imubno/gyro_z",
-        "rm3/imubno/mag_x",   "rm3/imubno/mag_y",   "rm3/imubno/mag_z"
-    ]
-
-# # --- Barometro DPS310 ---
-[[i2c]]
-name = "dps310"
-type = "dps310"
-address = 0x77
-bus = 1
-poll_interval = 0.2
-topics = [
-    "rm3/env/pressure",
-    "rm3/env/temperature"
-]
-
-# # --- MPU6050 ---
-[[i2c]]
-name = "mpu6050"
-type = "mpu6050"
-address = 0x68
-bus = 1
-poll_interval = 0.05
-topics = [
-    "rm3/imu6/accel_x", "rm3/imu6/accel_y", "rm3/imu6/accel_z",
-    "rm3/imu6/gyro_x",  "rm3/imu6/gyro_y",  "rm3/imu6/gyro_z",
-    "rm3/imu6/temperature"
-]
+#[[i2c]]
+#    name = "bno055"
+#    type = "bno055"
+#    address = 0x29
+#    bus = 1
+#    poll_interval = 0.1
+#   topics = [
+#       "rm3/imubno/accel_x", "rm3/imubno/accel_y", "rm3/imubno/accel_z",
+#       "rm3/imubno/gyro_x",  "rm3/imubno/gyro_y",  "rm3/imubno/gyro_z",
+#       "rm3/imubno/mag_x",   "rm3/imubno/mag_y",   "rm3/imubno/mag_z"
+#   ]
 
 [mqtt]
     hostname = "test.mosquitto.org"
@@ -89,5 +66,11 @@ topics = [
     timeout_noncomm = 30
     # Remote unit names mapping
     rm_thesaurus = {rm1 = "GPS+IMU", rm2 = "Anemometer"}
+    # Data names mapping
+    data_thesaurus = {"rm1/imu/yaw" = 'Yaw', "rm1/imu/pitch" = 'Pitch', "rm1/imu/roll" = 'Roll', "rm2/gps/lat" = 'Latitude', "rm2/gps/long" = 'Longitude', "rm2/gps/altitude" = 'GPS altitude', "rm2/gps/sats" = 'Satellites', "rm2/gps/speed" = 'GPS speed', "rm2/gps/cog" = 'Course over ground', "rm2/gps/time" = 'GPS time', "rm2/gps/status" = 'GPS status', "rm1/imu/sample_rate" = 'IMU sampling rate', "rm2/gps/sample_rate" = 'GPS sampling rate', 'rm3/env/temp' = 'Box temperature', 'rm3/env/hum' = 'Box humidity'}
+    # Data to hide from cards
+    hidden_data_cards = ["rm2/gps/time", "rm1/imu/sample_rate", "rm2/gps/sample_rate"]
+    # Data to hide from plots
+    hidden_data_plots = ["rm2/gps/status", "rm2/gps/time"]
     # CDNs to download
-    cdns = ["https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css", "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js", "https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.js", "https://cdn.bokeh.org/bokeh/release/bokeh-widgets-3.6.2.min.js", "https://cdn.bokeh.org/bokeh/release/bokeh-tables-3.6.2.min.js"]
+    cdns = ["https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css", "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js", "https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.js", "https://cdn.bokeh.org/bokeh/release/bokeh-widgets-3.6.2.min.js", "https://cdn.bokeh.org/bokeh/release/bokeh-tables-3.6.2.min.js", "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js", "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css", "https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css", "https://cdn.jsdelivr.net/npm/@yaireo/tagify", "https://cdn.plot.ly/plotly-3.0.1.min.js", "https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css", "https://cdn.jsdelivr.net/npm/@yaireo/tagify"]

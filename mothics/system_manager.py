@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from .aggregator import Aggregator
-from .comm_interface import MQTTInterface, SerialInterface, GPIOInterface, Communicator, available_interfaces
+from .comm_interface import * #MQTTInterface, SerialInterface, GPIOInterface, Communicator, available_interfaces
 from .preprocessors import UnitConversion, AngleOffset, available_processors
 from .webapp import WebApp
 from .helpers import setup_logger, tipify, check_cdn_availability, download_cdn, check_internet_connectivity, download_tiles, list_required_tiles, get_device_platform, parse_uc_table
@@ -36,35 +36,18 @@ DEFAULT_CONFIG = {
     "gps": [
         {
             "name": "UART_GPS",
-            "type": "UART_GPS",
             "port": "/dev/ttyS0",
             "baudrate": 9600,
-            "topics": "rm2/wind/speed"
         },
     ],
 
-    "i2c": [
-        # --- IMU BNO08x ---
-        {
-            "name": "bno08x",
-            "type": "bno08x",
-            "address": 0x4A,
-            "bus": 1,
-            "poll_interval": 0.05,
-            "topics": [
-                "rm3/imubno/accel_x", "rm3/imubno/accel_y", "rm3/imubno/accel_z",
-                "rm3/imubno/gyro_x",  "rm3/imubno/gyro_y",  "rm3/imubno/gyro_z",
-                "rm3/imubno/mag_x",   "rm3/imubno/mag_y",   "rm3/imubno/mag_z"
-            ]
-        },
-    ],
 
     "mqtt": {
         "hostname": "test.mosquitto.org",
         "topics": ["rm1/gps/lat", "rm1/gps/long"]
     },
 #    "gpio": {
-#    },
+#    }
     "communicator": {
         "max_values": 1e3,
         "trim_fraction": 0.5
@@ -204,7 +187,7 @@ class SystemManager:
     def initialize_cdns(self):
         """ Initializes CDNs for webapp display """
         # Get CDN URLs from configuration
-        print(self.config["webapp"])
+        #print(self.config["webapp"])
         cdn_urls = self.config["webapp"]["cdns"]
         
         if not cdn_urls:
@@ -400,7 +383,7 @@ class SystemManager:
         # Initialize angle offsetter regardless
         if AngleOffset not in preprocessors.keys():
             preprocessors[AngleOffset] = {"name": "default"}
-        
+
         # Initialize Communicator
         try:
             self.communicator = Communicator(interfaces=interfaces,

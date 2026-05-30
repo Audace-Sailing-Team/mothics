@@ -7,13 +7,14 @@ import busio
 from smbus2 import SMBus
 
 from adafruit_dps310.basic import DPS310
-from BNO08x import BNO08x
+import adafruit_bno055
+
 
 from .comm_interface import *
 
 class I2CModuleBase:
     """Base class for I2C-attached devices."""
-    def __init__(self, name, topic_root, address, bus=1, poll_interval=0.1):
+    def __init__(self, name=None, topic_root=None, address=None, bus=1, poll_interval=0.1):
         self.name = name
         self.topic_root = topic_root.rstrip("/")
         self.address = address
@@ -53,10 +54,8 @@ class MPU6050Module(I2CModuleBase):
     Usa SMBus e lettura raw come nei test originali.
     """
     def __init__(self, name="mpu6050", topic_root="imu/mpu6050",
-                 address=0x68, bus=1, topics=None, poll_interval=0.05):
+                 address=0x68, bus=1, poll_interval=0.05):
         super().__init__(name, topic_root, address, bus, poll_interval)
-
-        self.topics = topics
 
         # Mappa topic finale → valore
         self.field_map = {
@@ -124,158 +123,57 @@ class MPU6050Module(I2CModuleBase):
             return {}
 
 
-
 # ---------------------------------------------------------
-#   DPS310
+#   BNO055
 # ---------------------------------------------------------
 
-class DPS310Module(I2CModuleBase):
-    """
-    Modulo per sensore barometrico DPS310.
-    Usa la libreria Adafruit come nei test originali.
-    """
-    def __init__(self, name="dps310", topic_root="env/dps310",
-                 address=0x77, bus=1, poll_interval=0.2, topics=None):
+class AdafruitBNO055Module(I2CModuleBase):
+    """Modulo per sensore Adafruit BNO055."""
+    def __init__(self, name="bno055", topic_root="rm1/IMU", address=0x29, bus=1, poll_interval=0.1, pins=None):
         super().__init__(name, topic_root, address, bus, poll_interval)
-        self.i2c = None
-        self.sensor = None
-        self.topics = topics
-
-        self.field_map = {
-            "pressure": "pressure",
-            "temperature": "temperature"
-        }
-
-    def setup(self):
-        super().setup()
-        try:
-            # Adafruit DPS310 usa busio.I2C, non SMBus
-            self.i2c = busio.I2C(board.SCL, board.SDA)
-            self.sensor = DPS310(self.i2c)
-            self.logger.info(f"{self.name}: DPS310 inizializzato")
-        except Exception as e:
-            self.logger.error(f"{self.name}: setup error → {e}")
-
-    def read(self):
-        try:
-            pressure = self.sensor.pressure
-            temp = self.sensor.temperature
-
-            values = {
-                "pressure": pressure,
-                "temperature": temp
-            }
-
-            out = {}
-
-            for full_topic in self.topics:
-                key = full_topic.split("/")[-1]
-                if key not in self.field_map:
-                    continue
-
-                out[full_topic] = values[self.field_map[key]]
-
-            return out
-
-        except Exception as e:
-            self.logger.warning(f"{self.name}: read error → {e}")
-            return {}
-
-
-
-
-# ---------------------------------------------------------
-#   BNO08x (driver C++ via pybind11)
-# ---------------------------------------------------------
-
-class BNO08xModule(I2CModuleBase):
-    """
-    Modulo per IMU BNO08x usando driver C++ via pybind11.
-    Usa readBlock() per ottenere tutti i dati in un'unica chiamata.
-    """
-    def __init__(self, name="bno08x", topic_root="imu/bno08x",
-                 address=0x4A, bus=1, poll_interval=0.02, topics=None,
-                 period_us=10000):
-        # NON apriamo SMBus → ma manteniamo i parametri base
-        super().__init__(name, topic_root, address, bus, poll_interval)
+        if pins is None:
+            pins = (board.D5, board.D6)
+        self.pins = pins
         self.bno = None
-        self.period_us = period_us
-        # Se topics è una lista di topic COMPLETI → usali così come sono
-        self.topics = topics  # lista completa, es: rm3/imu/accel_x
-
-        # Mappa topic finale → attributo del blocco
-        self.field_map = {
-            "accel_x": "ax", "accel_y": "ay", "accel_z": "az",
-            "gyro_x": "gx", "gyro_y": "gy", "gyro_z": "gz",
-            "mag_x": "mx", "mag_y": "my", "mag_z": "mz",
-            "quat_w": "qw", "quat_x": "qx", "quat_y": "qy", "quat_z": "qz",
-            "linacc_x": "lax", "linacc_y": "lay", "linacc_z": "laz",
-            "grav_x": "gvx", "grav_y": "gvy", "grav_z": "gvz",
-            "girot_w": "giw", "girot_x": "gix", "girot_y": "giy", "girot_z": "giz"
-        }
 
     def setup(self):
-        # NON chiamare super().setup() → evita apertura SMBus
         try:
-            # Il driver apre direttamente /dev/i2c-X
-            self.bno = BNO08x(f"/dev/i2c-{self.bus_num}", self.address)
-            self.bno.begin()
-
-            # Abilita i sensori necessari
-            self.bno.enableAccelerometer(self.period_us)
-            self.bno.enableGyroscope(self.period_us)
-            self.bno.enableMagnetometer(self.period_us)
-            self.bno.enableRotationVector(self.period_us)
-            self.bno.enableLinearAcceleration(self.period_us)
-            self.bno.enableGravity(self.period_us)
-            self.bno.enableGameRotationVector(self.period_us)
-            self.bno.enableGyroIntegratedRotation(self.period_us)
-
-            # Warm-up
-            for _ in range(10):
-                self.bno.poll()
-                time.sleep(0.005)
-
-            self.logger.info(f"{self.name}: BNO08x inizializzato")
-
+            self.bus = busio.I2C(*self.pins)
+            self.bno = adafruit_bno055.BNO055_I2C(self.bus, address=self.address)
+            self.logger.info(f"{self.name}: BNO055 initialized on I2C address {hex(self.address)}")
         except Exception as e:
-            self.logger.error(f"{self.name}: setup error → {e}")
+            self.logger.critical(f"{self.name}: error initializing BNO055 - {e}")
+            raise
 
-    def read(self):
+    def read(self) -> dict:
         try:
-            self.bno.poll()
-            blk = self.bno.readBlock()
-            if blk is None:
-                return {}
-
-            out = {}
-
-            for full_topic in self.topics:
-                # es: rm3/imu/accel_x → accel_x
-                key = full_topic.split("/")[-1]
-
-                if key not in self.field_map:
-                    continue
-
-                attr = self.field_map[key]
-                value = getattr(blk, attr, None)
-
-                if value is not None:
-                    out[full_topic] = value
-
-            return out
-
+            ax, ay, az = self.bno.acceleration
+            gx, gy, gz = self.bno.gyro
+            roll, pitch, yaw = self.bno.euler
         except Exception as e:
-            self.logger.warning(f"{self.name}: read error → {e}")
+            self.logger.warning(f"{self.name}: read error: {e}")
             return {}
 
+        # The sensor can return None if data isn't ready
+        if ax is None or gx is None or roll is None:
+            return {}
+
+        out = {
+            f"{self.topic_root}/ax": ax, f"{self.topic_root}/ay": ay, f"{self.topic_root}/az": az,
+            f"{self.topic_root}/gx": gx, f"{self.topic_root}/gy": gy, f"{self.topic_root}/gz": gz,
+            f"{self.topic_root}/roll" : roll, f"{self.topic_root}/pitch" : pitch, f"{self.topic_root}/yaw" : yaw
+        }
+
+        return out
 
     def cleanup(self):
-        # Il driver non richiede chiusura esplicita
-        pass
+        if self.bus:
+            self.bus.deinit()
+            self.logger.info(f"{self.name}: closed I2C bus")
+
+
 
 i2c_module_registry = {
     "mpu6050": MPU6050Module,
-    "dps310": DPS310Module,
-    "bno08x": BNO08xModule
+    "bno055": AdafruitBNO055Module
 }
