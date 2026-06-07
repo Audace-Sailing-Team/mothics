@@ -23,6 +23,14 @@
 #       "rm3/imubno/mag_x",   "rm3/imubno/mag_y",   "rm3/imubno/mag_z"
 #   ]
 
+[[gpio]]
+	"type" = "dht22"
+	"name" = "Temperature_and_humidity_sensor"
+	"pin" = 6
+	"topic_root" = "rm3/env/" #????????????????????????????????????
+	"poll_interval" = 5.0
+
+
 [mqtt]
     hostname = "test.mosquitto.org"
     topics = ["rm1/gps/lat", "rm1/gps/long"]
