@@ -41,11 +41,6 @@ DEFAULT_CONFIG = {
         },
     ],
 
-
-    "mqtt": {
-        "hostname": "test.mosquitto.org",
-        "topics": ["rm1/gps/lat", "rm1/gps/long"]
-    },
 #    "gpio": {
 #    }
     "communicator": {
