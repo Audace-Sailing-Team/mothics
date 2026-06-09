@@ -8,6 +8,8 @@ from smbus2 import SMBus
 
 from adafruit_dps310.basic import DPS310
 import adafruit_bno055
+import adafruit_ads1x15.ads1115 as ADS
+from adafruit_ads1x15.analog_in import AnalogIn
 
 
 from .comm_interface import *
@@ -79,7 +81,7 @@ class MPU6050Module(I2CModuleBase):
             whoami = self.bus.read_byte_data(self.address, 0x75)
             self.logger.info(f"{self.name}: WHO_AM_I = {hex(whoami)}")
         except Exception as e:
-            self.logger.error(f"{self.name}: setup error → {e}")
+            self.logger.error(f"{self.name}: setup error: {e}")
 
     def read(self):
         try:
@@ -119,7 +121,7 @@ class MPU6050Module(I2CModuleBase):
             return out
 
         except Exception as e:
-            self.logger.warning(f"{self.name}: read error → {e}")
+            self.logger.warning(f"{self.name}: read error: {e}")
             return {}
 
 
@@ -171,9 +173,97 @@ class AdafruitBNO055Module(I2CModuleBase):
             self.bus.deinit()
             self.logger.info(f"{self.name}: closed I2C bus")
 
+class ADS1115Module(I2CModuleBase):
+    """
+    Modulo per convertitore ADC ADS1115 a 4 canali.
+    Legge la tensione su canali analogici 0 e 1.
+    Usa adafruit-circuitpython-ads1x15.
+    """
 
+    def __init__(self, name="ads1115", topic_root="adc/ads1115",
+                 address=0x48, bus=1, poll_interval=0.1, topics=None):
+        super().__init__(name, topic_root, address, bus, poll_interval)
+        self.i2c = None
+        self.ads = None
+        self.channels = {}
+        self.topics = topics or []
+
+        # Mappa topic finale → numero canale
+        self.field_map = {
+            "ch0": 0,
+            "ch1": 1,
+            "ch2": 2,
+            "ch3": 3,
+        }
+
+    def setup(self):
+        self.initialized = False
+        self.initialization_error = None
+        try:
+            # Inizializza I2C via busio
+            self.i2c = busio.I2C(board.SCL, board.SDA)
+
+            # Inizializza ADS1115
+            self.ads = ADS.ADS1115(self.i2c, address=self.address)
+
+            # Crea i canali analogici (usando numeri 0-3)
+            self.channels = {
+                0: AnalogIn(self.ads, 0),
+                1: AnalogIn(self.ads, 1),
+                2: AnalogIn(self.ads, 2),
+                3: AnalogIn(self.ads, 3),
+            }
+
+            self.logger.info(f"{self.name}: ADS1115 inizializzato su indirizzo {hex(self.address)}")
+            self.initialized = True
+        except Exception as e:
+            self.initialized = False
+            self.initialization_error = str(e)
+            self.logger.error(f"{self.name}: setup error: {e}")
+            raise
+
+    def read(self):
+        try:
+            values = {}
+
+            # Leggi tutti i canali disponibili
+            for ch_num in self.channels:
+                try:
+                    values[f"ch{ch_num}"] = self.channels[ch_num].voltage * 2
+                except Exception as e:
+                    self.logger.warning(f"{self.name}: error reading ch{ch_num}: {e}")
+
+            out = {}
+
+            # Mappa ai topic richiesti
+            if self.topics:
+                for full_topic in self.topics:
+                    key = full_topic.split("/")[-1]  # es: "ch0"
+
+                    if key not in self.field_map:
+                        continue
+
+                    ch_num = self.field_map[key]
+
+                    if f"ch{ch_num}" in values:
+                        out[full_topic] = round(values[f"ch{ch_num}"], 4)  # 4 decimali
+
+            return out
+
+        except Exception as e:
+            self.logger.warning(f"{self.name}: read error: {e}")
+            return {}
+
+    def cleanup(self):
+        if self.i2c:
+            try:
+                self.i2c.deinit()
+                self.logger.info(f"{self.name}: I2C chiuso")
+            except Exception as e:
+                self.logger.warning(f"{self.name}: error closing I2C: {e}")
 
 i2c_module_registry = {
     "mpu6050": MPU6050Module,
-    "bno055": AdafruitBNO055Module
+    "bno055": AdafruitBNO055Module,
+    "ads1115": ADS1115Module
 }

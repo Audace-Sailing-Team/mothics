@@ -462,7 +462,7 @@ class BNO055Interface(SerialBaseInterface):
             try:
                 ax, ay, az = self.bno.acceleration
                 gx, gy, gz = self.bno.gyro
-                roll, pitch, yaw = self.bno.euler
+                yaw, pitch, roll = self.bno.euler
 
                 # Controlliamo che almeno i dati minimi non siano None
                 if ax is not None and gx is not None and roll is not None:

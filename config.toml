@@ -10,6 +10,15 @@
     port = "/dev/ttyAMA5"
     baudrate = 115200
 
+[[i2c]]
+    name = "ads1115"
+    type = "ads1115"
+    address = 0x48
+    bus = 1
+    poll_interval = 0.1
+    topics = [ "rm5/adc/ch0", "rm5/adc/ch1",]
+
+
 [[gpio]]
 	"type" = "dht22"
 	"name" = "Temperature_and_humidity_sensor"
@@ -57,7 +66,7 @@
     # Remote unit names mapping
     rm_thesaurus = {rm1 = "GPS+IMU", rm2 = "Anemometer"}
     # Data names mapping
-    data_thesaurus = {"rm1/imu/yaw" = 'Yaw', "rm1/imu/pitch" = 'Pitch', "rm1/imu/roll" = 'Roll', "rm2/gps/lat" = 'Latitude', "rm2/gps/lon" = 'Longitude', "rm2/gps/altitude" = 'GPS altitude', "rm2/gps/sats" = 'Satellites', "rm2/gps/speed" = 'GPS speed', "rm2/gps/cog" = 'Course over ground', "rm2/gps/time" = 'GPS time', "rm2/gps/status" = 'GPS status', "rm1/imu/sample_rate" = 'IMU sampling rate', "rm2/gps/sample_rate" = 'GPS sampling rate', 'rm3/env/temp' = 'Box temperature', 'rm3/env/hum' = 'Box humidity'}
+    data_thesaurus = {"rm5/adc/ch0" = 'Battery voltage', "rm1/imu/yaw" = 'Yaw', "rm1/imu/pitch" = 'Pitch', "rm1/imu/roll" = 'Roll', "rm2/gps/lat" = 'Latitude', "rm2/gps/lon" = 'Longitude', "rm2/gps/altitude" = 'GPS altitude', "rm2/gps/sats" = 'Satellites', "rm2/gps/speed" = 'GPS speed', "rm2/gps/cog" = 'Course over ground', "rm2/gps/time" = 'GPS time', "rm2/gps/status" = 'GPS status', "rm1/imu/sample_rate" = 'IMU sampling rate', "rm2/gps/sample_rate" = 'GPS sampling rate', 'rm3/env/temp' = 'Box temperature', 'rm3/env/hum' = 'Box humidity'}
     # Data to hide from cards
     hidden_data_cards = ["rm2/gps/time", "rm1/imu/sample_rate", "rm2/gps/sample_rate"]
     # Data to hide from plots
