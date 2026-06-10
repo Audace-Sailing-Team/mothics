@@ -121,8 +121,7 @@ class SerialBaseInterface(BaseInterface):
         if topics is None:
             # FLAWED: no address should be explicitly specified!
             # NOTE: topic syntax is <module>/<sensor>/<quantity>
-            topics = ['rm1/gps/lat', 'rm1/gps/long']
-
+            topics = [] #'rm1/gps/lat', 'rm1/gps/long']
         elif isinstance(topics, str):
             topics = [topics]
         self.topics = topics
