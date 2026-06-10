@@ -21,3 +21,4 @@ pynmea2==1.19.0
 smbus2
 Adafruit-Blinka
 adafruit-circuitpython-bno055
+Adafruit-ADS1x15
